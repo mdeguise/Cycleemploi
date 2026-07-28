@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Secrets — never commit real values, see .env.example
+.env
+
+# .NET backend build artifacts
+backend/Api/bin/
+backend/Api/obj/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

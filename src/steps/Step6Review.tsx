@@ -3,19 +3,33 @@ import { useWizard } from '../context/WizardContext';
 import { StepFooter } from '../components/StepFooter';
 import { SubmissionModal } from '../components/SubmissionModal';
 import { CheckCircleIcon, UserIcon, BriefcaseIcon, LockIcon, LaptopIcon, AppsIcon } from '../components/icons';
-import { SYSTEMES_ACCES, EQUIPEMENTS, APPLICATIONS, EMPLOYEE_DIRECTORY, REGLE_DE_PAYE_AUTRE } from '../data/catalogs';
+import { REGLE_DE_PAYE_AUTRE, ACCES_BADGE } from '../data/catalogs';
 import { formatDateFr } from '../utils/formatDate';
 
 export function Step6Review() {
-  const { request, goToStep } = useWizard();
+  const { request, goToStep, submitRequest } = useWizard();
   const { employee: e, access: a, equipment: eq, applications: apps } = request;
-  const selected = EMPLOYEE_DIRECTORY.find((emp) => emp.id === e.employeeId) ?? null;
+  const selected = e.employee;
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const nameFor = (catalog: { id: string; nom: string }[], id: string) => catalog.find((c) => c.id === id)?.nom ?? id;
+  // Catalog values are stored as their own display text (see backend/Api/Controllers/
+  // RequestsController.cs's multi-select junction tables) — no id-to-name lookup needed anymore,
+  // the stored value IS the display name.
+  const nameFor = (value: string) => value;
 
-  const handleSubmit = () => {
-    setShowConfirmation(true);
+  const handleSubmit = async () => {
+    setSubmitError(null);
+    setIsSubmitting(true);
+    try {
+      await submitRequest();
+      setShowConfirmation(true);
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'La soumission a échoué. Veuillez réessayer.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -116,9 +130,9 @@ export function Step6Review() {
             <div className="review-item__label">Systèmes et accès</div>
             <div className="review-tag-list">
               {a.systemes.length ? (
-                a.systemes.map((id) => (
-                  <span key={id} className="review-tag">
-                    {nameFor(SYSTEMES_ACCES, id)}
+                a.systemes.map((value) => (
+                  <span key={value} className="review-tag">
+                    {nameFor(value)}
                   </span>
                 ))
               ) : (
@@ -126,7 +140,7 @@ export function Step6Review() {
               )}
             </div>
           </div>
-          {a.systemes.includes('badge') && (
+          {a.systemes.includes(ACCES_BADGE) && (
             <div>
               <div className="review-item__label">Zones ou édifices requis</div>
               <div className="review-item__value">{a.badgeZones || '—'}</div>
@@ -165,9 +179,9 @@ export function Step6Review() {
         <div className="review-section__body">
           <div className="review-tag-list">
             {eq.equipements.length ? (
-              eq.equipements.map((id) => (
-                <span key={id} className="review-tag">
-                  {nameFor(EQUIPEMENTS, id)}
+              eq.equipements.map((value) => (
+                <span key={value} className="review-tag">
+                  {nameFor(value)}
                 </span>
               ))
             ) : (
@@ -191,9 +205,9 @@ export function Step6Review() {
             <div className="review-item__label">Applications sélectionnées</div>
             <div className="review-tag-list">
               {apps.applications.length ? (
-                apps.applications.map((id) => (
-                  <span key={id} className="review-tag">
-                    {nameFor(APPLICATIONS, id)}
+                apps.applications.map((value) => (
+                  <span key={value} className="review-tag">
+                    {nameFor(value)}
                   </span>
                 ))
               ) : (
@@ -208,7 +222,13 @@ export function Step6Review() {
         </div>
       </div>
 
-      <StepFooter onSubmit={handleSubmit} />
+      {submitError && (
+        <div className="required-note" style={{ color: 'var(--tremblant-red-dark)' }}>
+          {submitError}
+        </div>
+      )}
+
+      <StepFooter onSubmit={handleSubmit} submitDisabled={isSubmitting} />
       <SubmissionModal open={showConfirmation} onClose={() => setShowConfirmation(false)} />
     </div>
   );

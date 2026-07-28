@@ -2,11 +2,10 @@ import { useWizard } from '../context/WizardContext';
 import { Field } from '../components/FormField';
 import { StepFooter } from '../components/StepFooter';
 import { BriefcaseIcon, InfoIcon } from '../components/icons';
-import { EMPLOYEE_DIRECTORY } from '../data/catalogs';
 
 export function Step2Position() {
   const { request } = useWizard();
-  const selected = EMPLOYEE_DIRECTORY.find((emp) => emp.id === request.employee.employeeId) ?? null;
+  const selected = request.employee.employee;
 
   return (
     <div className="step-panel">

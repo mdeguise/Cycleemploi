@@ -1,6 +1,8 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createEmptyRequest, TYPE_DEMANDE_TERMINAISON, type OnboardingRequest, type TypeDemande } from '../types';
 import { REGLE_DE_PAYE_AUTRE } from '../data/catalogs';
+import { useApi } from '../api/ApiContext';
+import type { RequestTypeApi, UpdateRequestDto } from '../api/types';
 
 export interface StepDescriptor {
   key: string;
@@ -29,20 +31,85 @@ function stepsFor(typeDemande: TypeDemande): StepDescriptor[] {
   return typeDemande === TYPE_DEMANDE_TERMINAISON ? OFFBOARDING_STEPS : ONBOARDING_STEPS;
 }
 
+function toRequestTypeApi(typeDemande: TypeDemande): RequestTypeApi {
+  if (typeDemande === TYPE_DEMANDE_TERMINAISON) return 'Offboarding';
+  if (typeDemande === 'Réactivation') return 'Reactivation';
+  return 'Onboarding';
+}
+
+/** Maps local wizard state to the shape PUT /api/requests/{id} expects. Pure function, no
+ * side effects — kept next to the context that's the only caller for now, move to src/api if a
+ * second caller ever needs it. */
+function toUpdateDto(request: OnboardingRequest): UpdateRequestDto {
+  const isOffboarding = request.typeDemande === TYPE_DEMANDE_TERMINAISON;
+  return {
+    employees: isOffboarding
+      ? request.offboarding.employees.map((e) => ({
+          workdayEmployeeId: e.workdayEmployeeId,
+          nameSnapshot: `${e.prenom} ${e.nom}`,
+          positionSnapshot: e.poste,
+          departementSnapshot: e.departement,
+          codeEmploiSnapshot: e.codeEmploi,
+          typeEmploiSnapshot: e.typeEmploi,
+          gestionnaireSnapshot: e.gestionnaire,
+        }))
+      : request.employee.employee
+        ? [
+            {
+              workdayEmployeeId: request.employee.employee.workdayEmployeeId,
+              nameSnapshot: `${request.employee.employee.prenom} ${request.employee.employee.nom}`,
+              positionSnapshot: request.employee.employee.poste,
+              departementSnapshot: request.employee.employee.departement,
+              codeEmploiSnapshot: request.employee.employee.codeEmploi,
+              typeEmploiSnapshot: request.employee.employee.typeEmploi,
+              gestionnaireSnapshot: request.employee.employee.gestionnaire,
+            },
+          ]
+        : [],
+    dateEntreePrevue: request.employee.dateEntreePrevue || null,
+    regleDePaye: request.employee.regleDePaye || null,
+    regleDePayeCommentaire: request.employee.regleDePayeCommentaire || null,
+    systemesAcces: request.access.systemes,
+    badgeZones: request.access.badgeZones || null,
+    systemePosHebergement: request.access.posHebergement,
+    stationnementRequis: request.access.stationnement || null,
+    justificationAcces: request.access.justification || null,
+    equipements: request.equipment.equipements,
+    notesEquipement: request.equipment.notes || null,
+    applications: request.applications.applications,
+    autreLogicielRequis: request.applications.autreLogiciel || null,
+    derniereJournee: request.offboarding.derniereJournee || null,
+    indemniteVacances: request.offboarding.indemniteVacances || null,
+    raisonArret: request.offboarding.raisonArret || null,
+    detailsRaison: request.offboarding.detailsRaison || null,
+    reembaucheriez: request.offboarding.reembaucheriez || null,
+    commentairesIT: request.offboarding.commentairesIT || null,
+    commentairesParkingAcces: request.offboarding.commentairesParkingAcces || null,
+    commentairesRedingote: request.offboarding.commentairesRedingote || null,
+    commentairesRH: request.offboarding.commentairesRH || null,
+  };
+}
+
 interface WizardContextValue {
   request: OnboardingRequest;
   setRequest: React.Dispatch<React.SetStateAction<OnboardingRequest>>;
   currentStep: number;
   setCurrentStep: (step: number) => void;
   furthestStep: number;
-  goNext: () => void;
+  goNext: () => Promise<void>;
   goBack: () => void;
   goToStep: (step: number) => void;
   isStepValid: (step: number) => boolean;
   progressLabel: string;
   steps: StepDescriptor[];
   stepCount: number;
-  setTypeDemande: (typeDemande: TypeDemande) => void;
+  setTypeDemande: (typeDemande: TypeDemande) => Promise<void>;
+  /** Persists current local state to the server — called on every step navigation (a natural
+   * checkpoint) and by the "Enregistrer le brouillon" button. No-ops until a request exists
+   * (i.e. before a type is selected). */
+  syncToServer: () => Promise<void>;
+  isSyncing: boolean;
+  submitRequest: () => Promise<void>;
 }
 
 const WizardContext = createContext<WizardContextValue | undefined>(undefined);
@@ -51,7 +118,7 @@ function validateStep(step: number, request: OnboardingRequest): boolean {
   if (request.typeDemande === TYPE_DEMANDE_TERMINAISON) {
     switch (step) {
       case 0:
-        return Boolean(request.typeDemande && request.offboarding.employeeIds.length > 0);
+        return Boolean(request.typeDemande && request.offboarding.employees.length > 0);
       case 1: {
         const o = request.offboarding;
         return Boolean(o.derniereJournee && o.indemniteVacances && o.raisonArret && o.detailsRaison && o.reembaucheriez);
@@ -66,17 +133,21 @@ function validateStep(step: number, request: OnboardingRequest): boolean {
       const e = request.employee;
       const regleValid =
         e.regleDePaye && (e.regleDePaye !== REGLE_DE_PAYE_AUTRE || Boolean(e.regleDePayeCommentaire));
-      return Boolean(request.typeDemande && e.employeeId && e.dateEntreePrevue && regleValid);
+      return Boolean(request.typeDemande && e.employee && e.dateEntreePrevue && regleValid);
     }
     default:
       return true;
   }
 }
 
-export function WizardProvider({ children }: { children: ReactNode }) {
-  const [request, setRequest] = useState<OnboardingRequest>(createEmptyRequest);
+export function WizardProvider({ children, demandePar }: { children: ReactNode; demandePar: string }) {
+  const api = useApi();
+  const [request, setRequest] = useState<OnboardingRequest>(() => createEmptyRequest(demandePar));
   const [currentStep, setCurrentStep] = useState(0);
   const [furthestStep, setFurthestStep] = useState(0);
+  const [isSyncing, setIsSyncing] = useState(false);
+  // Guards against a stale in-flight create() firing twice if the user double-clicks a type card.
+  const creatingRef = useRef(false);
 
   const steps = useMemo(() => stepsFor(request.typeDemande), [request.typeDemande]);
   const stepCount = steps.length;
@@ -87,16 +158,54 @@ export function WizardProvider({ children }: { children: ReactNode }) {
     setFurthestStep((f) => Math.max(f, clamped));
   };
 
-  const goNext = () => goToStep(currentStep + 1);
+  const syncToServer = async () => {
+    if (!request.requestId) return;
+    setIsSyncing(true);
+    try {
+      await api.requests.update(request.requestId, toUpdateDto(request));
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const goNext = async () => {
+    await syncToServer();
+    goToStep(currentStep + 1);
+  };
   const goBack = () => goToStep(currentStep - 1);
 
   const isStepValid = (step: number) => validateStep(step, request);
 
   const progressLabel = useMemo(() => `${currentStep + 1} / ${stepCount} étapes`, [currentStep, stepCount]);
 
-  const setTypeDemande = (typeDemande: TypeDemande) => {
-    setRequest((prev) => ({ ...prev, typeDemande }));
+  const setTypeDemande = async (typeDemande: TypeDemande) => {
     setFurthestStep(currentStep);
+
+    if (!request.requestId && typeDemande && !creatingRef.current) {
+      creatingRef.current = true;
+      try {
+        const created = await api.requests.create({ requestType: toRequestTypeApi(typeDemande) });
+        setRequest((prev) => ({
+          ...prev,
+          typeDemande,
+          requestId: created.requestId,
+          demandeNumero: created.requestNumber,
+          dateCreation: created.createdAt.slice(0, 10),
+        }));
+      } finally {
+        creatingRef.current = false;
+      }
+      return;
+    }
+
+    setRequest((prev) => ({ ...prev, typeDemande }));
+  };
+
+  const submitRequest = async () => {
+    if (!request.requestId) throw new Error('No request to submit — this should be unreachable.');
+    await syncToServer();
+    await api.requests.submit(request.requestId);
+    setRequest((prev) => ({ ...prev, statut: 'Soumise' }));
   };
 
   const value: WizardContextValue = {
@@ -113,6 +222,9 @@ export function WizardProvider({ children }: { children: ReactNode }) {
     steps,
     stepCount,
     setTypeDemande,
+    syncToServer,
+    isSyncing,
+    submitRequest,
   };
 
   return <WizardContext.Provider value={value}>{children}</WizardContext.Provider>;

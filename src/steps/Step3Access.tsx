@@ -3,7 +3,7 @@ import { Field, SectionTitle } from '../components/FormField';
 import { StepFooter } from '../components/StepFooter';
 import { ChoiceCard } from '../components/ChoiceCard';
 import { LockIcon } from '../components/icons';
-import { SYSTEMES_ACCES, POS_HEBERGEMENT_SYSTEMES } from '../data/catalogs';
+import { SYSTEMES_ACCES, POS_HEBERGEMENT_SYSTEMES, ACCES_BADGE } from '../data/catalogs';
 
 export function Step3Access() {
   const { request, setRequest } = useWizard();
@@ -54,16 +54,16 @@ export function Step3Access() {
       <div className="choice-list">
         {SYSTEMES_ACCES.map((sys) => (
           <ChoiceCard
-            key={sys.id}
+            key={sys.nom}
             title={sys.nom}
             description={sys.description}
-            selected={a.systemes.includes(sys.id)}
-            onToggle={() => toggleSysteme(sys.id)}
+            selected={a.systemes.includes(sys.nom)}
+            onToggle={() => toggleSysteme(sys.nom)}
           />
         ))}
       </div>
 
-      {a.systemes.includes('badge') && (
+      {a.systemes.includes(ACCES_BADGE) && (
         <Field label="Zones ou édifices requis">
           <input
             type="text"

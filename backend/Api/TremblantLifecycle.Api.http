@@ -1,0 +1,6 @@
+@TremblantLifecycle.Api_HostAddress = http://localhost:5211
+
+GET {{TremblantLifecycle.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

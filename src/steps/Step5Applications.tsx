@@ -37,11 +37,11 @@ export function Step5Applications() {
       <div className="choice-list">
         {APPLICATIONS.map((app) => (
           <ChoiceCard
-            key={app.id}
+            key={app.nom}
             title={app.nom}
             description={app.editeur}
-            selected={apps.applications.includes(app.id)}
-            onToggle={() => toggle(app.id)}
+            selected={apps.applications.includes(app.nom)}
+            onToggle={() => toggle(app.nom)}
           />
         ))}
       </div>

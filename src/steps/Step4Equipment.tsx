@@ -60,10 +60,10 @@ export function Step4Equipment() {
           <div className="choice-list">
             {EQUIPEMENTS.filter((e) => e.categorie === cat).map((item) => (
               <ChoiceCard
-                key={item.id}
+                key={item.nom}
                 title={item.nom}
-                selected={eq.equipements.includes(item.id)}
-                onToggle={() => toggle(item.id)}
+                selected={eq.equipements.includes(item.nom)}
+                onToggle={() => toggle(item.nom)}
               />
             ))}
           </div>

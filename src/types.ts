@@ -4,11 +4,14 @@ export const TYPE_DEMANDE_TERMINAISON = 'Avis de terminaison ou mise à pied tem
 
 export type TypeDemande = 'Nouvelle intégration' | 'Réactivation' | typeof TYPE_DEMANDE_TERMINAISON | '';
 
-export interface EmployeeDirectoryEntry {
-  id: string;
-  numeroEmploye: string;
-  prenom: string;
+/** Denormalized snapshot captured at selection time — mirrors backend RequestEmployeeDto. Not a
+ * live reference to WorkdayDemographic, which reloads on its own hourly schedule outside this
+ * app's control (see backend/Api/Models/Entities/RequestEmployee.cs). */
+export interface EmployeeSnapshot {
+  workdayEmployeeId: number;
   nom: string;
+  prenom: string;
+  numeroEmploye: string;
   poste: string;
   departement: string;
   codeEmploi: string;
@@ -17,7 +20,7 @@ export interface EmployeeDirectoryEntry {
 }
 
 export interface EmployeeSelectionInfo {
-  employeeId: string | null;
+  employee: EmployeeSnapshot | null;
   dateEntreePrevue: string;
   regleDePaye: string;
   regleDePayeCommentaire: string;
@@ -42,7 +45,7 @@ export interface ApplicationsInfo {
 }
 
 export interface OffboardingInfo {
-  employeeIds: string[];
+  employees: EmployeeSnapshot[];
   derniereJournee: string;
   indemniteVacances: string;
   raisonArret: string;
@@ -56,6 +59,9 @@ export interface OffboardingInfo {
 }
 
 export interface OnboardingRequest {
+  /** Null until setTypeDemande's first call creates the backend record — see WizardContext. Every
+   * field below is purely local/optimistic state until then. */
+  requestId: number | null;
   demandeNumero: string;
   dateCreation: string;
   demandePar: string;
@@ -68,15 +74,16 @@ export interface OnboardingRequest {
   offboarding: OffboardingInfo;
 }
 
-export function createEmptyRequest(): OnboardingRequest {
+export function createEmptyRequest(demandePar: string): OnboardingRequest {
   return {
-    demandeNumero: 'INT-2025-00024',
+    requestId: null,
+    demandeNumero: '',
     dateCreation: new Date().toISOString().slice(0, 10),
-    demandePar: 'Marie Tremblay',
+    demandePar,
     statut: 'Brouillon',
     typeDemande: '',
     employee: {
-      employeeId: null,
+      employee: null,
       dateEntreePrevue: '',
       regleDePaye: '',
       regleDePayeCommentaire: '',
@@ -97,7 +104,7 @@ export function createEmptyRequest(): OnboardingRequest {
       autreLogiciel: '',
     },
     offboarding: {
-      employeeIds: [],
+      employees: [],
       derniereJournee: '',
       indemniteVacances: '',
       raisonArret: '',

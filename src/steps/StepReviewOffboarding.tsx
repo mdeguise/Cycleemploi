@@ -3,17 +3,27 @@ import { useWizard } from '../context/WizardContext';
 import { StepFooter } from '../components/StepFooter';
 import { SubmissionModal } from '../components/SubmissionModal';
 import { CheckCircleIcon, UserIcon, LogOutIcon, ShieldIcon, LaptopIcon, LockIcon, ShirtIcon } from '../components/icons';
-import { EMPLOYEE_DIRECTORY } from '../data/catalogs';
 import { formatDateFr } from '../utils/formatDate';
 
 export function StepReviewOffboarding() {
-  const { request, goToStep } = useWizard();
+  const { request, goToStep, submitRequest } = useWizard();
   const o = request.offboarding;
-  const employees = EMPLOYEE_DIRECTORY.filter((emp) => o.employeeIds.includes(emp.id));
+  const employees = o.employees;
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const handleSubmit = () => {
-    setShowConfirmation(true);
+  const handleSubmit = async () => {
+    setSubmitError(null);
+    setIsSubmitting(true);
+    try {
+      await submitRequest();
+      setShowConfirmation(true);
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'La soumission a échoué. Veuillez réessayer.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -41,7 +51,7 @@ export function StepReviewOffboarding() {
           <div className="review-tag-list">
             {employees.length ? (
               employees.map((emp) => (
-                <span key={emp.id} className="review-tag">
+                <span key={emp.workdayEmployeeId} className="review-tag">
                   {emp.prenom} {emp.nom}
                 </span>
               ))
@@ -144,7 +154,13 @@ export function StepReviewOffboarding() {
         </div>
       </div>
 
-      <StepFooter onSubmit={handleSubmit} />
+      {submitError && (
+        <div className="required-note" style={{ color: 'var(--tremblant-red-dark)' }}>
+          {submitError}
+        </div>
+      )}
+
+      <StepFooter onSubmit={handleSubmit} submitDisabled={isSubmitting} />
       <SubmissionModal open={showConfirmation} onClose={() => setShowConfirmation(false)} />
     </div>
   );

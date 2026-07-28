@@ -1,4 +1,5 @@
 import './App.css';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { WizardProvider, useWizard } from './context/WizardContext';
 import { Header } from './components/Header';
 import { StepNav } from './components/StepNav';
@@ -14,6 +15,9 @@ import { Step2Cessation } from './steps/Step2Cessation';
 import { Step3DepartmentComments } from './steps/Step3DepartmentComments';
 import { StepReviewOffboarding } from './steps/StepReviewOffboarding';
 import { TYPE_DEMANDE_TERMINAISON } from './types';
+import { AuthGate } from './auth/AuthGate';
+import { ApiProvider } from './api/ApiContext';
+import { useApi } from './api/ApiContext';
 
 const ONBOARDING_STEP_COMPONENTS = [
   Step1Employee,
@@ -25,6 +29,8 @@ const ONBOARDING_STEP_COMPONENTS = [
 ];
 
 const OFFBOARDING_STEP_COMPONENTS = [Step1Employee, Step2Cessation, Step3DepartmentComments, StepReviewOffboarding];
+
+const queryClient = new QueryClient();
 
 function WizardBody() {
   const { currentStep, request } = useWizard();
@@ -45,11 +51,48 @@ function WizardBody() {
   );
 }
 
-function App() {
+/** Fetches the signed-in user's profile before the wizard mounts — WizardProvider needs a display
+ * name up front for the "Demandé par" field, and this doubles as the first real proof the backend
+ * connection + auth token flow actually works end to end. */
+function AuthenticatedApp() {
+  const api = useApi();
+  const { data: me, isLoading, isError, error } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => api.auth.me(),
+  });
+
+  if (isLoading) {
+    return (
+      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center' }}>
+        Chargement…
+      </div>
+    );
+  }
+
+  if (isError || !me) {
+    return (
+      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center' }}>
+        Impossible de charger le profil : {error instanceof Error ? error.message : 'erreur inconnue'}
+      </div>
+    );
+  }
+
   return (
-    <WizardProvider>
+    <WizardProvider demandePar={me.displayName}>
       <WizardBody />
     </WizardProvider>
+  );
+}
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthGate>
+        <ApiProvider>
+          <AuthenticatedApp />
+        </ApiProvider>
+      </AuthGate>
+    </QueryClientProvider>
   );
 }
 

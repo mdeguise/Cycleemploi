@@ -42,7 +42,7 @@ export function Step2Cessation() {
         </div>
       </div>
 
-      {o.employeeIds.length > 1 && (
+      {o.employees.length > 1 && (
         <div className="big-notice">
           <AlertTriangleIcon className="big-notice__icon" />
           <div className="big-notice__text">

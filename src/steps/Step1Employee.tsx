@@ -1,13 +1,43 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useWizard } from '../context/WizardContext';
 import { Field } from '../components/FormField';
 import { StepFooter } from '../components/StepFooter';
 import { UserIcon, SearchIcon, InfoIcon } from '../components/icons';
-import { EMPLOYEE_DIRECTORY, REGLES_DE_PAYE, REGLE_DE_PAYE_AUTRE } from '../data/catalogs';
-import { TYPE_DEMANDE_TERMINAISON, type EmployeeSelectionInfo, type TypeDemande } from '../types';
+import { REGLES_DE_PAYE, REGLE_DE_PAYE_AUTRE } from '../data/catalogs';
+import { TYPE_DEMANDE_TERMINAISON, type EmployeeSelectionInfo, type EmployeeSnapshot, type TypeDemande } from '../types';
+import { useApi } from '../api/ApiContext';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import type { EmployeeDto } from '../api/types';
 
 function initials(prenom: string, nom: string) {
   return `${prenom[0] ?? ''}${nom[0] ?? ''}`.toUpperCase();
+}
+
+function toSnapshot(e: EmployeeDto): EmployeeSnapshot {
+  return {
+    workdayEmployeeId: e.employeeId,
+    prenom: e.prenom,
+    nom: e.nom,
+    numeroEmploye: String(e.employeeId),
+    poste: e.poste ?? '',
+    departement: e.departement ?? '',
+    codeEmploi: e.codeEmploi ?? '',
+    typeEmploi: e.typeEmploi ?? '',
+    gestionnaire: e.gestionnaire ?? '',
+  };
+}
+
+/** Live search against /api/employees/search (WorkdayDemographic), debounced. Shared by both the
+ * onboarding single-select and offboarding multi-select branches below. */
+function useEmployeeSearch(query: string) {
+  const api = useApi();
+  const debounced = useDebouncedValue(query.trim(), 300);
+  return useQuery({
+    queryKey: ['employees', 'search', debounced],
+    queryFn: () => api.employees.search(debounced),
+    enabled: debounced.length >= 2,
+  });
 }
 
 export function Step1Employee() {
@@ -16,43 +46,40 @@ export function Step1Employee() {
   const isTermination = request.typeDemande === TYPE_DEMANDE_TERMINAISON;
   const [query, setQuery] = useState('');
 
-  const selected = EMPLOYEE_DIRECTORY.find((emp) => emp.id === e.employeeId) ?? null;
-  const terminationEmployees = EMPLOYEE_DIRECTORY.filter((emp) => request.offboarding.employeeIds.includes(emp.id));
+  const { data: results = [], isFetching } = useEmployeeSearch(query);
 
-  const q = query.trim().toLowerCase();
-  const results = q
-    ? EMPLOYEE_DIRECTORY.filter(
-        (emp) =>
-          (emp.numeroEmploye.toLowerCase().includes(q) ||
-            emp.nom.toLowerCase().includes(q) ||
-            emp.prenom.toLowerCase().includes(q)) &&
-          !request.offboarding.employeeIds.includes(emp.id),
-      ).slice(0, 6)
-    : [];
+  const selectedIds = new Set(request.offboarding.employees.map((emp) => emp.workdayEmployeeId));
+  const filteredResults = isTermination ? results.filter((r) => !selectedIds.has(r.employeeId)) : results;
 
   const update = (patch: Partial<EmployeeSelectionInfo>) => {
     setRequest((prev) => ({ ...prev, employee: { ...prev.employee, ...patch } }));
   };
 
-  const selectEmployee = (id: string) => {
-    update({ employeeId: id });
+  const selectEmployee = (dto: EmployeeDto) => {
+    update({ employee: toSnapshot(dto) });
     setQuery('');
   };
 
-  const clearSelection = () => update({ employeeId: null });
+  const clearSelection = () => update({ employee: null });
 
-  const addTerminationEmployee = (id: string) => {
+  const addTerminationEmployee = (dto: EmployeeDto) => {
     setRequest((prev) => {
-      if (prev.offboarding.employeeIds.includes(id)) return prev;
-      return { ...prev, offboarding: { ...prev.offboarding, employeeIds: [...prev.offboarding.employeeIds, id] } };
+      if (prev.offboarding.employees.some((emp) => emp.workdayEmployeeId === dto.employeeId)) return prev;
+      return {
+        ...prev,
+        offboarding: { ...prev.offboarding, employees: [...prev.offboarding.employees, toSnapshot(dto)] },
+      };
     });
     setQuery('');
   };
 
-  const removeTerminationEmployee = (id: string) => {
+  const removeTerminationEmployee = (workdayEmployeeId: number) => {
     setRequest((prev) => ({
       ...prev,
-      offboarding: { ...prev.offboarding, employeeIds: prev.offboarding.employeeIds.filter((x) => x !== id) },
+      offboarding: {
+        ...prev.offboarding,
+        employees: prev.offboarding.employees.filter((emp) => emp.workdayEmployeeId !== workdayEmployeeId),
+      },
     }));
   };
 
@@ -167,18 +194,20 @@ export function Step1Employee() {
                 placeholder="Numéro d'employé, nom ou prénom"
                 autoComplete="off"
               />
-              {q && (
+              {query.trim() && (
                 <div className="employee-results">
-                  {results.length ? (
-                    results.map((emp) => (
-                      <div key={emp.id} className="employee-result-item" onClick={() => addTerminationEmployee(emp.id)}>
+                  {isFetching ? (
+                    <div className="employee-result-empty">Recherche…</div>
+                  ) : filteredResults.length ? (
+                    filteredResults.map((emp) => (
+                      <div key={emp.employeeId} className="employee-result-item" onClick={() => addTerminationEmployee(emp)}>
                         <span className="employee-result-item__avatar">{initials(emp.prenom, emp.nom)}</span>
                         <span>
                           <div className="employee-result-item__name">
                             {emp.prenom} {emp.nom}
                           </div>
                           <div className="employee-result-item__meta">
-                            #{emp.numeroEmploye} · {emp.poste} · {emp.departement}
+                            #{emp.employeeId} · {emp.poste} · {emp.departement}
                           </div>
                         </span>
                       </div>
@@ -191,10 +220,10 @@ export function Step1Employee() {
             </div>
           </Field>
 
-          {terminationEmployees.length > 0 && (
+          {request.offboarding.employees.length > 0 && (
             <div className="choice-list">
-              {terminationEmployees.map((emp) => (
-                <div key={emp.id} className="employee-selected-card">
+              {request.offboarding.employees.map((emp) => (
+                <div key={emp.workdayEmployeeId} className="employee-selected-card">
                   <span className="employee-selected-card__avatar">{initials(emp.prenom, emp.nom)}</span>
                   <span>
                     <div className="employee-selected-card__name">
@@ -207,7 +236,7 @@ export function Step1Employee() {
                   <button
                     type="button"
                     className="employee-selected-card__change"
-                    onClick={() => removeTerminationEmployee(emp.id)}
+                    onClick={() => removeTerminationEmployee(emp.workdayEmployeeId)}
                   >
                     Retirer
                   </button>
@@ -218,7 +247,7 @@ export function Step1Employee() {
         </>
       ) : (
         <>
-          {!selected && (
+          {!e.employee && (
             <Field label="Rechercher un employé" required>
               <div className="employee-search">
                 <SearchIcon className="employee-search__icon" />
@@ -229,18 +258,20 @@ export function Step1Employee() {
                   placeholder="Numéro d'employé, nom ou prénom"
                   autoComplete="off"
                 />
-                {q && (
+                {query.trim() && (
                   <div className="employee-results">
-                    {results.length ? (
+                    {isFetching ? (
+                      <div className="employee-result-empty">Recherche…</div>
+                    ) : results.length ? (
                       results.map((emp) => (
-                        <div key={emp.id} className="employee-result-item" onClick={() => selectEmployee(emp.id)}>
+                        <div key={emp.employeeId} className="employee-result-item" onClick={() => selectEmployee(emp)}>
                           <span className="employee-result-item__avatar">{initials(emp.prenom, emp.nom)}</span>
                           <span>
                             <div className="employee-result-item__name">
                               {emp.prenom} {emp.nom}
                             </div>
                             <div className="employee-result-item__meta">
-                              #{emp.numeroEmploye} · {emp.poste} · {emp.departement}
+                              #{emp.employeeId} · {emp.poste} · {emp.departement}
                             </div>
                           </span>
                         </div>
@@ -254,15 +285,15 @@ export function Step1Employee() {
             </Field>
           )}
 
-          {selected && (
+          {e.employee && (
             <div className="employee-selected-card">
-              <span className="employee-selected-card__avatar">{initials(selected.prenom, selected.nom)}</span>
+              <span className="employee-selected-card__avatar">{initials(e.employee.prenom, e.employee.nom)}</span>
               <span>
                 <div className="employee-selected-card__name">
-                  {selected.prenom} {selected.nom}
+                  {e.employee.prenom} {e.employee.nom}
                 </div>
                 <div className="employee-selected-card__meta">
-                  #{selected.numeroEmploye} · {selected.poste} · {selected.departement}
+                  #{e.employee.numeroEmploye} · {e.employee.poste} · {e.employee.departement}
                 </div>
               </span>
               <button type="button" className="employee-selected-card__change" onClick={clearSelection}>
