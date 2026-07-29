@@ -10,7 +10,7 @@ public class RequestEmployee
     public int RequestId { get; set; }
     public Request Request { get; set; } = null!;
 
-    public int WorkdayEmployeeId { get; set; }
+    public string WorkdayEmployeeId { get; set; } = null!;
     public string NameSnapshot { get; set; } = null!;
     public string? PositionSnapshot { get; set; }
     public string? DepartementSnapshot { get; set; }

@@ -1,8 +1,0 @@
-node_modules
-backend
-.git
-.claude
-onboarding-offboarding-wizard
-.sync-check
-dist
-*.md

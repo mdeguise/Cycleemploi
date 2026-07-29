@@ -16,12 +16,14 @@ public class RequestsController : ControllerBase
     private readonly AppDbContext _db;
     private readonly RequestNumberService _requestNumbers;
     private readonly RequestAuthorizationService _authz;
+    private readonly IAdDirectoryService _ad;
 
-    public RequestsController(AppDbContext db, RequestNumberService requestNumbers, RequestAuthorizationService authz)
+    public RequestsController(AppDbContext db, RequestNumberService requestNumbers, RequestAuthorizationService authz, IAdDirectoryService ad)
     {
         _db = db;
         _requestNumbers = requestNumbers;
         _authz = authz;
+        _ad = ad;
     }
 
     [HttpPost]
@@ -39,7 +41,7 @@ public class RequestsController : ControllerBase
             RequestType = requestType,
             Status = RequestStatus.Brouillon,
             CreatedByObjectId = User.GetObjectId(),
-            CreatedByDisplayName = User.GetDisplayName(),
+            CreatedByDisplayName = _ad.GetUserInfo(User.GetSamAccountName()).DisplayName ?? User.GetObjectId(),
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -63,7 +65,7 @@ public class RequestsController : ControllerBase
         // RH comment is loaded separately and only attached to the DTO if the authorization check
         // passes — never inferred from the presence of OffboardingConfidentialComment alone.
         if (request.ConfidentialComment is not null &&
-            await _authz.CanReadConfidentialCommentAsync(request, User.GetObjectId(), ct))
+            _authz.CanReadConfidentialComment(request, User.GetObjectId()))
         {
             dto.CommentairesRH = request.ConfidentialComment.CommentaireRH;
         }

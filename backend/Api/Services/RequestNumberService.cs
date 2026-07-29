@@ -26,10 +26,14 @@ public class RequestNumberService
             _ => throw new ArgumentOutOfRangeException(nameof(type))
         };
 
+        // .ToListAsync() (not .SingleAsync()) deliberately — EF composes Single/First into a
+        // "SELECT TOP(n) ... FROM (<raw sql>) AS t" wrapper to check for extra rows, and SQL
+        // Server rejects NEXT VALUE FOR inside a derived table/subquery. ToListAsync executes the
+        // raw SQL unwrapped.
         var next = await _db.Database
             .SqlQuery<int>($"SELECT NEXT VALUE FOR RequestNumberSeq AS Value")
-            .SingleAsync(ct);
+            .ToListAsync(ct);
 
-        return $"{prefix}-{DateTime.UtcNow.Year}-{next:D5}";
+        return $"{prefix}-{DateTime.UtcNow.Year}-{next[0]:D5}";
     }
 }

@@ -9,7 +9,7 @@ public class CreateRequestDto
 
 public class RequestEmployeeDto
 {
-    public int WorkdayEmployeeId { get; set; }
+    public string WorkdayEmployeeId { get; set; } = null!;
     public string NameSnapshot { get; set; } = null!;
     public string? PositionSnapshot { get; set; }
     public string? DepartementSnapshot { get; set; }

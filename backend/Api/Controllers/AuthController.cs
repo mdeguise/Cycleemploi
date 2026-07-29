@@ -11,25 +11,28 @@ namespace TremblantLifecycle.Api.Controllers;
 [Authorize]
 public class AuthController : ControllerBase
 {
-    private readonly IGraphGroupService _graphGroupService;
+    private readonly IAdDirectoryService _ad;
     private readonly HrGroupOptions _hrGroupOptions;
 
-    public AuthController(IGraphGroupService graphGroupService, IOptions<HrGroupOptions> hrGroupOptions)
+    public AuthController(IAdDirectoryService ad, IOptions<HrGroupOptions> hrGroupOptions)
     {
-        _graphGroupService = graphGroupService;
+        _ad = ad;
         _hrGroupOptions = hrGroupOptions.Value;
     }
 
     [HttpGet("me")]
-    public async Task<ActionResult<MeDto>> Me(CancellationToken ct)
+    public ActionResult<MeDto> Me()
     {
-        var isHr = await _graphGroupService.IsCallerInGroupAsync(_hrGroupOptions.TrmRhAdmGroupId, ct);
+        var accountName = User.GetObjectId();
+        var sam = User.GetSamAccountName();
+        var info = _ad.GetUserInfo(sam);
+        var isHr = _ad.IsUserInGroup(sam, _hrGroupOptions.TrmRhAdmGroupName);
 
         return Ok(new MeDto
         {
-            ObjectId = User.GetObjectId(),
-            DisplayName = User.GetDisplayName(),
-            Email = User.GetEmail(),
+            ObjectId = accountName,
+            DisplayName = info.DisplayName ?? accountName,
+            Email = info.Email,
             IsHr = isHr
         });
     }

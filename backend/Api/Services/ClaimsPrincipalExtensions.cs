@@ -4,19 +4,16 @@ namespace TremblantLifecycle.Api.Services;
 
 public static class ClaimsPrincipalExtensions
 {
-    /// <summary>Entra ID's stable per-user object id — "oid" claim, falling back to
-    /// NameIdentifier for local/dev token setups that don't populate oid.</summary>
+    /// <summary>Windows Negotiate auth's Identity.Name — "DOMAIN\samaccountname". Stable per
+    /// account, used as the caller identifier everywhere an Entra "oid" was used before.</summary>
     public static string GetObjectId(this ClaimsPrincipal user) =>
-        user.FindFirstValue("oid")
-        ?? user.FindFirstValue(ClaimTypes.NameIdentifier)
-        ?? throw new InvalidOperationException("No object id claim on the authenticated user.");
+        user.Identity?.Name ?? throw new InvalidOperationException("No authenticated Windows identity.");
 
-    public static string GetDisplayName(this ClaimsPrincipal user) =>
-        user.FindFirstValue("name")
-        ?? user.FindFirstValue(ClaimTypes.Name)
-        ?? "Unknown";
-
-    public static string? GetEmail(this ClaimsPrincipal user) =>
-        user.FindFirstValue("preferred_username")
-        ?? user.FindFirstValue(ClaimTypes.Email);
+    /// <summary>Bare SAM account name (no "DOMAIN\" prefix) for AD lookups.</summary>
+    public static string GetSamAccountName(this ClaimsPrincipal user)
+    {
+        var name = user.GetObjectId();
+        var slash = name.IndexOf('\\');
+        return slash >= 0 ? name[(slash + 1)..] : name;
+    }
 }

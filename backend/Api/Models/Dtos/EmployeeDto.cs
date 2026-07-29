@@ -6,7 +6,7 @@ namespace TremblantLifecycle.Api.Models.Dtos;
 /// for why not simply == "Active").</summary>
 public class EmployeeDto
 {
-    public int EmployeeId { get; set; }
+    public string EmployeeId { get; set; } = null!;
     public string Prenom { get; set; } = null!;
     public string Nom { get; set; } = null!;
     public string? Poste { get; set; }

@@ -9,7 +9,7 @@ namespace TremblantLifecycle.Api.Models.Entities;
 /// </summary>
 public class WorkdayDemographic
 {
-    public int EmployeeId { get; set; }
+    public string EmployeeId { get; set; } = null!;
     public string? FirstName { get; set; }
     public string? PreferredFirstName { get; set; }
     public string? LastName { get; set; }

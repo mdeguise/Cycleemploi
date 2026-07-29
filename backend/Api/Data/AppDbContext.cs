@@ -38,6 +38,9 @@ public class AppDbContext : DbContext
             .WithMany(r => r.Employees)
             .HasForeignKey(re => re.RequestId)
             .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<RequestEmployee>()
+            .Property(re => re.WorkdayEmployeeId)
+            .HasMaxLength(50);
 
         // 1:1 detail tables — RequestId is both PK and FK on each.
         modelBuilder.Entity<OnboardingDetail>().HasKey(d => d.RequestId);

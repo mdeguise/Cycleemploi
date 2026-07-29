@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TremblantLifecycle.Api.Data;
 
@@ -11,9 +12,11 @@ using TremblantLifecycle.Api.Data;
 namespace TremblantLifecycle.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260728161449_ChangeWorkdayEmployeeIdToString")]
+    partial class ChangeWorkdayEmployeeIdToString
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -141,19 +144,23 @@ namespace TremblantLifecycle.Api.Migrations
                     b.Property<string>("CommentairesRedingote")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateOnly?>("DerniereJournee")
+                    b.Property<DateOnly>("DerniereJournee")
                         .HasColumnType("date");
 
                     b.Property<string>("DetailsRaison")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("IndemniteVacances")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("RaisonArret")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Reembaucheriez")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("RequestId");
@@ -166,10 +173,11 @@ namespace TremblantLifecycle.Api.Migrations
                     b.Property<int>("RequestId")
                         .HasColumnType("int");
 
-                    b.Property<DateOnly?>("DateEntreePrevue")
+                    b.Property<DateOnly>("DateEntreePrevue")
                         .HasColumnType("date");
 
                     b.Property<string>("RegleDePaye")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("RegleDePayeCommentaire")

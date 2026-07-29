@@ -445,8 +445,8 @@
   position: relative;
 }
 
-.employee-search input {
-  padding-left: 36px;
+.field .employee-search input[type="text"] {
+  padding-left: 42px;
 }
 
 .employee-search__icon {
@@ -827,6 +827,38 @@
 
 .tip-banner__close:hover {
   opacity: 1;
+}
+
+.type-demande-section {
+  border-radius: var(--radius-md);
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+.type-demande-section--unanswered {
+  background: var(--tremblant-red-light);
+  box-shadow: 0 0 0 1px var(--tremblant-red-border);
+  padding: 14px;
+  margin: -14px -14px 0;
+}
+
+.type-demande-section__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.type-demande-section__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--tremblant-red);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
 }
 
 .type-demande-grid {

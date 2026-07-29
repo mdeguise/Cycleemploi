@@ -8,7 +8,7 @@ export type TypeDemande = 'Nouvelle intégration' | 'Réactivation' | typeof TYP
  * live reference to WorkdayDemographic, which reloads on its own hourly schedule outside this
  * app's control (see backend/Api/Models/Entities/RequestEmployee.cs). */
 export interface EmployeeSnapshot {
-  workdayEmployeeId: number;
+  workdayEmployeeId: string;
   nom: string;
   prenom: string;
   numeroEmploye: string;

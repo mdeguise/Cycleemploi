@@ -15,7 +15,6 @@ import { Step2Cessation } from './steps/Step2Cessation';
 import { Step3DepartmentComments } from './steps/Step3DepartmentComments';
 import { StepReviewOffboarding } from './steps/StepReviewOffboarding';
 import { TYPE_DEMANDE_TERMINAISON } from './types';
-import { AuthGate } from './auth/AuthGate';
 import { ApiProvider } from './api/ApiContext';
 import { useApi } from './api/ApiContext';
 
@@ -53,7 +52,9 @@ function WizardBody() {
 
 /** Fetches the signed-in user's profile before the wizard mounts — WizardProvider needs a display
  * name up front for the "Demandé par" field, and this doubles as the first real proof the backend
- * connection + auth token flow actually works end to end. */
+ * connection + Windows Auth actually works end to end. A failure here most likely means the site
+ * isn't in the browser's trusted/intranet zone (so it never sent Windows credentials) rather than
+ * a real "not signed in" state — there's no login screen to fall back to. */
 function AuthenticatedApp() {
   const api = useApi();
   const { data: me, isLoading, isError, error } = useQuery({
@@ -87,11 +88,9 @@ function AuthenticatedApp() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthGate>
-        <ApiProvider>
-          <AuthenticatedApp />
-        </ApiProvider>
-      </AuthGate>
+      <ApiProvider>
+        <AuthenticatedApp />
+      </ApiProvider>
     </QueryClientProvider>
   );
 }

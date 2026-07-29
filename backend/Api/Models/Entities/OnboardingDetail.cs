@@ -6,7 +6,7 @@ public class OnboardingDetail
     public int RequestId { get; set; }
     public Request Request { get; set; } = null!;
 
-    public DateOnly DateEntreePrevue { get; set; }
-    public string RegleDePaye { get; set; } = null!;
+    public DateOnly? DateEntreePrevue { get; set; }
+    public string? RegleDePaye { get; set; }
     public string? RegleDePayeCommentaire { get; set; }
 }

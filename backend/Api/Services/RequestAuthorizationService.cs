@@ -5,7 +5,7 @@ namespace TremblantLifecycle.Api.Services;
 
 public class HrGroupOptions
 {
-    public string TrmRhAdmGroupId { get; set; } = null!;
+    public string TrmRhAdmGroupName { get; set; } = null!;
 }
 
 /// <summary>The single source of truth for the RH-comment access rule described in the plan:
@@ -15,25 +15,25 @@ public class HrGroupOptions
 /// response, never infer access from the UI alone.</summary>
 public class RequestAuthorizationService
 {
-    private readonly IGraphGroupService _graphGroupService;
-    private readonly string _hrGroupId;
+    private readonly IAdDirectoryService _ad;
+    private readonly string _hrGroupName;
 
-    public RequestAuthorizationService(IGraphGroupService graphGroupService, IOptions<HrGroupOptions> hrGroupOptions)
+    public RequestAuthorizationService(IAdDirectoryService ad, IOptions<HrGroupOptions> hrGroupOptions)
     {
-        _graphGroupService = graphGroupService;
-        _hrGroupId = hrGroupOptions.Value.TrmRhAdmGroupId;
+        _ad = ad;
+        _hrGroupName = hrGroupOptions.Value.TrmRhAdmGroupName;
     }
 
-    /// <summary>True if the currently authenticated caller (identified by callerObjectId) may read
-    /// the confidential RH comment on the given request.</summary>
-    public async Task<bool> CanReadConfidentialCommentAsync(Request request, string callerObjectId, CancellationToken ct = default)
+    /// <summary>True if the currently authenticated caller (identified by their Windows account
+    /// name) may read the confidential RH comment on the given request.</summary>
+    public bool CanReadConfidentialComment(Request request, string callerAccountName)
     {
-        var isAuthorDraft = request.CreatedByObjectId == callerObjectId && request.Status == RequestStatus.Brouillon;
+        var isAuthorDraft = request.CreatedByObjectId == callerAccountName && request.Status == RequestStatus.Brouillon;
         if (isAuthorDraft)
         {
             return true;
         }
 
-        return await _graphGroupService.IsCallerInGroupAsync(_hrGroupId, ct);
+        return _ad.IsUserInGroup(callerAccountName, _hrGroupName);
     }
 }

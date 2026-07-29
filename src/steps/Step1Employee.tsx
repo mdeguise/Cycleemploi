@@ -19,7 +19,7 @@ function toSnapshot(e: EmployeeDto): EmployeeSnapshot {
     workdayEmployeeId: e.employeeId,
     prenom: e.prenom,
     nom: e.nom,
-    numeroEmploye: String(e.employeeId),
+    numeroEmploye: e.employeeId,
     poste: e.poste ?? '',
     departement: e.departement ?? '',
     codeEmploi: e.codeEmploi ?? '',
@@ -73,7 +73,7 @@ export function Step1Employee() {
     setQuery('');
   };
 
-  const removeTerminationEmployee = (workdayEmployeeId: number) => {
+  const removeTerminationEmployee = (workdayEmployeeId: string) => {
     setRequest((prev) => ({
       ...prev,
       offboarding: {
@@ -101,8 +101,17 @@ export function Step1Employee() {
         </div>
       </div>
 
-      <Field label="Type de demande" required>
-        <div className="type-demande-grid">
+      <div className={`type-demande-section${request.typeDemande ? '' : ' type-demande-section--unanswered'}`}>
+        <Field
+          label={
+            <span className="type-demande-section__label">
+              <span className="type-demande-section__badge">1</span>
+              Commencez ici — Type de demande
+            </span>
+          }
+          required
+        >
+          <div className="type-demande-grid">
           <button
             type="button"
             className={`type-demande-option${request.typeDemande === 'Nouvelle intégration' ? ' type-demande-option--selected' : ''}`}
@@ -146,8 +155,9 @@ export function Step1Employee() {
               </div>
             </span>
           </button>
-        </div>
-      </Field>
+          </div>
+        </Field>
+      </div>
 
       {!isTermination && (
         <div className="workday-notice">

@@ -1,5 +1,6 @@
+using Microsoft.AspNetCore.Authentication.Negotiate;
+using Microsoft.AspNetCore.Server.IISIntegration;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Identity.Web;
 using TremblantLifecycle.Api.Data;
 using TremblantLifecycle.Api.Services;
 
@@ -14,33 +15,59 @@ builder.Services.AddDbContext<WorkdayContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("WorkdayDb")));
 
 // --- Auth ---
-// Microsoft.Identity.Web validates the incoming bearer token against Entra ID, and provides
-// ITokenAcquisition for the on-behalf-of Graph call GraphGroupService uses for the HR group check.
-builder.Services
-    .AddAuthentication(Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme)
-    .AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"))
-    .EnableTokenAcquisitionToCallDownstreamApi()
-    .AddInMemoryTokenCaches();
+// Windows Integrated Auth (Negotiate/Kerberos) — the app trusts the same AD identity the browser
+// and the user's Windows session already carry, instead of an Entra ID app registration. Only
+// works when both client and server are on the domain network (matches the VPN-only reachability
+// requirement) and the app is hosted on Windows (IIS) — Negotiate from a Linux container needs
+// Kerberos keytab/SPN setup that isn't worth the complexity here.
+//
+// Two distinct hosting scenarios need two distinct auth registrations. Under IIS in-process
+// hosting, IIS's own Windows Authentication module does the actual SSPI handshake and populates
+// HttpContext.User before ASP.NET Core ever sees the request — calling AddNegotiate() there throws
+// ("The Negotiate Authentication handler cannot be used on a server that directly supports Windows
+// Authentication") unless IIS is configured with Windows Auth AND Anonymous Auth both enabled
+// simultaneously so the app's own middleware can drive the challenge. That combination reads as an
+// anomaly to automated IIS hardening/compliance tooling (e.g. security agents flag "anonymous
+// enabled" and silently revert it), so it's not a stable config to depend on in production. Using
+// IISDefaults.AuthenticationScheme instead lets IIS run its standard Windows-Auth-only setup
+// (Anonymous OFF) with no app-level Negotiate handshake at all. ANCM sets ASPNETCORE_APPL_PATH only
+// for in-process IIS hosting, so it's a reliable way to distinguish that from local `dotnet run`
+// (plain Kestrel, no IIS integration), which still needs the self-hosted Negotiate handler.
+if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ASPNETCORE_APPL_PATH")))
+{
+    builder.Services.AddAuthentication(IISDefaults.AuthenticationScheme);
+}
+else
+{
+    builder.Services
+        .AddAuthentication(NegotiateDefaults.AuthenticationScheme)
+        .AddNegotiate();
+}
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = options.DefaultPolicy; // every endpoint requires an authenticated caller by default
+});
 
 builder.Services.Configure<HrGroupOptions>(builder.Configuration.GetSection("HrGroup"));
-builder.Services.AddHttpClient("Graph");
-builder.Services.AddScoped<IGraphGroupService, GraphGroupService>();
+builder.Services.AddScoped<IAdDirectoryService, AdDirectoryService>();
 builder.Services.AddScoped<RequestAuthorizationService>();
 builder.Services.AddScoped<RequestNumberService>();
 
 // --- CORS ---
-// Only needed for local dev (frontend on :5173, backend on a different port). In Docker/prod, the
-// web container's Nginx reverse-proxies /api/* to the api container, so browser requests are
-// same-origin and this policy is unused there.
-const string DevCorsPolicy = "DevCors";
+// Frontend and API are hosted as separate top-level IIS sites/ports (not a nested Application —
+// see git history for why: Windows Auth on a nested Application produced an unresolved empty 404
+// specific to that topology), so this is needed in production too, not just local dev. Windows
+// Auth in the browser requires credentials: 'include' on fetch plus an explicit (non-wildcard)
+// origin here — AllowCredentials() can't be combined with AllowAnyOrigin().
+const string CorsPolicy = "Frontend";
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy(DevCorsPolicy, policy =>
-        policy.WithOrigins("http://localhost:5173")
+    options.AddPolicy(CorsPolicy, policy =>
+        policy.WithOrigins("http://localhost:5173", "http://vm-trm-live:8090", "http://cycleemploi")
             .AllowAnyHeader()
-            .AllowAnyMethod());
+            .AllowAnyMethod()
+            .AllowCredentials());
 });
 
 builder.Services.AddControllers();
@@ -53,10 +80,12 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
-    app.UseCors(DevCorsPolicy);
 }
 
-app.UseHttpsRedirection();
+app.UseCors(CorsPolicy);
+
+// HTTP-only deployment (no HTTPS binding on the IIS site) — UseHttpsRedirection would just log a
+// "failed to determine the https port" warning on every request with no https_port to redirect to.
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

@@ -10,11 +10,11 @@ public class OffboardingDetail
     public int RequestId { get; set; }
     public Request Request { get; set; } = null!;
 
-    public DateOnly DerniereJournee { get; set; }
-    public string IndemniteVacances { get; set; } = null!;
-    public string RaisonArret { get; set; } = null!;
-    public string DetailsRaison { get; set; } = null!;
-    public string Reembaucheriez { get; set; } = null!;
+    public DateOnly? DerniereJournee { get; set; }
+    public string? IndemniteVacances { get; set; }
+    public string? RaisonArret { get; set; }
+    public string? DetailsRaison { get; set; }
+    public string? Reembaucheriez { get; set; }
     public string? CommentairesIT { get; set; }
     public string? CommentairesParkingAcces { get; set; }
     public string? CommentairesRedingote { get; set; }

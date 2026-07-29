@@ -36,7 +36,7 @@ public class EmployeesController : ControllerBase
         var results = await _workday.WorkdayDemographics
             .Where(e => e.PrimaryJob == 1 && e.EmploymentStatus != "Terminated")
             .Where(e =>
-                EF.Functions.Like(e.EmployeeId.ToString(), $"{q}%") ||
+                EF.Functions.Like(e.EmployeeId, $"{q}%") ||
                 EF.Functions.Like(e.LastName!, $"{q}%") ||
                 EF.Functions.Like(e.FirstName!, $"{q}%"))
             .OrderBy(e => e.LastName)
@@ -57,8 +57,8 @@ public class EmployeesController : ControllerBase
         return Ok(results);
     }
 
-    [HttpGet("{workdayId:int}")]
-    public async Task<ActionResult<EmployeeDto>> GetById(int workdayId, CancellationToken ct)
+    [HttpGet("{workdayId}")]
+    public async Task<ActionResult<EmployeeDto>> GetById(string workdayId, CancellationToken ct)
     {
         var employee = await _workday.WorkdayDemographics
             .Where(e => e.EmployeeId == workdayId && e.PrimaryJob == 1)

@@ -4,7 +4,7 @@
 // pass; worth doing before this ships.
 
 export interface EmployeeDto {
-  employeeId: number;
+  employeeId: string;
   prenom: string;
   nom: string;
   poste?: string | null;
@@ -54,7 +54,7 @@ export type RequestTypeApi = 'Onboarding' | 'Reactivation' | 'Offboarding';
 export type RequestStatusApi = 'Brouillon' | 'Soumise' | 'EnTraitement' | 'Completee';
 
 export interface RequestEmployeeDto {
-  workdayEmployeeId: number;
+  workdayEmployeeId: string;
   nameSnapshot: string;
   positionSnapshot?: string | null;
   departementSnapshot?: string | null;
