@@ -31,6 +31,13 @@ export function Step3Access() {
     setRequest((prev) => ({ ...prev, access: { ...prev.access, badgeZones } }));
   };
 
+  const toggleBesoinCodeAlarme = () => {
+    setRequest((prev) => ({
+      ...prev,
+      access: { ...prev.access, besoinCodeAlarme: !prev.access.besoinCodeAlarme },
+    }));
+  };
+
   const updateJustification = (justification: string) => {
     setRequest((prev) => ({ ...prev, access: { ...prev.access, justification } }));
   };
@@ -64,14 +71,22 @@ export function Step3Access() {
       </div>
 
       {a.systemes.includes(ACCES_BADGE) && (
-        <Field label="Zones ou édifices requis">
-          <input
-            type="text"
-            value={a.badgeZones}
-            onChange={(ev) => updateBadgeZones(ev.target.value)}
-            placeholder="Précisez les zones ou édifices requis"
+        <>
+          <Field label="Zones ou édifices requis">
+            <input
+              type="text"
+              value={a.badgeZones}
+              onChange={(ev) => updateBadgeZones(ev.target.value)}
+              placeholder="Précisez les zones ou édifices requis"
+            />
+          </Field>
+          <ChoiceCard
+            title="Besoin de code d'alarme"
+            description="Cochez si un code d'alarme doit être créé pour cet employé"
+            selected={a.besoinCodeAlarme}
+            onToggle={toggleBesoinCodeAlarme}
           />
-        </Field>
+        </>
       )}
 
       <SectionTitle icon={<LockIcon style={{ width: 16, height: 16 }} />}>Système POS et Hébergement</SectionTitle>

@@ -141,10 +141,16 @@ export function Step6Review() {
             </div>
           </div>
           {a.systemes.includes(ACCES_BADGE) && (
-            <div>
-              <div className="review-item__label">Zones ou édifices requis</div>
-              <div className="review-item__value">{a.badgeZones || '—'}</div>
-            </div>
+            <>
+              <div>
+                <div className="review-item__label">Zones ou édifices requis</div>
+                <div className="review-item__value">{a.badgeZones || '—'}</div>
+              </div>
+              <div>
+                <div className="review-item__label">Besoin de code d'alarme</div>
+                <div className="review-item__value">{a.besoinCodeAlarme ? 'Oui' : 'Non'}</div>
+              </div>
+            </>
           )}
           <div>
             <div className="review-item__label">Système POS et Hébergement</div>

@@ -30,6 +30,7 @@ export interface AccessInfo {
   systemes: string[];
   posHebergement: string[];
   badgeZones: string;
+  besoinCodeAlarme: boolean;
   justification: string;
   stationnement: string;
 }
@@ -92,6 +93,7 @@ export function createEmptyRequest(demandePar: string): OnboardingRequest {
       systemes: [],
       posHebergement: [],
       badgeZones: '',
+      besoinCodeAlarme: false,
       justification: '',
       stationnement: '',
     },

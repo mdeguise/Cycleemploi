@@ -57,7 +57,9 @@ builder.Services.AddScoped<RequestNumberService>();
 // --- Ticket-system integrations (submit-time, best-effort — see RequestsController.Submit) ---
 builder.Services.Configure<FreshdeskOptions>(builder.Configuration.GetSection("Freshdesk"));
 builder.Services.Configure<SendGridOptions>(builder.Configuration.GetSection("SendGrid"));
+builder.Services.Configure<DynamicsOptions>(builder.Configuration.GetSection("Dynamics"));
 builder.Services.AddHttpClient<IFreshdeskService, FreshdeskService>();
+builder.Services.AddHttpClient<IDynamicsEamService, DynamicsEamService>();
 builder.Services.AddScoped<IEmailNotificationService, SendGridEmailNotificationService>();
 
 // --- CORS ---

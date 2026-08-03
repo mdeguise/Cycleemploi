@@ -18,8 +18,13 @@ public class RequestsController : ControllerBase
     private readonly RequestAuthorizationService _authz;
     private readonly IAdDirectoryService _ad;
     private readonly IFreshdeskService _freshdesk;
+    private readonly IDynamicsEamService _dynamics;
     private readonly IEmailNotificationService _email;
     private readonly ILogger<RequestsController> _logger;
+
+    /// <summary>Systèmes junction rows store the catalog's display text directly (see
+    /// AccessDetail's doc comment) — this must match src/data/catalogs.ts's ACCES_BADGE exactly.</summary>
+    private const string AccesBadgeSystemeValue = "Badge d'accès aux édifices";
 
     public RequestsController(
         AppDbContext db,
@@ -27,6 +32,7 @@ public class RequestsController : ControllerBase
         RequestAuthorizationService authz,
         IAdDirectoryService ad,
         IFreshdeskService freshdesk,
+        IDynamicsEamService dynamics,
         IEmailNotificationService email,
         ILogger<RequestsController> logger)
     {
@@ -35,6 +41,7 @@ public class RequestsController : ControllerBase
         _authz = authz;
         _ad = ad;
         _freshdesk = freshdesk;
+        _dynamics = dynamics;
         _email = email;
         _logger = logger;
     }
@@ -123,6 +130,7 @@ public class RequestsController : ControllerBase
 
         request.AccessDetail ??= new AccessDetail { RequestId = id };
         request.AccessDetail.BadgeZones = dto.BadgeZones;
+        request.AccessDetail.BesoinCodeAlarme = dto.BesoinCodeAlarme;
         request.AccessDetail.Justification = dto.JustificationAcces;
         request.AccessDetail.Stationnement = dto.StationnementRequis;
         ReplaceJunction(_db.RequestAccessSystemes, request.AccessDetail.Systemes, id, dto.SystemesAcces,
@@ -199,6 +207,7 @@ public class RequestsController : ControllerBase
         // fail a submission the requester already completed — a failure here notifies IT support by
         // email instead, so a ticket can be created manually.
         await TryCreateFreshdeskTicketAsync(request, ct);
+        await TryCreateD365BadgeTicketAsync(request, ct);
 
         return NoContent();
     }
@@ -248,6 +257,70 @@ public class RequestsController : ControllerBase
                 // Nothing more useful to do here — the submission already succeeded and is
                 // committed; let this surface in the server logs for someone to notice.
                 _logger.LogError(emailEx, "Also failed to send the Freshdesk-failure notification email for request {RequestNumber}", request.RequestNumber);
+            }
+        }
+    }
+
+    /// <summary>Creates a D365 F&amp;O Enterprise Asset Management work order for badge/alarm
+    /// activation when "Badge d'accès aux édifices" was selected — only applies to
+    /// Onboarding/Réactivation, mirroring the old Freshservice-triggered Power Automate flow this
+    /// replaces. Same fail-open, email-on-failure pattern as the Freshdesk integration above.</summary>
+    private async Task TryCreateD365BadgeTicketAsync(Request request, CancellationToken ct)
+    {
+        if (request.RequestType is not (RequestType.Onboarding or RequestType.Reactivation))
+        {
+            return;
+        }
+
+        var systemes = request.AccessDetail?.Systemes.Select(s => s.Value) ?? [];
+        if (!systemes.Contains(AccesBadgeSystemeValue))
+        {
+            return;
+        }
+
+        var employee = request.Employees.FirstOrDefault(e => e.IsPrimary) ?? request.Employees.FirstOrDefault();
+        if (employee is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var d365RequestId = await _dynamics.CreateBadgeRequestAsync(request, employee, ct);
+            _logger.LogInformation("Created D365 EAM badge request {D365RequestId} for request {RequestNumber}", d365RequestId, request.RequestNumber);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create D365 EAM badge request for request {RequestNumber}", request.RequestNumber);
+
+            var subject = $"[Cycle Emploi] Échec de création de billet D365 (badge/alarme) — demande #{request.RequestNumber}";
+            var body =
+                $"La demande #{request.RequestNumber} ({request.RequestType.ToFrenchLabel()}) a été soumise avec succès et incluait une demande de badge d'accès aux édifices, " +
+                "mais la création du billet D365 (Enterprise Asset Management) correspondant a échoué. Le billet devra être créé manuellement.\n\n" +
+                "== Détails de la demande ==\n" +
+                $"Employé: {employee.NameSnapshot}\n" +
+                $"Demandé par: {request.CreatedByDisplayName}\n" +
+                $"Date de soumission: {request.SubmittedAt:yyyy-MM-dd HH:mm} UTC\n\n" +
+                "== Détails de l'erreur ==\n" +
+                $"Type: {ex.GetType().Name}\n" +
+                $"Message: {ex.Message}\n" +
+                (ex.InnerException is not null ? $"Cause interne: {ex.InnerException.Message}\n" : "") +
+                $"Survenue: {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC\n\n" +
+                "== Étapes à vérifier ==\n" +
+                "1. Consulter les journaux applicatifs sur vm-trm-live pour la trace complète, en recherchant le numéro de demande ci-dessus.\n" +
+                "2. Si l'erreur mentionne un code HTTP 401/403 sur login.microsoftonline.com ou D365: le secret de l'application Entra ID a peut-être expiré — vérifier/régénérer dans Entra ID (App registrations) et mettre à jour appsettings.Production.json sur vm-trm-live.\n" +
+                "3. Si l'erreur mentionne \"D365 client secret not configured\": l'intégration D365 n'a pas encore été configurée — voir la section Dynamics de appsettings.Production.json.\n" +
+                "4. Si l'erreur indique un problème de connexion/timeout: vérifier que vm-trm-live peut atteindre https://alterra.operations.dynamics.com (port 443).\n" +
+                "5. Si l'erreur mentionne un champ invalide ou persiste après plusieurs tentatives: la numérotation des RequestId (WREF0000xxxxx) est peut-être désynchronisée — vérifier le dernier RequestId existant dans AssetMaintenanceRequests.\n" +
+                "6. Une fois la cause corrigée, créer le billet manuellement dans D365 (Enterprise Asset Management, emplacement fonctionnel BF-SEC-GEN) avec les détails de la demande ci-dessus — les données complètes de la demande restent disponibles dans l'application Cycle Emploi.";
+
+            try
+            {
+                await _email.SendAsync(subject, body, ct);
+            }
+            catch (Exception emailEx)
+            {
+                _logger.LogError(emailEx, "Also failed to send the D365-failure notification email for request {RequestNumber}", request.RequestNumber);
             }
         }
     }
@@ -326,6 +399,7 @@ public class RequestsController : ControllerBase
         RegleDePayeCommentaire = r.OnboardingDetail?.RegleDePayeCommentaire,
         SystemesAcces = r.AccessDetail?.Systemes.Select(s => s.Value).ToList() ?? [],
         BadgeZones = r.AccessDetail?.BadgeZones,
+        BesoinCodeAlarme = r.AccessDetail?.BesoinCodeAlarme ?? false,
         SystemePosHebergement = r.AccessDetail?.PosHebergement.Select(p => p.Value).ToList() ?? [],
         StationnementRequis = r.AccessDetail?.Stationnement,
         JustificationAcces = r.AccessDetail?.Justification,

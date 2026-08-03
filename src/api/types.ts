@@ -76,6 +76,7 @@ export interface RequestDto {
   regleDePayeCommentaire?: string | null;
   systemesAcces: string[];
   badgeZones?: string | null;
+  besoinCodeAlarme?: boolean;
   systemePosHebergement: string[];
   stationnementRequis?: string | null;
   justificationAcces?: string | null;

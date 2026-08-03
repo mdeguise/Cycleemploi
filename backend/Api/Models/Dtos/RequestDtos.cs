@@ -41,6 +41,7 @@ public class RequestDto
     // Access
     public List<string> SystemesAcces { get; set; } = [];
     public string? BadgeZones { get; set; }
+    public bool BesoinCodeAlarme { get; set; }
     public List<string> SystemePosHebergement { get; set; } = [];
     public string? StationnementRequis { get; set; }
     public string? JustificationAcces { get; set; }
@@ -80,6 +81,7 @@ public class UpdateRequestDto
     public string? RegleDePayeCommentaire { get; set; }
     public List<string> SystemesAcces { get; set; } = [];
     public string? BadgeZones { get; set; }
+    public bool BesoinCodeAlarme { get; set; }
     public List<string> SystemePosHebergement { get; set; } = [];
     public string? StationnementRequis { get; set; }
     public string? JustificationAcces { get; set; }

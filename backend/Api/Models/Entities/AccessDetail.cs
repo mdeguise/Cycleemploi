@@ -9,6 +9,7 @@ public class AccessDetail
     public Request Request { get; set; } = null!;
 
     public string? BadgeZones { get; set; }
+    public bool BesoinCodeAlarme { get; set; }
     public string? Justification { get; set; }
     public string? Stationnement { get; set; }
 
