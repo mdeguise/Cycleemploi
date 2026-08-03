@@ -308,10 +308,10 @@ public class RequestsController : ControllerBase
                 $"Survenue: {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC\n\n" +
                 "== Étapes à vérifier ==\n" +
                 "1. Consulter les journaux applicatifs sur vm-trm-live pour la trace complète, en recherchant le numéro de demande ci-dessus.\n" +
-                "2. Si l'erreur mentionne un code HTTP 401/403 sur login.microsoftonline.com ou D365: le secret de l'application Entra ID a peut-être expiré — vérifier/régénérer dans Entra ID (App registrations) et mettre à jour appsettings.Production.json sur vm-trm-live.\n" +
-                "3. Si l'erreur mentionne \"D365 client secret not configured\": l'intégration D365 n'a pas encore été configurée — voir la section Dynamics de appsettings.Production.json.\n" +
-                "4. Si l'erreur indique un problème de connexion/timeout: vérifier que vm-trm-live peut atteindre https://alterra.operations.dynamics.com (port 443).\n" +
-                "5. Si l'erreur mentionne un champ invalide ou persiste après plusieurs tentatives: la numérotation des RequestId (WREF0000xxxxx) est peut-être désynchronisée — vérifier le dernier RequestId existant dans AssetMaintenanceRequests.\n" +
+                "2. Si l'erreur mentionne \"webhook URL not configured\": l'intégration Power Automate n'a pas encore été configurée — voir la section PowerAutomate de appsettings.Production.json.\n" +
+                "3. Si l'erreur mentionne un code HTTP 4xx/5xx du webhook: vérifier dans Power Automate (Mes flux) que le flux qui crée les billets D365 (badge/alarme) est toujours activé et n'a pas d'erreur de connexion (ex. connexion Dynamics expirée).\n" +
+                "4. Si l'erreur indique un problème de connexion/timeout: vérifier que vm-trm-live peut atteindre prod-*.logic.azure.com (les points de terminaison Power Automate, port 443).\n" +
+                "5. Consulter l'historique d'exécution du flux dans Power Automate pour voir si la demande a été reçue et où elle a échoué côté D365.\n" +
                 "6. Une fois la cause corrigée, créer le billet manuellement dans D365 (Enterprise Asset Management, emplacement fonctionnel BF-SEC-GEN) avec les détails de la demande ci-dessus — les données complètes de la demande restent disponibles dans l'application Cycle Emploi.";
 
             try
