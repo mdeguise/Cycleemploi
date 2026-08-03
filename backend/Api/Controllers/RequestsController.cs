@@ -17,13 +17,26 @@ public class RequestsController : ControllerBase
     private readonly RequestNumberService _requestNumbers;
     private readonly RequestAuthorizationService _authz;
     private readonly IAdDirectoryService _ad;
+    private readonly IFreshdeskService _freshdesk;
+    private readonly IEmailNotificationService _email;
+    private readonly ILogger<RequestsController> _logger;
 
-    public RequestsController(AppDbContext db, RequestNumberService requestNumbers, RequestAuthorizationService authz, IAdDirectoryService ad)
+    public RequestsController(
+        AppDbContext db,
+        RequestNumberService requestNumbers,
+        RequestAuthorizationService authz,
+        IAdDirectoryService ad,
+        IFreshdeskService freshdesk,
+        IEmailNotificationService email,
+        ILogger<RequestsController> logger)
     {
         _db = db;
         _requestNumbers = requestNumbers;
         _authz = authz;
         _ad = ad;
+        _freshdesk = freshdesk;
+        _email = email;
+        _logger = logger;
     }
 
     [HttpPost]
@@ -181,7 +194,50 @@ public class RequestsController : ControllerBase
         request.UpdatedAt = request.SubmittedAt.Value;
         await _db.SaveChangesAsync(ct);
 
+        // Best-effort: the submission has already succeeded and is committed by this point.
+        // Downstream ticket-system integrations (Freshdesk now, TDX later) must never be able to
+        // fail a submission the requester already completed — a failure here notifies IT support by
+        // email instead, so a ticket can be created manually.
+        await TryCreateFreshdeskTicketAsync(request, ct);
+
         return NoContent();
+    }
+
+    private async Task TryCreateFreshdeskTicketAsync(Request request, CancellationToken ct)
+    {
+        try
+        {
+            var requesterEmail = _ad.GetUserInfo(User.GetSamAccountName()).Email;
+            if (string.IsNullOrWhiteSpace(requesterEmail))
+            {
+                throw new InvalidOperationException("Could not resolve requester email from AD.");
+            }
+
+            await _freshdesk.CreateTicketAsync(request, requesterEmail, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create Freshdesk ticket for request {RequestNumber}", request.RequestNumber);
+
+            var subject = $"[Cycle Emploi] Échec de création de ticket Freshdesk — demande #{request.RequestNumber}";
+            var body =
+                $"La demande #{request.RequestNumber} ({request.RequestType.ToFrenchLabel()}) a été soumise avec succès, " +
+                "mais la création du ticket Freshdesk correspondant a échoué. Un ticket devra être créé manuellement.\n\n" +
+                $"Erreur: {ex.Message}\n\n" +
+                $"Demandé par: {request.CreatedByDisplayName}\n" +
+                $"Date de soumission: {request.SubmittedAt:yyyy-MM-dd HH:mm} UTC";
+
+            try
+            {
+                await _email.SendAsync(subject, body, ct);
+            }
+            catch (Exception emailEx)
+            {
+                // Nothing more useful to do here — the submission already succeeded and is
+                // committed; let this surface in the server logs for someone to notice.
+                _logger.LogError(emailEx, "Also failed to send the Freshdesk-failure notification email for request {RequestNumber}", request.RequestNumber);
+            }
+        }
     }
 
     private static List<string> ValidateForSubmit(Request request)

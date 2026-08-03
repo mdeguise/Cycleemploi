@@ -54,6 +54,12 @@ builder.Services.AddScoped<IAdDirectoryService, AdDirectoryService>();
 builder.Services.AddScoped<RequestAuthorizationService>();
 builder.Services.AddScoped<RequestNumberService>();
 
+// --- Ticket-system integrations (submit-time, best-effort — see RequestsController.Submit) ---
+builder.Services.Configure<FreshdeskOptions>(builder.Configuration.GetSection("Freshdesk"));
+builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection("Smtp"));
+builder.Services.AddHttpClient<IFreshdeskService, FreshdeskService>();
+builder.Services.AddScoped<IEmailNotificationService, SmtpEmailNotificationService>();
+
 // --- CORS ---
 // Frontend and API are hosted as separate top-level IIS sites/ports (not a nested Application —
 // see git history for why: Windows Auth on a nested Application produced an unresolved empty 404

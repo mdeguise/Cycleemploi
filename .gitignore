@@ -15,6 +15,12 @@ dist-ssr
 # Secrets — never commit real values, see .env.example
 .env
 
+# Real API keys/SMTP credentials for Freshdesk/TDX/etc. — see CONTRIBUTING.md and
+# backend/Api/appsettings.json's Freshdesk/Smtp section comments. dotnet publish includes this
+# automatically if present, so it deploys the same way as every other file, but it must never be
+# committed.
+backend/Api/appsettings.Production.json
+
 # .NET backend build artifacts
 backend/Api/bin/
 backend/Api/obj/
