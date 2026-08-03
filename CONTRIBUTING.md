@@ -5,14 +5,14 @@
 - **Windows**, domain-joined (or on VPN) — the backend uses Windows-specific libraries for Negotiate auth and AD lookups (`System.DirectoryServices.AccountManagement`), so this doesn't run on macOS/Linux.
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - [Node.js](https://nodejs.org/) + npm
-- Git, and a GitHub account added as a collaborator on [mdeguise/PowerApp](https://github.com/mdeguise/PowerApp)
+- Git, and a GitHub account added as a collaborator on [mdeguise/Cycleemploi](https://github.com/mdeguise/Cycleemploi)
 - VS Code (or Visual Studio) — no specific extensions required beyond the usual C#/TypeScript ones
 
 ## Get the code
 
 ```bash
-git clone https://github.com/mdeguise/PowerApp.git
-cd PowerApp
+git clone https://github.com/mdeguise/Cycleemploi.git
+cd Cycleemploi
 ```
 
 ## SQL Server access (for local dev)

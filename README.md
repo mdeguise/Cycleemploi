@@ -1,6 +1,6 @@
 # Gestion du cycle d'emploi - Tremblant
 
-Repo: **https://github.com/mdeguise/PowerApp**
+Repo: **https://github.com/mdeguise/Cycleemploi**
 
 A full-stack internal tool for Tremblant's employee lifecycle requests: **Nouvelle intégration**, **Réactivation**, and **Avis de terminaison ou mise à pied temporaire** (offboarding), each as its own multi-step wizard sharing the same app shell.
 
