@@ -56,9 +56,9 @@ builder.Services.AddScoped<RequestNumberService>();
 
 // --- Ticket-system integrations (submit-time, best-effort — see RequestsController.Submit) ---
 builder.Services.Configure<FreshdeskOptions>(builder.Configuration.GetSection("Freshdesk"));
-builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection("Smtp"));
+builder.Services.Configure<SendGridOptions>(builder.Configuration.GetSection("SendGrid"));
 builder.Services.AddHttpClient<IFreshdeskService, FreshdeskService>();
-builder.Services.AddScoped<IEmailNotificationService, SmtpEmailNotificationService>();
+builder.Services.AddScoped<IEmailNotificationService, SendGridEmailNotificationService>();
 
 // --- CORS ---
 // Frontend and API are hosted as separate top-level IIS sites/ports (not a nested Application —
