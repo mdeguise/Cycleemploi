@@ -24,6 +24,7 @@ backend/Api/appsettings.Production.json
 # .NET backend build artifacts
 backend/Api/bin/
 backend/Api/obj/
+backend/Api/publish-out/
 
 # Editor directories and files
 .vscode/*
