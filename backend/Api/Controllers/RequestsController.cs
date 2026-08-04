@@ -23,8 +23,10 @@ public class RequestsController : ControllerBase
     private readonly ILogger<RequestsController> _logger;
 
     /// <summary>Systèmes junction rows store the catalog's display text directly (see
-    /// AccessDetail's doc comment) — this must match src/data/catalogs.ts's ACCES_BADGE exactly.</summary>
+    /// AccessDetail's doc comment) — these must match src/data/catalogs.ts's ACCES_BADGE and
+    /// BESOIN_CODE_ALARME exactly.</summary>
     private const string AccesBadgeSystemeValue = "Badge d'accès aux édifices";
+    private const string BesoinCodeAlarmeSystemeValue = "Besoin de code d'alarme";
 
     public RequestsController(
         AppDbContext db,
@@ -130,7 +132,7 @@ public class RequestsController : ControllerBase
 
         request.AccessDetail ??= new AccessDetail { RequestId = id };
         request.AccessDetail.BadgeZones = dto.BadgeZones;
-        request.AccessDetail.BesoinCodeAlarme = dto.BesoinCodeAlarme;
+        request.AccessDetail.CodeAlarmeDetails = dto.CodeAlarmeDetails;
         request.AccessDetail.Justification = dto.JustificationAcces;
         request.AccessDetail.Stationnement = dto.StationnementRequis;
         ReplaceJunction(_db.RequestAccessSystemes, request.AccessDetail.Systemes, id, dto.SystemesAcces,
@@ -262,9 +264,10 @@ public class RequestsController : ControllerBase
     }
 
     /// <summary>Creates a D365 F&amp;O Enterprise Asset Management work order for badge/alarm
-    /// activation when "Badge d'accès aux édifices" was selected — only applies to
-    /// Onboarding/Réactivation, mirroring the old Freshservice-triggered Power Automate flow this
-    /// replaces. Same fail-open, email-on-failure pattern as the Freshdesk integration above.</summary>
+    /// activation when "Badge d'accès aux édifices" and/or "Besoin de code d'alarme" was selected —
+    /// only applies to Onboarding/Réactivation, mirroring the old Freshservice-triggered Power
+    /// Automate flow this replaces. Same fail-open, email-on-failure pattern as the Freshdesk
+    /// integration above.</summary>
     private async Task TryCreateD365BadgeTicketAsync(Request request, CancellationToken ct)
     {
         if (request.RequestType is not (RequestType.Onboarding or RequestType.Reactivation))
@@ -272,8 +275,8 @@ public class RequestsController : ControllerBase
             return;
         }
 
-        var systemes = request.AccessDetail?.Systemes.Select(s => s.Value) ?? [];
-        if (!systemes.Contains(AccesBadgeSystemeValue))
+        var systemes = (request.AccessDetail?.Systemes.Select(s => s.Value) ?? []).ToList();
+        if (!systemes.Contains(AccesBadgeSystemeValue) && !systemes.Contains(BesoinCodeAlarmeSystemeValue))
         {
             return;
         }
@@ -399,7 +402,7 @@ public class RequestsController : ControllerBase
         RegleDePayeCommentaire = r.OnboardingDetail?.RegleDePayeCommentaire,
         SystemesAcces = r.AccessDetail?.Systemes.Select(s => s.Value).ToList() ?? [],
         BadgeZones = r.AccessDetail?.BadgeZones,
-        BesoinCodeAlarme = r.AccessDetail?.BesoinCodeAlarme ?? false,
+        CodeAlarmeDetails = r.AccessDetail?.CodeAlarmeDetails,
         SystemePosHebergement = r.AccessDetail?.PosHebergement.Select(p => p.Value).ToList() ?? [],
         StationnementRequis = r.AccessDetail?.Stationnement,
         JustificationAcces = r.AccessDetail?.Justification,

@@ -3,7 +3,7 @@ import { Field, SectionTitle } from '../components/FormField';
 import { StepFooter } from '../components/StepFooter';
 import { ChoiceCard } from '../components/ChoiceCard';
 import { LockIcon } from '../components/icons';
-import { SYSTEMES_ACCES, POS_HEBERGEMENT_SYSTEMES, ACCES_BADGE } from '../data/catalogs';
+import { SYSTEMES_ACCES, POS_HEBERGEMENT_SYSTEMES, ACCES_BADGE, BESOIN_CODE_ALARME } from '../data/catalogs';
 
 export function Step3Access() {
   const { request, setRequest } = useWizard();
@@ -31,11 +31,8 @@ export function Step3Access() {
     setRequest((prev) => ({ ...prev, access: { ...prev.access, badgeZones } }));
   };
 
-  const toggleBesoinCodeAlarme = () => {
-    setRequest((prev) => ({
-      ...prev,
-      access: { ...prev.access, besoinCodeAlarme: !prev.access.besoinCodeAlarme },
-    }));
+  const updateCodeAlarmeDetails = (codeAlarmeDetails: string) => {
+    setRequest((prev) => ({ ...prev, access: { ...prev.access, codeAlarmeDetails } }));
   };
 
   const updateJustification = (justification: string) => {
@@ -71,22 +68,25 @@ export function Step3Access() {
       </div>
 
       {a.systemes.includes(ACCES_BADGE) && (
-        <>
-          <Field label="Zones ou édifices requis">
-            <input
-              type="text"
-              value={a.badgeZones}
-              onChange={(ev) => updateBadgeZones(ev.target.value)}
-              placeholder="Précisez les zones ou édifices requis"
-            />
-          </Field>
-          <ChoiceCard
-            title="Besoin de code d'alarme"
-            description="Cochez si un code d'alarme doit être créé pour cet employé"
-            selected={a.besoinCodeAlarme}
-            onToggle={toggleBesoinCodeAlarme}
+        <Field label="Zones ou édifices requis">
+          <input
+            type="text"
+            value={a.badgeZones}
+            onChange={(ev) => updateBadgeZones(ev.target.value)}
+            placeholder="Précisez les zones ou édifices requis"
           />
-        </>
+        </Field>
+      )}
+
+      {a.systemes.includes(BESOIN_CODE_ALARME) && (
+        <Field label="Précisions - code d'alarme">
+          <input
+            type="text"
+            value={a.codeAlarmeDetails}
+            onChange={(ev) => updateCodeAlarmeDetails(ev.target.value)}
+            placeholder="Précisez l'emplacement ou tout détail utile pour le code d'alarme"
+          />
+        </Field>
       )}
 
       <SectionTitle icon={<LockIcon style={{ width: 16, height: 16 }} />}>Système POS et Hébergement</SectionTitle>

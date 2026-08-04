@@ -25,17 +25,21 @@ public class PowerAutomateEamService : IDynamicsEamService
 
         var access = request.AccessDetail;
         var d = request.OnboardingDetail;
+        var systemes = access?.Systemes.Select(s => s.Value).ToList() ?? [];
 
         var payload = new BadgeRequestPayload
         {
             RequestNumber = request.RequestNumber,
             NomEmploye = employee.NameSnapshot,
+            PositionTitle = employee.PositionSnapshot,
             Departement = employee.DepartementSnapshot,
             Statut = employee.TypeEmploiSnapshot,
             DebutantLe = d?.DateEntreePrevue?.ToString("yyyy-MM-dd"),
             Manager = employee.GestionnaireSnapshot,
+            DemandePar = request.CreatedByDisplayName,
             ZonesOuEdifices = access?.BadgeZones,
-            BesoinCodeAlarme = access?.BesoinCodeAlarme ?? false
+            BesoinCodeAlarme = systemes.Contains("Besoin de code d'alarme"),
+            DetailsCodeAlarme = access?.CodeAlarmeDetails
         };
 
         using var response = await _http.PostAsJsonAsync(_options.BadgeRequestWebhookUrl, payload, ct);
@@ -72,6 +76,9 @@ public class PowerAutomateEamService : IDynamicsEamService
         [JsonPropertyName("nomEmploye")]
         public string? NomEmploye { get; set; }
 
+        [JsonPropertyName("positionTitle")]
+        public string? PositionTitle { get; set; }
+
         [JsonPropertyName("departement")]
         public string? Departement { get; set; }
 
@@ -84,11 +91,17 @@ public class PowerAutomateEamService : IDynamicsEamService
         [JsonPropertyName("manager")]
         public string? Manager { get; set; }
 
+        [JsonPropertyName("demandePar")]
+        public string? DemandePar { get; set; }
+
         [JsonPropertyName("zonesOuEdifices")]
         public string? ZonesOuEdifices { get; set; }
 
         [JsonPropertyName("besoinCodeAlarme")]
         public bool BesoinCodeAlarme { get; set; }
+
+        [JsonPropertyName("detailsCodeAlarme")]
+        public string? DetailsCodeAlarme { get; set; }
     }
 
     private class BadgeRequestResponse

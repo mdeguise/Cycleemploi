@@ -71,7 +71,7 @@ function toUpdateDto(request: OnboardingRequest): UpdateRequestDto {
     regleDePayeCommentaire: request.employee.regleDePayeCommentaire || null,
     systemesAcces: request.access.systemes,
     badgeZones: request.access.badgeZones || null,
-    besoinCodeAlarme: request.access.besoinCodeAlarme,
+    codeAlarmeDetails: request.access.codeAlarmeDetails || null,
     systemePosHebergement: request.access.posHebergement,
     stationnementRequis: request.access.stationnement || null,
     justificationAcces: request.access.justification || null,

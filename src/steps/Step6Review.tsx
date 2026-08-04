@@ -3,7 +3,7 @@ import { useWizard } from '../context/WizardContext';
 import { StepFooter } from '../components/StepFooter';
 import { SubmissionModal } from '../components/SubmissionModal';
 import { CheckCircleIcon, UserIcon, BriefcaseIcon, LockIcon, LaptopIcon, AppsIcon } from '../components/icons';
-import { REGLE_DE_PAYE_AUTRE, ACCES_BADGE } from '../data/catalogs';
+import { REGLE_DE_PAYE_AUTRE, ACCES_BADGE, BESOIN_CODE_ALARME } from '../data/catalogs';
 import { formatDateFr } from '../utils/formatDate';
 
 export function Step6Review() {
@@ -141,16 +141,16 @@ export function Step6Review() {
             </div>
           </div>
           {a.systemes.includes(ACCES_BADGE) && (
-            <>
-              <div>
-                <div className="review-item__label">Zones ou édifices requis</div>
-                <div className="review-item__value">{a.badgeZones || '—'}</div>
-              </div>
-              <div>
-                <div className="review-item__label">Besoin de code d'alarme</div>
-                <div className="review-item__value">{a.besoinCodeAlarme ? 'Oui' : 'Non'}</div>
-              </div>
-            </>
+            <div>
+              <div className="review-item__label">Zones ou édifices requis</div>
+              <div className="review-item__value">{a.badgeZones || '—'}</div>
+            </div>
+          )}
+          {a.systemes.includes(BESOIN_CODE_ALARME) && (
+            <div>
+              <div className="review-item__label">Précisions - code d'alarme</div>
+              <div className="review-item__value">{a.codeAlarmeDetails || '—'}</div>
+            </div>
           )}
           <div>
             <div className="review-item__label">Système POS et Hébergement</div>
