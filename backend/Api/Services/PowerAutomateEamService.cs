@@ -32,6 +32,7 @@ public class PowerAutomateEamService : IDynamicsEamService
             RequestNumber = request.RequestNumber,
             NomEmploye = employee.NameSnapshot,
             PositionTitle = employee.PositionSnapshot,
+            JobCode = employee.CodeEmploiSnapshot,
             Departement = employee.DepartementSnapshot,
             Statut = employee.TypeEmploiSnapshot,
             DebutantLe = d?.DateEntreePrevue?.ToString("yyyy-MM-dd"),
@@ -50,14 +51,14 @@ public class PowerAutomateEamService : IDynamicsEamService
         }
 
         // The flow may run async (default "When an HTTP request is received" behavior returns 202
-        // with no body) or synchronously return the created D365 job code via a Response action —
+        // with no body) or synchronously return the created D365 RequestId via a Response action —
         // support both rather than requiring the flow author to add one.
         try
         {
             var result = await response.Content.ReadFromJsonAsync<BadgeRequestResponse>(cancellationToken: ct);
-            if (!string.IsNullOrWhiteSpace(result?.JobCode))
+            if (!string.IsNullOrWhiteSpace(result?.RequestId))
             {
-                return result.JobCode;
+                return result.RequestId;
             }
         }
         catch
@@ -65,7 +66,7 @@ public class PowerAutomateEamService : IDynamicsEamService
             // No JSON body (e.g. a plain 202 Accepted) — not an error, just nothing to report back.
         }
 
-        return $"(soumis via webhook, jobcode D365 non retourné — statut {(int)response.StatusCode})";
+        return $"(soumis via webhook, ID D365 non retourné — statut {(int)response.StatusCode})";
     }
 
     private class BadgeRequestPayload
@@ -78,6 +79,9 @@ public class PowerAutomateEamService : IDynamicsEamService
 
         [JsonPropertyName("positionTitle")]
         public string? PositionTitle { get; set; }
+
+        [JsonPropertyName("jobcode")]
+        public string? JobCode { get; set; }
 
         [JsonPropertyName("departement")]
         public string? Departement { get; set; }
@@ -106,7 +110,7 @@ public class PowerAutomateEamService : IDynamicsEamService
 
     private class BadgeRequestResponse
     {
-        [JsonPropertyName("jobcode")]
-        public string? JobCode { get; set; }
+        [JsonPropertyName("requestId")]
+        public string? RequestId { get; set; }
     }
 }

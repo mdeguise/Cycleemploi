@@ -289,8 +289,8 @@ public class RequestsController : ControllerBase
 
         try
         {
-            var d365JobCode = await _dynamics.CreateBadgeRequestAsync(request, employee, ct);
-            _logger.LogInformation("Created D365 EAM badge request, jobcode {D365JobCode}, for request {RequestNumber}", d365JobCode, request.RequestNumber);
+            var d365RequestId = await _dynamics.CreateBadgeRequestAsync(request, employee, ct);
+            _logger.LogInformation("Created D365 EAM badge request {D365RequestId} for request {RequestNumber}", d365RequestId, request.RequestNumber);
         }
         catch (Exception ex)
         {
