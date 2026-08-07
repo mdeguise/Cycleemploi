@@ -58,8 +58,10 @@ builder.Services.AddScoped<RequestNumberService>();
 builder.Services.Configure<FreshdeskOptions>(builder.Configuration.GetSection("Freshdesk"));
 builder.Services.Configure<SendGridOptions>(builder.Configuration.GetSection("SendGrid"));
 builder.Services.Configure<PowerAutomateOptions>(builder.Configuration.GetSection("PowerAutomate"));
+builder.Services.Configure<TdxOptions>(builder.Configuration.GetSection("Tdx"));
 builder.Services.AddHttpClient<IFreshdeskService, FreshdeskService>();
 builder.Services.AddHttpClient<IDynamicsEamService, PowerAutomateEamService>();
+builder.Services.AddHttpClient<ITdxService, TdxService>();
 builder.Services.AddScoped<IEmailNotificationService, SendGridEmailNotificationService>();
 
 // --- CORS ---

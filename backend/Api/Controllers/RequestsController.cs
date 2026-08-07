@@ -21,6 +21,7 @@ public class RequestsController : ControllerBase
     private readonly IFreshdeskService _freshdesk;
     private readonly FreshdeskOptions _freshdeskOptions;
     private readonly IDynamicsEamService _dynamics;
+    private readonly ITdxService _tdx;
     private readonly IEmailNotificationService _email;
     private readonly ILogger<RequestsController> _logger;
 
@@ -38,6 +39,7 @@ public class RequestsController : ControllerBase
         IFreshdeskService freshdesk,
         IOptions<FreshdeskOptions> freshdeskOptions,
         IDynamicsEamService dynamics,
+        ITdxService tdx,
         IEmailNotificationService email,
         ILogger<RequestsController> logger)
     {
@@ -48,6 +50,7 @@ public class RequestsController : ControllerBase
         _freshdesk = freshdesk;
         _freshdeskOptions = freshdeskOptions.Value;
         _dynamics = dynamics;
+        _tdx = tdx;
         _email = email;
         _logger = logger;
     }
@@ -216,6 +219,7 @@ public class RequestsController : ControllerBase
         // (if it succeeded) can be included in the D365 webhook payload for cross-referencing.
         var freshdeskTicketId = await TryCreateFreshdeskTicketAsync(request, ct);
         await TryCreateD365BadgeTicketAsync(request, freshdeskTicketId, ct);
+        await TryCreateTdxTicketAsync(request, ct);
 
         return NoContent();
     }
@@ -391,6 +395,71 @@ public class RequestsController : ControllerBase
                 catch (Exception emailEx)
                 {
                     _logger.LogError(emailEx, "Also failed to send the D365-failure notification email for request {RequestNumber}, employee {EmployeeName}", request.RequestNumber, employee.NameSnapshot);
+                }
+            }
+        }
+    }
+
+    /// <summary>Creates a TDX ticket (TeamDynamix, "OneIT" app) for every submitted request,
+    /// regardless of type — unlike the D365 badge/alarm integration, there's no gating condition
+    /// here. Loops per employee on the request, same as the Freshdesk child tickets and D365
+    /// integration, since a termination can target several people at once.</summary>
+    private async Task TryCreateTdxTicketAsync(Request request, CancellationToken ct)
+    {
+        List<RequestEmployee> employeesToProcess = request.RequestType == RequestType.Offboarding
+            ? request.Employees.ToList()
+            : (request.Employees.FirstOrDefault(e => e.IsPrimary) ?? request.Employees.FirstOrDefault()) is { } emp
+                ? [emp]
+                : [];
+
+        var requesterInfo = _ad.GetUserInfo(User.GetSamAccountName());
+        var requesterName = requesterInfo.DisplayName ?? request.CreatedByDisplayName;
+        var requesterEmail = requesterInfo.Email;
+
+        foreach (var employee in employeesToProcess)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(requesterEmail))
+                {
+                    throw new InvalidOperationException("Could not resolve requester email from AD.");
+                }
+
+                var tdxTicketId = await _tdx.CreateTicketAsync(request, employee, requesterName, requesterEmail, ct);
+                _logger.LogInformation("Created TDX ticket {TdxTicketId} for request {RequestNumber}, employee {EmployeeName}", tdxTicketId, request.RequestNumber, employee.NameSnapshot);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to create TDX ticket for request {RequestNumber}, employee {EmployeeName}", request.RequestNumber, employee.NameSnapshot);
+
+                var subject = $"[Cycle Emploi] Échec de création de billet TDX — demande #{request.RequestNumber} — {employee.NameSnapshot}";
+                var body =
+                    $"La demande #{request.RequestNumber} ({request.RequestType.ToFrenchLabel()}) a été soumise avec succès, " +
+                    $"mais la création du billet TDX correspondant à {employee.NameSnapshot} a échoué. Le billet devra être créé manuellement.\n\n" +
+                    "== Détails de la demande ==\n" +
+                    $"Employé: {employee.NameSnapshot}\n" +
+                    $"Demandé par: {request.CreatedByDisplayName}\n" +
+                    $"Date de soumission: {request.SubmittedAt:yyyy-MM-dd HH:mm} UTC\n\n" +
+                    "== Détails de l'erreur ==\n" +
+                    $"Type: {ex.GetType().Name}\n" +
+                    $"Message: {ex.Message}\n" +
+                    (ex.InnerException is not null ? $"Cause interne: {ex.InnerException.Message}\n" : "") +
+                    $"Survenue: {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC\n\n" +
+                    "== Étapes à vérifier ==\n" +
+                    "1. Consulter les journaux applicatifs sur vm-trm-live pour la trace complète, en recherchant le numéro de demande ci-dessus.\n" +
+                    "2. Si l'erreur mentionne \"TDX username/password not configured\": l'intégration TDX n'a pas encore été configurée — voir la section Tdx de appsettings.Production.json.\n" +
+                    "3. Si l'erreur mentionne un code HTTP 401 sur /api/auth: le mot de passe du compte de service TDX a peut-être expiré ou été changé.\n" +
+                    "4. Si l'erreur mentionne \"returned no match\" sur la recherche du demandeur: le compte AD du demandeur n'a pas d'adresse courriel valide, ou cette adresse n'existe pas dans TDX — vérifier l'attribut mail dans Active Directory.\n" +
+                    "5. Si l'erreur indique un problème de connexion/timeout: vérifier que vm-trm-live peut atteindre https://get.alterra.support (port 443).\n" +
+                    "6. Une fois la cause corrigée, créer le billet manuellement dans TDX (application OneIT, formulaire Quick Incident, groupe IT Operations) avec les détails ci-dessus — les données complètes de la demande restent disponibles dans l'application Cycle Emploi.";
+
+                try
+                {
+                    await _email.SendAsync(subject, body, ct);
+                }
+                catch (Exception emailEx)
+                {
+                    _logger.LogError(emailEx, "Also failed to send the TDX-failure notification email for request {RequestNumber}, employee {EmployeeName}", request.RequestNumber, employee.NameSnapshot);
                 }
             }
         }
