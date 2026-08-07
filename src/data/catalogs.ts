@@ -14,6 +14,7 @@ export const TYPES_EMPLOI = ['Temps plein - permanent', 'Temps plein - saisonnie
 export const REGLE_DE_PAYE_AUTRE = 'AUTRES PRÉCISÉ DANS COMMENTAIRES';
 
 export const REGLES_DE_PAYE = [
+  'AUCUNE',
   '05H45 SANS REPAS',
   '7H30 AVEC 60 MIN DE REPAS',
   '7H30 AVEC 30 MIN DE REPAS',

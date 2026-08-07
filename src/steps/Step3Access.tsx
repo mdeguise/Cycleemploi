@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { useWizard } from '../context/WizardContext';
 import { Field, SectionTitle } from '../components/FormField';
 import { StepFooter } from '../components/StepFooter';
@@ -57,37 +58,36 @@ export function Step3Access() {
 
       <div className="choice-list">
         {SYSTEMES_ACCES.map((sys) => (
-          <ChoiceCard
-            key={sys.nom}
-            title={sys.nom}
-            description={sys.description}
-            selected={a.systemes.includes(sys.nom)}
-            onToggle={() => toggleSysteme(sys.nom)}
-          />
+          <Fragment key={sys.nom}>
+            <ChoiceCard
+              title={sys.nom}
+              description={sys.description}
+              selected={a.systemes.includes(sys.nom)}
+              onToggle={() => toggleSysteme(sys.nom)}
+            />
+            {sys.nom === ACCES_BADGE && a.systemes.includes(ACCES_BADGE) && (
+              <Field label="Zones ou édifices requis">
+                <input
+                  type="text"
+                  value={a.badgeZones}
+                  onChange={(ev) => updateBadgeZones(ev.target.value)}
+                  placeholder="Précisez les zones ou édifices requis"
+                />
+              </Field>
+            )}
+            {sys.nom === BESOIN_CODE_ALARME && a.systemes.includes(BESOIN_CODE_ALARME) && (
+              <Field label="Précisions - code d'alarme">
+                <input
+                  type="text"
+                  value={a.codeAlarmeDetails}
+                  onChange={(ev) => updateCodeAlarmeDetails(ev.target.value)}
+                  placeholder="Précisez l'emplacement ou tout détail utile pour le code d'alarme"
+                />
+              </Field>
+            )}
+          </Fragment>
         ))}
       </div>
-
-      {a.systemes.includes(ACCES_BADGE) && (
-        <Field label="Zones ou édifices requis">
-          <input
-            type="text"
-            value={a.badgeZones}
-            onChange={(ev) => updateBadgeZones(ev.target.value)}
-            placeholder="Précisez les zones ou édifices requis"
-          />
-        </Field>
-      )}
-
-      {a.systemes.includes(BESOIN_CODE_ALARME) && (
-        <Field label="Précisions - code d'alarme">
-          <input
-            type="text"
-            value={a.codeAlarmeDetails}
-            onChange={(ev) => updateCodeAlarmeDetails(ev.target.value)}
-            placeholder="Précisez l'emplacement ou tout détail utile pour le code d'alarme"
-          />
-        </Field>
-      )}
 
       <SectionTitle icon={<LockIcon style={{ width: 16, height: 16 }} />}>Système POS et Hébergement</SectionTitle>
       <div className="choice-list">

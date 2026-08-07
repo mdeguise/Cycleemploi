@@ -33,6 +33,14 @@ public class PowerAutomateEamService : IDynamicsEamService
             ? request.OffboardingDetail?.DerniereJournee?.ToString("yyyy-MM-dd")
             : request.OnboardingDetail?.DateEntreePrevue?.ToString("yyyy-MM-dd");
 
+        // Offboarding has no "Accès et comptes" step (no badge/alarm selection, no Stationnement
+        // field) — it has its own single free-text "Stationnement et puce d'accès" field instead
+        // (src/steps/Step3DepartmentComments.tsx), which is the closest equivalent for a
+        // termination. Onboarding/Réactivation use AccessDetail.Stationnement.
+        var stationnementEtPuceAcces = request.RequestType == RequestType.Offboarding
+            ? request.OffboardingDetail?.CommentairesParkingAcces
+            : access?.Stationnement;
+
         var payload = new BadgeRequestPayload
         {
             RequestNumber = request.RequestNumber,
@@ -45,9 +53,11 @@ public class PowerAutomateEamService : IDynamicsEamService
             DebutantLe = dateReference,
             Manager = employee.GestionnaireSnapshot,
             DemandePar = request.CreatedByDisplayName,
+            BesoinBadgeAcces = systemes.Contains("Badge d'accès aux édifices"),
             ZonesOuEdifices = access?.BadgeZones,
             BesoinCodeAlarme = systemes.Contains("Besoin de code d'alarme"),
             DetailsCodeAlarme = access?.CodeAlarmeDetails,
+            StationnementEtPuceAcces = stationnementEtPuceAcces,
             FreshdeskTicketId = freshdeskTicketId
         };
 
@@ -109,6 +119,9 @@ public class PowerAutomateEamService : IDynamicsEamService
         [JsonPropertyName("demandePar")]
         public string? DemandePar { get; set; }
 
+        [JsonPropertyName("besoinBadgeAcces")]
+        public bool BesoinBadgeAcces { get; set; }
+
         [JsonPropertyName("zonesOuEdifices")]
         public string? ZonesOuEdifices { get; set; }
 
@@ -117,6 +130,9 @@ public class PowerAutomateEamService : IDynamicsEamService
 
         [JsonPropertyName("detailsCodeAlarme")]
         public string? DetailsCodeAlarme { get; set; }
+
+        [JsonPropertyName("stationnementEtPuceAcces")]
+        public string? StationnementEtPuceAcces { get; set; }
 
         [JsonPropertyName("freshdeskTicketId")]
         public long? FreshdeskTicketId { get; set; }
