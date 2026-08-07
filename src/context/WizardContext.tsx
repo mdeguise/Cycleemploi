@@ -85,7 +85,8 @@ function toUpdateDto(request: OnboardingRequest): UpdateRequestDto {
     detailsRaison: request.offboarding.detailsRaison || null,
     reembaucheriez: request.offboarding.reembaucheriez || null,
     commentairesIT: request.offboarding.commentairesIT || null,
-    commentairesParkingAcces: request.offboarding.commentairesParkingAcces || null,
+    commentairesStationnement: request.offboarding.commentairesStationnement || null,
+    commentairesPuceAcces: request.offboarding.commentairesPuceAcces || null,
     commentairesRedingote: request.offboarding.commentairesRedingote || null,
     commentairesRH: request.offboarding.commentairesRH || null,
   };

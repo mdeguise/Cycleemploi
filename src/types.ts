@@ -55,7 +55,8 @@ export interface OffboardingInfo {
   attachments: File[];
   commentairesRH: string;
   commentairesIT: string;
-  commentairesParkingAcces: string;
+  commentairesStationnement: string;
+  commentairesPuceAcces: string;
   commentairesRedingote: string;
 }
 
@@ -115,7 +116,8 @@ export function createEmptyRequest(demandePar: string): OnboardingRequest {
       attachments: [],
       commentairesRH: '',
       commentairesIT: '',
-      commentairesParkingAcces: '',
+      commentairesStationnement: '',
+      commentairesPuceAcces: '',
       commentairesRedingote: '',
     },
   };

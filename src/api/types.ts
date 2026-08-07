@@ -90,7 +90,8 @@ export interface RequestDto {
   detailsRaison?: string | null;
   reembaucheriez?: string | null;
   commentairesIT?: string | null;
-  commentairesParkingAcces?: string | null;
+  commentairesStationnement?: string | null;
+  commentairesPuceAcces?: string | null;
   commentairesRedingote?: string | null;
   /** Omitted from the JSON entirely (not just null) when the caller isn't authorized to read it —
    * see backend/Api/Controllers/RequestsController.cs. */

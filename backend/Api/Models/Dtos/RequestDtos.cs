@@ -61,7 +61,8 @@ public class RequestDto
     public string? DetailsRaison { get; set; }
     public string? Reembaucheriez { get; set; }
     public string? CommentairesIT { get; set; }
-    public string? CommentairesParkingAcces { get; set; }
+    public string? CommentairesStationnement { get; set; }
+    public string? CommentairesPuceAcces { get; set; }
     public string? CommentairesRedingote { get; set; }
 
     /// <summary>Only populated when the caller passed the RequestAuthorizationService check —
@@ -95,7 +96,8 @@ public class UpdateRequestDto
     public string? DetailsRaison { get; set; }
     public string? Reembaucheriez { get; set; }
     public string? CommentairesIT { get; set; }
-    public string? CommentairesParkingAcces { get; set; }
+    public string? CommentairesStationnement { get; set; }
+    public string? CommentairesPuceAcces { get; set; }
     public string? CommentairesRedingote { get; set; }
 
     /// <summary>Write-only from this DTO's perspective — the author can always write this as

@@ -138,10 +138,18 @@ export function StepReviewOffboarding() {
           <div>
             <div className="review-item__label">
               <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <LockIcon style={{ width: 12, height: 12 }} /> Stationnement et puce d'accès
+                <LockIcon style={{ width: 12, height: 12 }} /> Stationnement
               </span>
             </div>
-            <div className="review-item__value">{o.commentairesParkingAcces || '—'}</div>
+            <div className="review-item__value">{o.commentairesStationnement || '—'}</div>
+          </div>
+          <div>
+            <div className="review-item__label">
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <LockIcon style={{ width: 12, height: 12 }} /> Puce d'accès
+              </span>
+            </div>
+            <div className="review-item__value">{o.commentairesPuceAcces || '—'}</div>
           </div>
           <div>
             <div className="review-item__label">

@@ -159,7 +159,8 @@ public class RequestsController : ControllerBase
             request.OffboardingDetail.DetailsRaison = dto.DetailsRaison ?? request.OffboardingDetail.DetailsRaison;
             request.OffboardingDetail.Reembaucheriez = dto.Reembaucheriez ?? request.OffboardingDetail.Reembaucheriez;
             request.OffboardingDetail.CommentairesIT = dto.CommentairesIT;
-            request.OffboardingDetail.CommentairesParkingAcces = dto.CommentairesParkingAcces;
+            request.OffboardingDetail.CommentairesStationnement = dto.CommentairesStationnement;
+            request.OffboardingDetail.CommentairesPuceAcces = dto.CommentairesPuceAcces;
             request.OffboardingDetail.CommentairesRedingote = dto.CommentairesRedingote;
 
             // Written unconditionally here — the author can always write this as normal form entry.
@@ -425,7 +426,8 @@ public class RequestsController : ControllerBase
         DetailsRaison = r.OffboardingDetail?.DetailsRaison,
         Reembaucheriez = r.OffboardingDetail?.Reembaucheriez,
         CommentairesIT = r.OffboardingDetail?.CommentairesIT,
-        CommentairesParkingAcces = r.OffboardingDetail?.CommentairesParkingAcces,
+        CommentairesStationnement = r.OffboardingDetail?.CommentairesStationnement,
+        CommentairesPuceAcces = r.OffboardingDetail?.CommentairesPuceAcces,
         CommentairesRedingote = r.OffboardingDetail?.CommentairesRedingote
         // CommentairesRH deliberately not mapped here — see GetInternal.
     };

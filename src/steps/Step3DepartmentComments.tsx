@@ -72,14 +72,29 @@ export function Step3DepartmentComments() {
         label={
           <span className="dept-comment-label">
             <LockIcon style={{ width: 15, height: 15 }} />
-            Stationnement et puce d'accès
+            Stationnement
           </span>
         }
       >
         <textarea
-          value={o.commentairesParkingAcces}
-          onChange={(ev) => update({ commentairesParkingAcces: ev.target.value })}
-          placeholder="Commentaires concernant le stationnement et la puce d'accès de l'employé"
+          value={o.commentairesStationnement}
+          onChange={(ev) => update({ commentairesStationnement: ev.target.value })}
+          placeholder="Commentaires concernant le stationnement de l'employé"
+        />
+      </Field>
+
+      <Field
+        label={
+          <span className="dept-comment-label">
+            <LockIcon style={{ width: 15, height: 15 }} />
+            Puce d'accès
+          </span>
+        }
+      >
+        <textarea
+          value={o.commentairesPuceAcces}
+          onChange={(ev) => update({ commentairesPuceAcces: ev.target.value })}
+          placeholder="Commentaires concernant la puce d'accès de l'employé"
         />
       </Field>
 

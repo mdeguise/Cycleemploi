@@ -33,13 +33,24 @@ public class PowerAutomateEamService : IDynamicsEamService
             ? request.OffboardingDetail?.DerniereJournee?.ToString("yyyy-MM-dd")
             : request.OnboardingDetail?.DateEntreePrevue?.ToString("yyyy-MM-dd");
 
-        // Offboarding has no "Accès et comptes" step (no badge/alarm selection, no Stationnement
-        // field) — it has its own single free-text "Stationnement et puce d'accès" field instead
-        // (src/steps/Step3DepartmentComments.tsx), which is the closest equivalent for a
-        // termination. Onboarding/Réactivation use AccessDetail.Stationnement.
-        var stationnementEtPuceAcces = request.RequestType == RequestType.Offboarding
-            ? request.OffboardingDetail?.CommentairesParkingAcces
-            : access?.Stationnement;
+        // Stationnement and puce d'accès are always kept as two separate fields — different
+        // departments manage each, even though they used to share one free-text box on the
+        // termination form (now split into two — see Step3DepartmentComments.tsx). Onboarding/
+        // Réactivation only has a dedicated Stationnement field; "puce d'accès" concerns there are
+        // already fully captured via BesoinBadgeAcces/ZonesOuEdifices above, so PuceAcces is null
+        // for those two types rather than duplicating that data under a different name.
+        string? stationnement;
+        string? puceAcces;
+        if (request.RequestType == RequestType.Offboarding)
+        {
+            stationnement = request.OffboardingDetail?.CommentairesStationnement;
+            puceAcces = request.OffboardingDetail?.CommentairesPuceAcces;
+        }
+        else
+        {
+            stationnement = access?.Stationnement;
+            puceAcces = null;
+        }
 
         var payload = new BadgeRequestPayload
         {
@@ -57,7 +68,8 @@ public class PowerAutomateEamService : IDynamicsEamService
             ZonesOuEdifices = access?.BadgeZones,
             BesoinCodeAlarme = systemes.Contains("Besoin de code d'alarme"),
             DetailsCodeAlarme = access?.CodeAlarmeDetails,
-            StationnementEtPuceAcces = stationnementEtPuceAcces,
+            Stationnement = stationnement,
+            PuceAcces = puceAcces,
             FreshdeskTicketId = freshdeskTicketId
         };
 
@@ -131,8 +143,11 @@ public class PowerAutomateEamService : IDynamicsEamService
         [JsonPropertyName("detailsCodeAlarme")]
         public string? DetailsCodeAlarme { get; set; }
 
-        [JsonPropertyName("stationnementEtPuceAcces")]
-        public string? StationnementEtPuceAcces { get; set; }
+        [JsonPropertyName("stationnement")]
+        public string? Stationnement { get; set; }
+
+        [JsonPropertyName("puceAcces")]
+        public string? PuceAcces { get; set; }
 
         [JsonPropertyName("freshdeskTicketId")]
         public long? FreshdeskTicketId { get; set; }
