@@ -26,12 +26,15 @@ public class PowerAutomateEamService : IDynamicsEamService
         var access = request.AccessDetail;
         var systemes = access?.Systemes.Select(s => s.Value).ToList() ?? [];
 
-        // "debutantLe" keeps its name in the payload (avoids reworking the flow's schema again),
-        // but for a termination it actually carries the last day, not a start date — there's no
-        // "date d'entrée" for an employee who's leaving.
-        var dateReference = request.RequestType == RequestType.Offboarding
-            ? request.OffboardingDetail?.DerniereJournee?.ToString("yyyy-MM-dd")
+        // debutantLe (start date) and derniereJournee (last day) are two distinct fields — a
+        // termination has no "date d'entrée", and reusing debutantLe for both was confusing, so
+        // each request type only ever populates the one that actually applies to it.
+        var debutantLe = request.RequestType == RequestType.Offboarding
+            ? null
             : request.OnboardingDetail?.DateEntreePrevue?.ToString("yyyy-MM-dd");
+        var derniereJournee = request.RequestType == RequestType.Offboarding
+            ? request.OffboardingDetail?.DerniereJournee?.ToString("yyyy-MM-dd")
+            : null;
 
         // Stationnement and puce d'accès are always kept as two separate fields — different
         // departments manage each, even though they used to share one free-text box on the
@@ -61,7 +64,8 @@ public class PowerAutomateEamService : IDynamicsEamService
             JobCode = employee.CodeEmploiSnapshot,
             Departement = employee.DepartementSnapshot,
             Statut = employee.TypeEmploiSnapshot,
-            DebutantLe = dateReference,
+            DebutantLe = debutantLe,
+            DerniereJournee = derniereJournee,
             Manager = employee.GestionnaireSnapshot,
             DemandePar = request.CreatedByDisplayName,
             BesoinBadgeAcces = systemes.Contains("Badge d'accès aux édifices"),
@@ -124,6 +128,9 @@ public class PowerAutomateEamService : IDynamicsEamService
 
         [JsonPropertyName("debutantLe")]
         public string? DebutantLe { get; set; }
+
+        [JsonPropertyName("derniereJournee")]
+        public string? DerniereJournee { get; set; }
 
         [JsonPropertyName("manager")]
         public string? Manager { get; set; }
