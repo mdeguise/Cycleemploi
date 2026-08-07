@@ -33,12 +33,32 @@ public class EmployeesController : ControllerBase
             return Ok(new List<EmployeeDto>());
         }
 
-        var results = await _workday.WorkdayDemographics
-            .Where(e => e.PrimaryJob == 1 && e.EmploymentStatus != "Terminated")
-            .Where(e =>
+        var terms = q.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        var query = _workday.WorkdayDemographics
+            .Where(e => e.PrimaryJob == 1 && e.EmploymentStatus != "Terminated");
+
+        if (terms.Length <= 1)
+        {
+            query = query.Where(e =>
                 EF.Functions.Like(e.EmployeeId, $"{q}%") ||
                 EF.Functions.Like(e.LastName!, $"{q}%") ||
-                EF.Functions.Like(e.FirstName!, $"{q}%"))
+                EF.Functions.Like(e.FirstName!, $"{q}%"));
+        }
+        else
+        {
+            // Multi-word query (e.g. "marc de") — every word must match the start of either the
+            // first or last name, in any order, since we don't know which word the user typed as
+            // the first vs. last name.
+            foreach (var term in terms)
+            {
+                query = query.Where(e =>
+                    EF.Functions.Like(e.FirstName!, $"{term}%") ||
+                    EF.Functions.Like(e.LastName!, $"{term}%"));
+            }
+        }
+
+        var results = await query
             .OrderBy(e => e.LastName)
             .Take(6)
             .Select(e => new EmployeeDto
