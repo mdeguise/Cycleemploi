@@ -21,7 +21,7 @@ public class FreshdeskService : IFreshdeskService
         _options = options.Value;
     }
 
-    public async Task CreateTicketAsync(Request request, string requesterEmail, CancellationToken ct)
+    public async Task<long> CreateTicketAsync(Request request, string requesterEmail, CancellationToken ct)
     {
         var (subject, description) = BuildContent(request);
 
@@ -47,11 +47,14 @@ public class FreshdeskService : IFreshdeskService
             "Basic", Convert.ToBase64String(Encoding.ASCII.GetBytes($"{_options.ApiKey}:X")));
 
         using var response = await _http.SendAsync(requestMessage, ct);
+        var responseBody = await response.Content.ReadAsStringAsync(ct);
         if (!response.IsSuccessStatusCode)
         {
-            var body = await response.Content.ReadAsStringAsync(ct);
-            throw new FreshdeskTicketException($"Freshdesk returned {(int)response.StatusCode} {response.ReasonPhrase}: {body}");
+            throw new FreshdeskTicketException($"Freshdesk returned {(int)response.StatusCode} {response.ReasonPhrase}: {responseBody}");
         }
+
+        using var doc = JsonDocument.Parse(responseBody);
+        return doc.RootElement.GetProperty("id").GetInt64();
     }
 
     private static (string Subject, string Description) BuildContent(Request request)

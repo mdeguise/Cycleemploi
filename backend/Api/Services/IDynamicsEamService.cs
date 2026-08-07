@@ -8,8 +8,11 @@ namespace TremblantLifecycle.Api.Services;
 /// trigger, and the data comes directly from the wizard instead of parsed ticket custom fields.</summary>
 public interface IDynamicsEamService
 {
-    /// <returns>The RequestId of the created AssetMaintenanceRequests record (e.g. "WREF0000012346").</returns>
-    Task<string> CreateBadgeRequestAsync(Request request, RequestEmployee employee, CancellationToken ct);
+    /// <param name="freshdeskTicketId">The id of the Freshdesk ticket created for this same
+    /// submission (if that succeeded) — included in the webhook payload for cross-referencing.
+    /// Null if the Freshdesk ticket creation failed or hasn't happened.</param>
+    /// <returns>The jobcode of the created AssetMaintenanceRequests record.</returns>
+    Task<string> CreateBadgeRequestAsync(Request request, RequestEmployee employee, long? freshdeskTicketId, CancellationToken ct);
 }
 
 public class DynamicsEamException(string message) : Exception(message);

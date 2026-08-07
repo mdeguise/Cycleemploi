@@ -16,7 +16,7 @@ public class PowerAutomateEamService : IDynamicsEamService
         _options = options.Value;
     }
 
-    public async Task<string> CreateBadgeRequestAsync(Request request, RequestEmployee employee, CancellationToken ct)
+    public async Task<string> CreateBadgeRequestAsync(Request request, RequestEmployee employee, long? freshdeskTicketId, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(_options.BadgeRequestWebhookUrl))
         {
@@ -40,7 +40,8 @@ public class PowerAutomateEamService : IDynamicsEamService
             DemandePar = request.CreatedByDisplayName,
             ZonesOuEdifices = access?.BadgeZones,
             BesoinCodeAlarme = systemes.Contains("Besoin de code d'alarme"),
-            DetailsCodeAlarme = access?.CodeAlarmeDetails
+            DetailsCodeAlarme = access?.CodeAlarmeDetails,
+            FreshdeskTicketId = freshdeskTicketId
         };
 
         using var response = await _http.PostAsJsonAsync(_options.BadgeRequestWebhookUrl, payload, ct);
@@ -106,6 +107,9 @@ public class PowerAutomateEamService : IDynamicsEamService
 
         [JsonPropertyName("detailsCodeAlarme")]
         public string? DetailsCodeAlarme { get; set; }
+
+        [JsonPropertyName("freshdeskTicketId")]
+        public long? FreshdeskTicketId { get; set; }
     }
 
     private class BadgeRequestResponse

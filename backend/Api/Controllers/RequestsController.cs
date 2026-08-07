@@ -207,14 +207,15 @@ public class RequestsController : ControllerBase
         // Best-effort: the submission has already succeeded and is committed by this point.
         // Downstream ticket-system integrations (Freshdesk now, TDX later) must never be able to
         // fail a submission the requester already completed — a failure here notifies IT support by
-        // email instead, so a ticket can be created manually.
-        await TryCreateFreshdeskTicketAsync(request, ct);
-        await TryCreateD365BadgeTicketAsync(request, ct);
+        // email instead, so a ticket can be created manually. Freshdesk runs first so its ticket id
+        // (if it succeeded) can be included in the D365 webhook payload for cross-referencing.
+        var freshdeskTicketId = await TryCreateFreshdeskTicketAsync(request, ct);
+        await TryCreateD365BadgeTicketAsync(request, freshdeskTicketId, ct);
 
         return NoContent();
     }
 
-    private async Task TryCreateFreshdeskTicketAsync(Request request, CancellationToken ct)
+    private async Task<long?> TryCreateFreshdeskTicketAsync(Request request, CancellationToken ct)
     {
         try
         {
@@ -224,7 +225,7 @@ public class RequestsController : ControllerBase
                 throw new InvalidOperationException("Could not resolve requester email from AD.");
             }
 
-            await _freshdesk.CreateTicketAsync(request, requesterEmail, ct);
+            return await _freshdesk.CreateTicketAsync(request, requesterEmail, ct);
         }
         catch (Exception ex)
         {
@@ -260,6 +261,8 @@ public class RequestsController : ControllerBase
                 // committed; let this surface in the server logs for someone to notice.
                 _logger.LogError(emailEx, "Also failed to send the Freshdesk-failure notification email for request {RequestNumber}", request.RequestNumber);
             }
+
+            return null;
         }
     }
 
@@ -268,7 +271,7 @@ public class RequestsController : ControllerBase
     /// only applies to Onboarding/Réactivation, mirroring the old Freshservice-triggered Power
     /// Automate flow this replaces. Same fail-open, email-on-failure pattern as the Freshdesk
     /// integration above.</summary>
-    private async Task TryCreateD365BadgeTicketAsync(Request request, CancellationToken ct)
+    private async Task TryCreateD365BadgeTicketAsync(Request request, long? freshdeskTicketId, CancellationToken ct)
     {
         if (request.RequestType is not (RequestType.Onboarding or RequestType.Reactivation))
         {
@@ -289,8 +292,8 @@ public class RequestsController : ControllerBase
 
         try
         {
-            var d365RequestId = await _dynamics.CreateBadgeRequestAsync(request, employee, ct);
-            _logger.LogInformation("Created D365 EAM badge request {D365RequestId} for request {RequestNumber}", d365RequestId, request.RequestNumber);
+            var d365JobCode = await _dynamics.CreateBadgeRequestAsync(request, employee, freshdeskTicketId, ct);
+            _logger.LogInformation("Created D365 EAM badge request, jobcode {D365JobCode}, for request {RequestNumber}", d365JobCode, request.RequestNumber);
         }
         catch (Exception ex)
         {
