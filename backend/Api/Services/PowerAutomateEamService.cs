@@ -50,14 +50,14 @@ public class PowerAutomateEamService : IDynamicsEamService
         }
 
         // The flow may run async (default "When an HTTP request is received" behavior returns 202
-        // with no body) or synchronously return the created D365 RequestId via a Response action —
+        // with no body) or synchronously return the created D365 job code via a Response action —
         // support both rather than requiring the flow author to add one.
         try
         {
             var result = await response.Content.ReadFromJsonAsync<BadgeRequestResponse>(cancellationToken: ct);
-            if (!string.IsNullOrWhiteSpace(result?.RequestId))
+            if (!string.IsNullOrWhiteSpace(result?.JobCode))
             {
-                return result.RequestId;
+                return result.JobCode;
             }
         }
         catch
@@ -65,7 +65,7 @@ public class PowerAutomateEamService : IDynamicsEamService
             // No JSON body (e.g. a plain 202 Accepted) — not an error, just nothing to report back.
         }
 
-        return $"(soumis via webhook, ID D365 non retourné — statut {(int)response.StatusCode})";
+        return $"(soumis via webhook, jobcode D365 non retourné — statut {(int)response.StatusCode})";
     }
 
     private class BadgeRequestPayload
@@ -106,7 +106,7 @@ public class PowerAutomateEamService : IDynamicsEamService
 
     private class BadgeRequestResponse
     {
-        [JsonPropertyName("requestId")]
-        public string? RequestId { get; set; }
+        [JsonPropertyName("jobcode")]
+        public string? JobCode { get; set; }
     }
 }
