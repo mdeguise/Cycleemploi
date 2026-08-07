@@ -10,4 +10,11 @@ public class FreshdeskOptions
     public long GroupId { get; set; }
     public long EmailConfigId { get; set; }
     public string TicketType { get; set; } = "";
+
+    /// <summary>Child ticket group (Freshdesk "Parent-child ticketing" — parent_id on create),
+    /// created alongside the main ticket on every submission. Includes all job codes associated to
+    /// the employee(s), unlike ChildGroupIdWithoutJobCodes.</summary>
+    public long ChildGroupIdWithJobCodes { get; set; }
+
+    public long ChildGroupIdWithoutJobCodes { get; set; }
 }

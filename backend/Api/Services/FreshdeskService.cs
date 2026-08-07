@@ -1,7 +1,9 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using TremblantLifecycle.Api.Data;
 using TremblantLifecycle.Api.Models.Entities;
 
 namespace TremblantLifecycle.Api.Services;
@@ -14,11 +16,13 @@ public class FreshdeskService : IFreshdeskService
 {
     private readonly HttpClient _http;
     private readonly FreshdeskOptions _options;
+    private readonly WorkdayContext _workday;
 
-    public FreshdeskService(HttpClient http, IOptions<FreshdeskOptions> options)
+    public FreshdeskService(HttpClient http, IOptions<FreshdeskOptions> options, WorkdayContext workday)
     {
         _http = http;
         _options = options.Value;
+        _workday = workday;
     }
 
     public async Task<long> CreateTicketAsync(Request request, string requesterEmail, CancellationToken ct)
@@ -38,6 +42,34 @@ public class FreshdeskService : IFreshdeskService
             tags = Array.Empty<string>()
         };
 
+        return await PostTicketAsync(payload, ct);
+    }
+
+    public async Task<long> CreateChildTicketAsync(Request request, long parentTicketId, string requesterEmail, long groupId, bool includeAllJobCodes, CancellationToken ct)
+    {
+        var employeeNames = string.Join(", ", request.Employees.Select(e => e.NameSnapshot));
+        var subject = $"{request.RequestType.ToFrenchLabel()} - {employeeNames} (#{request.RequestNumber})";
+        var description = await BuildChildContentAsync(request, includeAllJobCodes, ct);
+
+        var payload = new
+        {
+            description,
+            subject,
+            email = requesterEmail,
+            type = _options.TicketType,
+            email_config_id = _options.EmailConfigId,
+            group_id = groupId,
+            priority = 1,
+            status = 2,
+            parent_id = parentTicketId,
+            tags = Array.Empty<string>()
+        };
+
+        return await PostTicketAsync(payload, ct);
+    }
+
+    private async Task<long> PostTicketAsync(object payload, CancellationToken ct)
+    {
         using var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
         using var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"https://{_options.Subdomain}/api/v2/tickets")
         {
@@ -55,6 +87,50 @@ public class FreshdeskService : IFreshdeskService
 
         using var doc = JsonDocument.Parse(responseBody);
         return doc.RootElement.GetProperty("id").GetInt64();
+    }
+
+    /// <summary>Content for the two "child" tickets fanned out to other departments — deliberately a
+    /// much smaller field set than the main ticket (no confidential comments, no equipment/apps
+    /// detail), per the specific fields those departments asked for. Loops over every employee on
+    /// the request (a termination can target several at once), since date/manager/position/paygroup
+    /// are only meaningful per-employee.</summary>
+    private async Task<string> BuildChildContentAsync(Request request, bool includeAllJobCodes, CancellationToken ct)
+    {
+        var isOffboarding = request.RequestType == RequestType.Offboarding;
+        var dateLabel = isOffboarding ? "Date de fin (dernière journée)" : "Date de début prévue";
+        var dateValue = isOffboarding
+            ? request.OffboardingDetail?.DerniereJournee
+            : request.OnboardingDetail?.DateEntreePrevue;
+        // No équivalent "règle de paye" field exists on OffboardingDetail — left blank for terminations.
+        var paygroup = request.OnboardingDetail?.RegleDePaye;
+
+        var sb = new StringBuilder();
+        sb.Append($"<h3>Demande #{request.RequestNumber} — {request.RequestType.ToFrenchLabel()}</h3>");
+        sb.Append($"<p><b>Type de demande:</b> {request.RequestType.ToFrenchLabel()}</p>");
+
+        foreach (var emp in request.Employees)
+        {
+            sb.Append("<p>");
+            sb.Append($"<b>Nom employé:</b> {emp.NameSnapshot}<br>");
+            sb.Append($"<b>{dateLabel}:</b> {(dateValue is { } date ? date.ToString("yyyy-MM-dd") : "—")}<br>");
+            sb.Append($"<b>Gestionnaire:</b> {emp.GestionnaireSnapshot}<br>");
+            sb.Append($"<b>Titre du poste:</b> {emp.PositionSnapshot}<br>");
+            sb.Append($"<b>Groupe de paye:</b> {paygroup ?? "—"}");
+
+            if (includeAllJobCodes)
+            {
+                var jobCodes = await _workday.WorkdayDemographics
+                    .Where(w => w.EmployeeId == emp.WorkdayEmployeeId && w.JobCode != null && w.JobCode != "")
+                    .Select(w => w.JobCode!)
+                    .Distinct()
+                    .ToListAsync(ct);
+                sb.Append($"<br><b>Tous les codes d'emploi:</b> {(jobCodes.Count > 0 ? string.Join(", ", jobCodes) : "—")}");
+            }
+
+            sb.Append("</p>");
+        }
+
+        return sb.ToString();
     }
 
     private static (string Subject, string Description) BuildContent(Request request)

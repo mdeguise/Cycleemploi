@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using TremblantLifecycle.Api.Data;
 using TremblantLifecycle.Api.Models.Dtos;
 using TremblantLifecycle.Api.Models.Entities;
@@ -18,6 +19,7 @@ public class RequestsController : ControllerBase
     private readonly RequestAuthorizationService _authz;
     private readonly IAdDirectoryService _ad;
     private readonly IFreshdeskService _freshdesk;
+    private readonly FreshdeskOptions _freshdeskOptions;
     private readonly IDynamicsEamService _dynamics;
     private readonly IEmailNotificationService _email;
     private readonly ILogger<RequestsController> _logger;
@@ -34,6 +36,7 @@ public class RequestsController : ControllerBase
         RequestAuthorizationService authz,
         IAdDirectoryService ad,
         IFreshdeskService freshdesk,
+        IOptions<FreshdeskOptions> freshdeskOptions,
         IDynamicsEamService dynamics,
         IEmailNotificationService email,
         ILogger<RequestsController> logger)
@@ -43,6 +46,7 @@ public class RequestsController : ControllerBase
         _authz = authz;
         _ad = ad;
         _freshdesk = freshdesk;
+        _freshdeskOptions = freshdeskOptions.Value;
         _dynamics = dynamics;
         _email = email;
         _logger = logger;
@@ -218,15 +222,24 @@ public class RequestsController : ControllerBase
 
     private async Task<long?> TryCreateFreshdeskTicketAsync(Request request, CancellationToken ct)
     {
+        string? requesterEmail = null;
         try
         {
-            var requesterEmail = _ad.GetUserInfo(User.GetSamAccountName()).Email;
+            requesterEmail = _ad.GetUserInfo(User.GetSamAccountName()).Email;
             if (string.IsNullOrWhiteSpace(requesterEmail))
             {
                 throw new InvalidOperationException("Could not resolve requester email from AD.");
             }
 
-            return await _freshdesk.CreateTicketAsync(request, requesterEmail, ct);
+            var ticketId = await _freshdesk.CreateTicketAsync(request, requesterEmail, ct);
+
+            // Best-effort, independent of each other and of the main ticket above (which already
+            // succeeded and is committed) — fanning the same submission out to two other
+            // departments as Freshdesk "child" tickets of the main one.
+            await TryCreateFreshdeskChildTicketAsync(request, ticketId, requesterEmail, _freshdeskOptions.ChildGroupIdWithJobCodes, includeAllJobCodes: true, ct);
+            await TryCreateFreshdeskChildTicketAsync(request, ticketId, requesterEmail, _freshdeskOptions.ChildGroupIdWithoutJobCodes, includeAllJobCodes: false, ct);
+
+            return ticketId;
         }
         catch (Exception ex)
         {
@@ -264,6 +277,51 @@ public class RequestsController : ControllerBase
             }
 
             return null;
+        }
+    }
+
+    /// <summary>Creates one Freshdesk "child" ticket (Parent-child ticketing feature) of the
+    /// already-created main ticket, fanning the submission out to another department's group.
+    /// Independent failure handling from the main ticket and from the other child ticket — either
+    /// can fail without affecting the other, since the main ticket (and the submission itself) is
+    /// already committed by the time either of these run.</summary>
+    private async Task TryCreateFreshdeskChildTicketAsync(Request request, long parentTicketId, string requesterEmail, long groupId, bool includeAllJobCodes, CancellationToken ct)
+    {
+        try
+        {
+            await _freshdesk.CreateChildTicketAsync(request, parentTicketId, requesterEmail, groupId, includeAllJobCodes, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create Freshdesk child ticket (group {GroupId}) for request {RequestNumber}", groupId, request.RequestNumber);
+
+            var subject = $"[Cycle Emploi] Échec de création de ticket Freshdesk enfant (groupe {groupId}) — demande #{request.RequestNumber}";
+            var body =
+                $"La demande #{request.RequestNumber} ({request.RequestType.ToFrenchLabel()}) a été soumise avec succès, et le ticket Freshdesk principal (#{parentTicketId}) a été créé, " +
+                $"mais la création du ticket enfant destiné au groupe {groupId} a échoué. Ce ticket devra être créé manuellement.\n\n" +
+                "== Détails de la demande ==\n" +
+                $"Demandé par: {request.CreatedByDisplayName}\n" +
+                $"Ticket principal Freshdesk: #{parentTicketId}\n" +
+                $"Date de soumission: {request.SubmittedAt:yyyy-MM-dd HH:mm} UTC\n\n" +
+                "== Détails de l'erreur ==\n" +
+                $"Type: {ex.GetType().Name}\n" +
+                $"Message: {ex.Message}\n" +
+                (ex.InnerException is not null ? $"Cause interne: {ex.InnerException.Message}\n" : "") +
+                $"Survenue: {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC\n\n" +
+                "== Étapes à vérifier ==\n" +
+                "1. Consulter les journaux applicatifs sur vm-trm-live pour la trace complète, en recherchant le numéro de demande ci-dessus.\n" +
+                "2. Si l'erreur mentionne un code HTTP Freshdesk (401/403): la clé API a peut-être expiré ou été révoquée.\n" +
+                "3. Si l'erreur mentionne \"parent_id\" ou un champ invalide: vérifier que la fonctionnalité \"Parent-child ticketing\" est toujours activée dans Freshdesk (Admin > Fonctionnalités avancées) et que le ticket principal existe toujours.\n" +
+                $"4. Une fois la cause corrigée, créer le ticket manuellement dans Freshdesk (groupe {groupId}), en le liant comme ticket enfant du ticket principal #{parentTicketId} — les données complètes de la demande restent disponibles dans l'application Cycle Emploi.";
+
+            try
+            {
+                await _email.SendAsync(subject, body, ct);
+            }
+            catch (Exception emailEx)
+            {
+                _logger.LogError(emailEx, "Also failed to send the Freshdesk-child-ticket-failure notification email for request {RequestNumber}, group {GroupId}", request.RequestNumber, groupId);
+            }
         }
     }
 
