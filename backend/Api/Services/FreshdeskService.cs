@@ -101,8 +101,6 @@ public class FreshdeskService : IFreshdeskService
         var dateValue = isOffboarding
             ? request.OffboardingDetail?.DerniereJournee
             : request.OnboardingDetail?.DateEntreePrevue;
-        // No équivalent "règle de paye" field exists on OffboardingDetail — left blank for terminations.
-        var paygroup = request.OnboardingDetail?.RegleDePaye;
 
         var sb = new StringBuilder();
         sb.Append($"<h3>Demande #{request.RequestNumber} — {request.RequestType.ToFrenchLabel()}</h3>");
@@ -110,12 +108,20 @@ public class FreshdeskService : IFreshdeskService
 
         foreach (var emp in request.Employees)
         {
+            // Pay_Group is a distinct Workday field from this app's own "Règle de paye" wizard
+            // input — looked up live rather than snapshotted, from the employee's primary job
+            // assignment (matches how EmployeesController resolves canonical employee data).
+            var payGroup = await _workday.WorkdayDemographics
+                .Where(w => w.EmployeeId == emp.WorkdayEmployeeId && w.PrimaryJob == 1)
+                .Select(w => w.PayGroup)
+                .FirstOrDefaultAsync(ct);
+
             sb.Append("<p>");
             sb.Append($"<b>Nom employé:</b> {emp.NameSnapshot}<br>");
             sb.Append($"<b>{dateLabel}:</b> {(dateValue is { } date ? date.ToString("yyyy-MM-dd") : "—")}<br>");
             sb.Append($"<b>Gestionnaire:</b> {emp.GestionnaireSnapshot}<br>");
             sb.Append($"<b>Titre du poste:</b> {emp.PositionSnapshot}<br>");
-            sb.Append($"<b>Groupe de paye:</b> {paygroup ?? "—"}");
+            sb.Append($"<b>Groupe de paye:</b> {payGroup ?? "—"}");
 
             if (includeAllJobCodes)
             {

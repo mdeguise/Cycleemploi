@@ -31,6 +31,7 @@ public class WorkdayContext : DbContext
             entity.Property(e => e.WorkerType).HasColumnName("Worker_Type");
             entity.Property(e => e.Manager).HasColumnName("Manager");
             entity.Property(e => e.ManagerId).HasColumnName("Manager_ID");
+            entity.Property(e => e.PayGroup).HasColumnName("Pay_Group");
             entity.Property(e => e.EmploymentStatus).HasColumnName("Employment_Status");
             entity.Property(e => e.TerminationReason).HasColumnName("Termination_Reason");
             entity.Property(e => e.TerminationDate).HasColumnName("Termination_Date");

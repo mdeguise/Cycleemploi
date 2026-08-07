@@ -20,6 +20,7 @@ public class WorkdayDemographic
     public string? WorkerType { get; set; }
     public string? Manager { get; set; }
     public string? ManagerId { get; set; }
+    public string? PayGroup { get; set; }
 
     /// <summary>Real values confirmed against live data: "Active", "Inactive", "Terminated".
     /// "Inactive" covers on-leave/layoff, which the business treats as active for this app's
