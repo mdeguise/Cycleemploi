@@ -30,6 +30,7 @@ public class PowerAutomateEamService : IDynamicsEamService
         var payload = new BadgeRequestPayload
         {
             RequestNumber = request.RequestNumber,
+            TypeDemande = request.RequestType.ToFrenchLabel(),
             NomEmploye = employee.NameSnapshot,
             PositionTitle = employee.PositionSnapshot,
             JobCode = employee.CodeEmploiSnapshot,
@@ -74,6 +75,9 @@ public class PowerAutomateEamService : IDynamicsEamService
     {
         [JsonPropertyName("requestNumber")]
         public string RequestNumber { get; set; } = "";
+
+        [JsonPropertyName("typeDemande")]
+        public string TypeDemande { get; set; } = "";
 
         [JsonPropertyName("nomEmploye")]
         public string? NomEmploye { get; set; }
