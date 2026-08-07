@@ -24,8 +24,14 @@ public class PowerAutomateEamService : IDynamicsEamService
         }
 
         var access = request.AccessDetail;
-        var d = request.OnboardingDetail;
         var systemes = access?.Systemes.Select(s => s.Value).ToList() ?? [];
+
+        // "debutantLe" keeps its name in the payload (avoids reworking the flow's schema again),
+        // but for a termination it actually carries the last day, not a start date — there's no
+        // "date d'entrée" for an employee who's leaving.
+        var dateReference = request.RequestType == RequestType.Offboarding
+            ? request.OffboardingDetail?.DerniereJournee?.ToString("yyyy-MM-dd")
+            : request.OnboardingDetail?.DateEntreePrevue?.ToString("yyyy-MM-dd");
 
         var payload = new BadgeRequestPayload
         {
@@ -36,7 +42,7 @@ public class PowerAutomateEamService : IDynamicsEamService
             JobCode = employee.CodeEmploiSnapshot,
             Departement = employee.DepartementSnapshot,
             Statut = employee.TypeEmploiSnapshot,
-            DebutantLe = d?.DateEntreePrevue?.ToString("yyyy-MM-dd"),
+            DebutantLe = dateReference,
             Manager = employee.GestionnaireSnapshot,
             DemandePar = request.CreatedByDisplayName,
             ZonesOuEdifices = access?.BadgeZones,

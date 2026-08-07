@@ -267,66 +267,72 @@ public class RequestsController : ControllerBase
     }
 
     /// <summary>Creates a D365 F&amp;O Enterprise Asset Management work order for badge/alarm
-    /// activation when "Badge d'accès aux édifices" and/or "Besoin de code d'alarme" was selected —
-    /// only applies to Onboarding/Réactivation, mirroring the old Freshservice-triggered Power
-    /// Automate flow this replaces. Same fail-open, email-on-failure pattern as the Freshdesk
-    /// integration above.</summary>
+    /// activation/deactivation, mirroring the old Freshservice-triggered Power Automate flow this
+    /// replaces. For Onboarding/Réactivation, only fires when "Badge d'accès aux édifices" and/or
+    /// "Besoin de code d'alarme" was selected, for the single employee on the request. For
+    /// Offboarding there's no equivalent selection step, so it always fires — once per employee on
+    /// the request, since a termination can target several people at once. Same fail-open,
+    /// email-on-failure pattern as the Freshdesk integration above, applied per employee so one
+    /// failure in a batch termination doesn't stop the others from being sent.</summary>
     private async Task TryCreateD365BadgeTicketAsync(Request request, long? freshdeskTicketId, CancellationToken ct)
     {
-        if (request.RequestType is not (RequestType.Onboarding or RequestType.Reactivation))
+        List<RequestEmployee> employeesToProcess;
+        if (request.RequestType == RequestType.Offboarding)
         {
-            return;
+            employeesToProcess = request.Employees.ToList();
+        }
+        else
+        {
+            var systemes = (request.AccessDetail?.Systemes.Select(s => s.Value) ?? []).ToList();
+            if (!systemes.Contains(AccesBadgeSystemeValue) && !systemes.Contains(BesoinCodeAlarmeSystemeValue))
+            {
+                return;
+            }
+
+            var employee = request.Employees.FirstOrDefault(e => e.IsPrimary) ?? request.Employees.FirstOrDefault();
+            employeesToProcess = employee is null ? [] : [employee];
         }
 
-        var systemes = (request.AccessDetail?.Systemes.Select(s => s.Value) ?? []).ToList();
-        if (!systemes.Contains(AccesBadgeSystemeValue) && !systemes.Contains(BesoinCodeAlarmeSystemeValue))
+        foreach (var employee in employeesToProcess)
         {
-            return;
-        }
-
-        var employee = request.Employees.FirstOrDefault(e => e.IsPrimary) ?? request.Employees.FirstOrDefault();
-        if (employee is null)
-        {
-            return;
-        }
-
-        try
-        {
-            var d365JobCode = await _dynamics.CreateBadgeRequestAsync(request, employee, freshdeskTicketId, ct);
-            _logger.LogInformation("Created D365 EAM badge request, jobcode {D365JobCode}, for request {RequestNumber}", d365JobCode, request.RequestNumber);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to create D365 EAM badge request for request {RequestNumber}", request.RequestNumber);
-
-            var subject = $"[Cycle Emploi] Échec de création de billet D365 (badge/alarme) — demande #{request.RequestNumber}";
-            var body =
-                $"La demande #{request.RequestNumber} ({request.RequestType.ToFrenchLabel()}) a été soumise avec succès et incluait une demande de badge d'accès aux édifices, " +
-                "mais la création du billet D365 (Enterprise Asset Management) correspondant a échoué. Le billet devra être créé manuellement.\n\n" +
-                "== Détails de la demande ==\n" +
-                $"Employé: {employee.NameSnapshot}\n" +
-                $"Demandé par: {request.CreatedByDisplayName}\n" +
-                $"Date de soumission: {request.SubmittedAt:yyyy-MM-dd HH:mm} UTC\n\n" +
-                "== Détails de l'erreur ==\n" +
-                $"Type: {ex.GetType().Name}\n" +
-                $"Message: {ex.Message}\n" +
-                (ex.InnerException is not null ? $"Cause interne: {ex.InnerException.Message}\n" : "") +
-                $"Survenue: {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC\n\n" +
-                "== Étapes à vérifier ==\n" +
-                "1. Consulter les journaux applicatifs sur vm-trm-live pour la trace complète, en recherchant le numéro de demande ci-dessus.\n" +
-                "2. Si l'erreur mentionne \"webhook URL not configured\": l'intégration Power Automate n'a pas encore été configurée — voir la section PowerAutomate de appsettings.Production.json.\n" +
-                "3. Si l'erreur mentionne un code HTTP 4xx/5xx du webhook: vérifier dans Power Automate (Mes flux) que le flux qui crée les billets D365 (badge/alarme) est toujours activé et n'a pas d'erreur de connexion (ex. connexion Dynamics expirée).\n" +
-                "4. Si l'erreur indique un problème de connexion/timeout: vérifier que vm-trm-live peut atteindre prod-*.logic.azure.com (les points de terminaison Power Automate, port 443).\n" +
-                "5. Consulter l'historique d'exécution du flux dans Power Automate pour voir si la demande a été reçue et où elle a échoué côté D365.\n" +
-                "6. Une fois la cause corrigée, créer le billet manuellement dans D365 (Enterprise Asset Management, emplacement fonctionnel BF-SEC-GEN) avec les détails de la demande ci-dessus — les données complètes de la demande restent disponibles dans l'application Cycle Emploi.";
-
             try
             {
-                await _email.SendAsync(subject, body, ct);
+                var d365JobCode = await _dynamics.CreateBadgeRequestAsync(request, employee, freshdeskTicketId, ct);
+                _logger.LogInformation("Created D365 EAM badge request, jobcode {D365JobCode}, for request {RequestNumber}, employee {EmployeeName}", d365JobCode, request.RequestNumber, employee.NameSnapshot);
             }
-            catch (Exception emailEx)
+            catch (Exception ex)
             {
-                _logger.LogError(emailEx, "Also failed to send the D365-failure notification email for request {RequestNumber}", request.RequestNumber);
+                _logger.LogError(ex, "Failed to create D365 EAM badge request for request {RequestNumber}, employee {EmployeeName}", request.RequestNumber, employee.NameSnapshot);
+
+                var subject = $"[Cycle Emploi] Échec de création de billet D365 (badge/alarme) — demande #{request.RequestNumber} — {employee.NameSnapshot}";
+                var body =
+                    $"La demande #{request.RequestNumber} ({request.RequestType.ToFrenchLabel()}) a été soumise avec succès, " +
+                    $"mais la création du billet D365 (Enterprise Asset Management) correspondant à {employee.NameSnapshot} a échoué. Le billet devra être créé manuellement.\n\n" +
+                    "== Détails de la demande ==\n" +
+                    $"Employé: {employee.NameSnapshot}\n" +
+                    $"Demandé par: {request.CreatedByDisplayName}\n" +
+                    $"Date de soumission: {request.SubmittedAt:yyyy-MM-dd HH:mm} UTC\n\n" +
+                    "== Détails de l'erreur ==\n" +
+                    $"Type: {ex.GetType().Name}\n" +
+                    $"Message: {ex.Message}\n" +
+                    (ex.InnerException is not null ? $"Cause interne: {ex.InnerException.Message}\n" : "") +
+                    $"Survenue: {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC\n\n" +
+                    "== Étapes à vérifier ==\n" +
+                    "1. Consulter les journaux applicatifs sur vm-trm-live pour la trace complète, en recherchant le numéro de demande ci-dessus.\n" +
+                    "2. Si l'erreur mentionne \"webhook URL not configured\": l'intégration Power Automate n'a pas encore été configurée — voir la section PowerAutomate de appsettings.Production.json.\n" +
+                    "3. Si l'erreur mentionne un code HTTP 4xx/5xx du webhook: vérifier dans Power Automate (Mes flux) que le flux qui crée les billets D365 (badge/alarme) est toujours activé et n'a pas d'erreur de connexion (ex. connexion Dynamics expirée).\n" +
+                    "4. Si l'erreur indique un problème de connexion/timeout: vérifier que vm-trm-live peut atteindre prod-*.logic.azure.com (les points de terminaison Power Automate, port 443).\n" +
+                    "5. Consulter l'historique d'exécution du flux dans Power Automate pour voir si la demande a été reçue et où elle a échoué côté D365.\n" +
+                    "6. Une fois la cause corrigée, créer le billet manuellement dans D365 (Enterprise Asset Management, emplacement fonctionnel BF-SEC-GEN) avec les détails ci-dessus — les données complètes de la demande restent disponibles dans l'application Cycle Emploi.";
+
+                try
+                {
+                    await _email.SendAsync(subject, body, ct);
+                }
+                catch (Exception emailEx)
+                {
+                    _logger.LogError(emailEx, "Also failed to send the D365-failure notification email for request {RequestNumber}, employee {EmployeeName}", request.RequestNumber, employee.NameSnapshot);
+                }
             }
         }
     }
