@@ -44,6 +44,22 @@ export const SYSTEMES_ACCES: AccessSystem[] = [
 export const ACCES_BADGE = 'Badge d\'accès aux édifices';
 export const BESOIN_CODE_ALARME = 'Besoin de code d\'alarme';
 
+// Matches backend/Api/Models/Entities/D365SecurityRoleMapping.cs's D365SecurityRoles.All exactly —
+// the checkbox options on TDX's "D365 - Access" form (FormID 10799), confirmed against a real
+// export of that form. Used by the admin page that manages JobCode -> role mappings.
+export const D365_SECURITY_ROLES = [
+  'Procurement - Approver/Requester',
+  'Procurement - Project Manager',
+  'Procurement - Receiver',
+  'Accounts Payable - Access (must be accountant)',
+  'General Ledger - JE Preparer / Accountant',
+  'General Ledger - JE Reviewer / Sr. Accountant',
+  'Financial Reporting - Resort Specific',
+  'Financial Reporting - Denver/Corp',
+  'Accounts Receivable - Clerk',
+  'Accounts Receivable - Manager',
+];
+
 export const POS_HEBERGEMENT_SYSTEMES = ['RTP', 'SMS', 'OPERA', 'SYMPHONIE', 'APROPOS'];
 
 export interface EquipmentItem {

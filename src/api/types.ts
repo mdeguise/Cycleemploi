@@ -106,3 +106,14 @@ export type UpdateRequestDto = Omit<
 export interface CreateRequestDto {
   requestType: RequestTypeApi;
 }
+
+export interface D365SecurityRoleMappingDto {
+  id: number;
+  jobCode: string;
+  role: string;
+}
+
+export interface CreateD365SecurityRoleMappingDto {
+  jobCode: string;
+  role: string;
+}

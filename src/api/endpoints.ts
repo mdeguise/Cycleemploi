@@ -1,7 +1,9 @@
 import type { ApiClient } from './client';
 import type {
   CatalogsDto,
+  CreateD365SecurityRoleMappingDto,
   CreateRequestDto,
+  D365SecurityRoleMappingDto,
   EmployeeDto,
   MeDto,
   RequestDto,
@@ -27,6 +29,12 @@ export function createApi(client: ApiClient) {
       update: (id: number, dto: UpdateRequestDto) =>
         client.put<void>(`/api/requests/${id}`, dto),
       submit: (id: number) => client.post<void>(`/api/requests/${id}/submit`),
+    },
+    d365SecurityRoles: {
+      list: () => client.get<D365SecurityRoleMappingDto[]>('/api/d365-security-roles'),
+      create: (dto: CreateD365SecurityRoleMappingDto) =>
+        client.post<D365SecurityRoleMappingDto>('/api/d365-security-roles', dto),
+      remove: (id: number) => client.delete<void>(`/api/d365-security-roles/${id}`),
     },
   };
 }

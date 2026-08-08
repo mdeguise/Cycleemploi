@@ -23,6 +23,7 @@ public class AppDbContext : DbContext
     public DbSet<OffboardingDetail> OffboardingDetails => Set<OffboardingDetail>();
     public DbSet<OffboardingConfidentialComment> OffboardingConfidentialComments => Set<OffboardingConfidentialComment>();
     public DbSet<Attachment> Attachments => Set<Attachment>();
+    public DbSet<D365SecurityRoleMapping> D365SecurityRoleMappings => Set<D365SecurityRoleMapping>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -94,6 +95,13 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Attachment>()
             .HasOne(a => a.Request).WithMany(r => r.Attachments)
             .HasForeignKey(a => a.RequestId).OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<D365SecurityRoleMapping>(entity =>
+        {
+            entity.Property(m => m.JobCode).HasMaxLength(50).IsRequired();
+            entity.Property(m => m.Role).HasMaxLength(200).IsRequired();
+            entity.HasIndex(m => new { m.JobCode, m.Role }).IsUnique();
+        });
 
         // Transactionally-safe request numbering — see RequestNumberService.
         modelBuilder.HasSequence<int>("RequestNumberSeq").StartsAt(1).IncrementsBy(1);

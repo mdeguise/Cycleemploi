@@ -1,7 +1,10 @@
 import './App.css';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { WizardProvider, useWizard } from './context/WizardContext';
 import { Header } from './components/Header';
+import tremblantLogo from './assets/logo-tremblant.png';
 import { StepNav } from './components/StepNav';
 import { SummarySidebar } from './components/SummarySidebar';
 import { TipBanner } from './components/TipBanner';
@@ -17,6 +20,7 @@ import { StepReviewOffboarding } from './steps/StepReviewOffboarding';
 import { TYPE_DEMANDE_TERMINAISON } from './types';
 import { ApiProvider } from './api/ApiContext';
 import { useApi } from './api/ApiContext';
+import { D365RolesAdminPage } from './admin/D365RolesAdminPage';
 
 const ONBOARDING_STEP_COMPONENTS = [
   Step1Employee,
@@ -79,9 +83,35 @@ function AuthenticatedApp() {
   }
 
   return (
-    <WizardProvider demandePar={me.displayName}>
-      <WizardBody />
-    </WizardProvider>
+    <BrowserRouter>
+      <Routes>
+        <Route
+          path="/admin/d365-roles"
+          element={
+            <div className="app-shell">
+              <header className="app-header">
+                <div className="app-header__brand">
+                  <img src={tremblantLogo} alt="Tremblant" className="app-header__logo" />
+                  <div className="app-header__title">Administration — Rôles de sécurité D365</div>
+                </div>
+                <Link to="/">Retour à l'application</Link>
+              </header>
+              <div className="app-body">
+                <D365RolesAdminPage />
+              </div>
+            </div>
+          }
+        />
+        <Route
+          path="/*"
+          element={
+            <WizardProvider demandePar={me.displayName}>
+              <WizardBody />
+            </WizardProvider>
+          }
+        />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
