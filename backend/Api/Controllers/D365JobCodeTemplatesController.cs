@@ -35,22 +35,30 @@ public class D365JobCodeTemplatesController : ControllerBase
             .ToDictionaryAsync(x => x.JobCode, x => x.PositionTitle, ct);
     }
 
-    /// <summary>Every job code currently held by an active primary-job employee, each flagged with
-    /// whether its D365 access template has been filled out yet — the progress tracker for the
-    /// automation rollout.</summary>
+    /// <summary>Every job code with real D365 role data (i.e. it appears in D365UserSecurityRoles —
+    /// the same 136 job codes the granular-role base was derived from), each flagged with whether
+    /// its D365 access template has been filled out yet — the progress tracker for the automation
+    /// rollout. Deliberately narrower than "every job code Workday currently has" — a job code with
+    /// no D365 usage on record isn't a useful starting point for this form.</summary>
     [HttpGet]
     public async Task<ActionResult<List<D365JobCodeTemplateSummaryDto>>> List(CancellationToken ct)
     {
+        var jobCodesWithRoleData = await _db.D365UserSecurityRoles
+            .Where(r => r.JobCode != null)
+            .Select(r => r.JobCode!)
+            .Distinct()
+            .ToListAsync(ct);
+
         var titles = await GetPositionTitlesByJobCode(ct);
         var filledJobCodes = await _db.D365JobCodeTemplates.Select(t => t.JobCode).ToListAsync(ct);
         var filledSet = filledJobCodes.ToHashSet();
 
-        var result = titles
-            .Select(kv => new D365JobCodeTemplateSummaryDto
+        var result = jobCodesWithRoleData
+            .Select(jobCode => new D365JobCodeTemplateSummaryDto
             {
-                JobCode = kv.Key,
-                PositionTitle = kv.Value,
-                IsFilled = filledSet.Contains(kv.Key)
+                JobCode = jobCode,
+                PositionTitle = titles.GetValueOrDefault(jobCode),
+                IsFilled = filledSet.Contains(jobCode)
             })
             .OrderBy(x => x.JobCode)
             .ToList();
