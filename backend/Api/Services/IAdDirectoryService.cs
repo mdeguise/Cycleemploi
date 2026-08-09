@@ -25,6 +25,13 @@ public interface IAdDirectoryService
 
     /// <summary>All Tremblant AD accounts (extensionAttribute2 = "T"), enabled and disabled, in a
     /// single LDAP query. Used by the reconciliation view to resolve account status for Dynaway
-    /// logins (by Sam) and D365 users (by Cn) without a per-user round trip.</summary>
+    /// logins (by Sam) without a per-user round trip.</summary>
     IReadOnlyList<AdAccount> GetTremblantAccounts();
+
+    /// <summary>AD accounts whose employeeID attribute is one of the given values, across the whole
+    /// directory (NOT limited to Tremblant/ext2=T — a person can hold Tremblant D365 roles while
+    /// their AD account is tagged another resort). employeeID equals the Workday EmployeeId, so this
+    /// is the reliable join from a D365 user (once linked to Workday) to their AD account, immune to
+    /// display-name typos/renames. Batched into chunked LDAP OR-filters.</summary>
+    IReadOnlyList<AdAccount> GetAccountsByEmployeeId(IEnumerable<string> employeeIds);
 }
