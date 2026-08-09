@@ -16,10 +16,23 @@ namespace TremblantLifecycle.Api.Controllers;
 public class D365SecurityRolesController : ControllerBase
 {
     private readonly AppDbContext _db;
+    private readonly WorkdayContext _workday;
 
-    public D365SecurityRolesController(AppDbContext db)
+    public D365SecurityRolesController(AppDbContext db, WorkdayContext workday)
     {
         _db = db;
+        _workday = workday;
+    }
+
+    /// <summary>JobCode -> PositionTitle, from each job code's current primary-job holders — purely
+    /// for display in the admin table, so IT can recognize a job code without memorizing it.</summary>
+    private async Task<Dictionary<string, string?>> GetPositionTitlesByJobCode(CancellationToken ct)
+    {
+        return await _workday.WorkdayDemographics
+            .Where(w => w.PrimaryJob == 1 && w.JobCode != null)
+            .GroupBy(w => w.JobCode!)
+            .Select(g => new { JobCode = g.Key, PositionTitle = g.First().PositionTitle })
+            .ToDictionaryAsync(x => x.JobCode, x => x.PositionTitle, ct);
     }
 
     [HttpGet]
@@ -29,6 +42,13 @@ public class D365SecurityRolesController : ControllerBase
             .OrderBy(m => m.JobCode).ThenBy(m => m.Role)
             .Select(m => new D365SecurityRoleMappingDto { Id = m.Id, JobCode = m.JobCode, Role = m.Role })
             .ToListAsync(ct);
+
+        var titles = await GetPositionTitlesByJobCode(ct);
+        foreach (var mapping in mappings)
+        {
+            titles.TryGetValue(mapping.JobCode, out var title);
+            mapping.PositionTitle = title;
+        }
 
         return Ok(mappings);
     }
@@ -68,7 +88,16 @@ public class D365SecurityRolesController : ControllerBase
         _db.D365SecurityRoleMappings.Add(mapping);
         await _db.SaveChangesAsync(ct);
 
-        return Ok(new D365SecurityRoleMappingDto { Id = mapping.Id, JobCode = mapping.JobCode, Role = mapping.Role });
+        var titles = await GetPositionTitlesByJobCode(ct);
+        titles.TryGetValue(mapping.JobCode, out var positionTitle);
+
+        return Ok(new D365SecurityRoleMappingDto
+        {
+            Id = mapping.Id,
+            JobCode = mapping.JobCode,
+            Role = mapping.Role,
+            PositionTitle = positionTitle
+        });
     }
 
     [HttpDelete("{id:int}")]

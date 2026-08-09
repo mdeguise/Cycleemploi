@@ -5,6 +5,7 @@ public class D365SecurityRoleMappingDto
     public int Id { get; set; }
     public string JobCode { get; set; } = null!;
     public string Role { get; set; } = null!;
+    public string? PositionTitle { get; set; }
 }
 
 public class CreateD365SecurityRoleMappingDto

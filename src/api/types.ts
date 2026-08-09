@@ -111,6 +111,7 @@ export interface D365SecurityRoleMappingDto {
   id: number;
   jobCode: string;
   role: string;
+  positionTitle?: string | null;
 }
 
 export interface CreateD365SecurityRoleMappingDto {

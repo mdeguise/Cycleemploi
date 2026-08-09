@@ -110,6 +110,7 @@ export function D365RolesAdminPage() {
           <thead>
             <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--border, #ddd)' }}>
               <th style={{ padding: '8px 12px' }}>Code d'emploi</th>
+              <th style={{ padding: '8px 12px' }}>Titre du poste</th>
               <th style={{ padding: '8px 12px' }}>Rôle D365</th>
               <th style={{ padding: '8px 12px' }}></th>
             </tr>
@@ -117,7 +118,7 @@ export function D365RolesAdminPage() {
           <tbody>
             {mappings.length === 0 && (
               <tr>
-                <td colSpan={3} style={{ padding: '12px', color: '#888' }}>
+                <td colSpan={4} style={{ padding: '12px', color: '#888' }}>
                   Aucun mappage — ajoutez-en un ci-dessus.
                 </td>
               </tr>
@@ -125,6 +126,9 @@ export function D365RolesAdminPage() {
             {mappings.map((m) => (
               <tr key={m.id} style={{ borderBottom: '1px solid var(--border, #eee)' }}>
                 <td style={{ padding: '8px 12px' }}>{m.jobCode}</td>
+                <td style={{ padding: '8px 12px', color: m.positionTitle ? undefined : '#888' }}>
+                  {m.positionTitle ?? '—'}
+                </td>
                 <td style={{ padding: '8px 12px' }}>{m.role}</td>
                 <td style={{ padding: '8px 12px', textAlign: 'right' }}>
                   <button type="button" className="review-section__edit" onClick={() => handleDelete(m.id)}>
