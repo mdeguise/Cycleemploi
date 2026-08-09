@@ -58,7 +58,6 @@ export const D365_SECURITY_ROLES = [
   'Financial Reporting - Denver/Corp',
   'Accounts Receivable - Clerk',
   'Accounts Receivable - Manager',
-  'Dynaway - Maintenance Access',
 ];
 
 export const POS_HEBERGEMENT_SYSTEMES = ['RTP', 'SMS', 'OPERA', 'SYMPHONIE', 'APROPOS'];
