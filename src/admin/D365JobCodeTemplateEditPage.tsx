@@ -12,6 +12,7 @@ export function D365JobCodeTemplateEditPage() {
   const [legalEntity, setLegalEntity] = useState('');
   const [departmentNumber, setDepartmentNumber] = useState('');
   const [approvalLimit, setApprovalLimit] = useState('0');
+  const [levyEmployee, setLevyEmployee] = useState(false);
   const [apAccessDetails, setApAccessDetails] = useState('');
   const [additionalLegalEntities, setAdditionalLegalEntities] = useState('');
   const [roles, setRoles] = useState<string[]>([]);
@@ -30,6 +31,7 @@ export function D365JobCodeTemplateEditPage() {
         setLegalEntity(template.legalEntity);
         setDepartmentNumber(template.departmentNumber);
         setApprovalLimit(String(template.approvalLimit));
+        setLevyEmployee(template.levyEmployee);
         setApAccessDetails(template.apAccessDetails ?? '');
         setAdditionalLegalEntities(template.additionalLegalEntities ?? '');
         setRoles(template.roles);
@@ -63,6 +65,7 @@ export function D365JobCodeTemplateEditPage() {
         legalEntity: legalEntity.trim(),
         departmentNumber: departmentNumber.trim(),
         approvalLimit: limit,
+        levyEmployee,
         apAccessDetails: apAccessDetails.trim() || null,
         additionalLegalEntities: additionalLegalEntities.trim() || null,
         roles,
@@ -118,6 +121,20 @@ export function D365JobCodeTemplateEditPage() {
                 onChange={(ev) => setApprovalLimit(ev.target.value)}
                 style={{ width: 160 }}
               />
+            </div>
+          </div>
+
+          <div className="field">
+            <label className="field__label">Employé Levy *</label>
+            <div className="field__input-wrap">
+              <select
+                value={levyEmployee ? 'yes' : 'no'}
+                onChange={(ev) => setLevyEmployee(ev.target.value === 'yes')}
+                style={{ width: 160 }}
+              >
+                <option value="no">Non</option>
+                <option value="yes">Oui</option>
+              </select>
             </div>
           </div>
 

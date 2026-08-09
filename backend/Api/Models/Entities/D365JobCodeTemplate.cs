@@ -18,6 +18,10 @@ public class D365JobCodeTemplate
     public string? ApAccessDetails { get; set; }
     public string? AdditionalLegalEntities { get; set; }
 
+    /// <summary>Answers the form's "Levy Employee *" dropdown (Yes/No) — determined by job
+    /// classification, so it's a per-job-code answer like everything else here.</summary>
+    public bool LevyEmployee { get; set; }
+
     public List<D365JobCodeTemplateRole> Roles { get; set; } = [];
 }
 

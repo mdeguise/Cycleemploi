@@ -140,6 +140,7 @@ export interface D365JobCodeTemplateDto {
   legalEntity: string;
   departmentNumber: string;
   approvalLimit: number;
+  levyEmployee: boolean;
   apAccessDetails?: string | null;
   additionalLegalEntities?: string | null;
   roles: string[];
@@ -150,6 +151,7 @@ export interface UpsertD365JobCodeTemplateDto {
   legalEntity: string;
   departmentNumber: string;
   approvalLimit: number;
+  levyEmployee: boolean;
   apAccessDetails?: string | null;
   additionalLegalEntities?: string | null;
   roles: string[];

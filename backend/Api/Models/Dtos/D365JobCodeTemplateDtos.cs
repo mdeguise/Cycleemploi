@@ -14,6 +14,7 @@ public class D365JobCodeTemplateDto
     public string LegalEntity { get; set; } = "";
     public string DepartmentNumber { get; set; } = "";
     public decimal ApprovalLimit { get; set; }
+    public bool LevyEmployee { get; set; }
     public string? ApAccessDetails { get; set; }
     public string? AdditionalLegalEntities { get; set; }
     public List<string> Roles { get; set; } = [];
@@ -25,6 +26,7 @@ public class UpsertD365JobCodeTemplateDto
     public string LegalEntity { get; set; } = null!;
     public string DepartmentNumber { get; set; } = null!;
     public decimal ApprovalLimit { get; set; }
+    public bool LevyEmployee { get; set; }
     public string? ApAccessDetails { get; set; }
     public string? AdditionalLegalEntities { get; set; }
     public List<string> Roles { get; set; } = [];

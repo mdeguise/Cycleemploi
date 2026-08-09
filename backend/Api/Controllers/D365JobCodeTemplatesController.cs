@@ -96,6 +96,7 @@ public class D365JobCodeTemplatesController : ControllerBase
             LegalEntity = template.LegalEntity,
             DepartmentNumber = template.DepartmentNumber,
             ApprovalLimit = template.ApprovalLimit,
+            LevyEmployee = template.LevyEmployee,
             ApAccessDetails = template.ApAccessDetails,
             AdditionalLegalEntities = template.AdditionalLegalEntities,
             Roles = template.Roles.Select(r => r.Role).OrderBy(r => r).ToList(),
@@ -137,6 +138,7 @@ public class D365JobCodeTemplatesController : ControllerBase
         template.LegalEntity = dto.LegalEntity.Trim();
         template.DepartmentNumber = dto.DepartmentNumber.Trim();
         template.ApprovalLimit = dto.ApprovalLimit;
+        template.LevyEmployee = dto.LevyEmployee;
         template.ApAccessDetails = string.IsNullOrWhiteSpace(dto.ApAccessDetails) ? null : dto.ApAccessDetails.Trim();
         template.AdditionalLegalEntities = string.IsNullOrWhiteSpace(dto.AdditionalLegalEntities) ? null : dto.AdditionalLegalEntities.Trim();
 
@@ -158,6 +160,7 @@ public class D365JobCodeTemplatesController : ControllerBase
             LegalEntity = template.LegalEntity,
             DepartmentNumber = template.DepartmentNumber,
             ApprovalLimit = template.ApprovalLimit,
+            LevyEmployee = template.LevyEmployee,
             ApAccessDetails = template.ApAccessDetails,
             AdditionalLegalEntities = template.AdditionalLegalEntities,
             Roles = template.Roles.Select(r => r.Role).OrderBy(r => r).ToList(),
