@@ -75,6 +75,20 @@ export function D365RolesAdminPage() {
         </div>
       </div>
 
+      <div className="required-note" style={{ marginBottom: 24 }}>
+        Cette liste de base a été générée à partir d'un seuil de 30% d'appartenance par code d'emploi (un rôle est
+        inclus si au moins 30% des employés de ce code d'emploi le détiennent actuellement), calculé à partir du
+        rapport Power BI{' '}
+        <a
+          href="https://app.powerbi.com/groups/me/apps/c7795d78-0dad-40d2-8c64-99adacfb8f23/reports/8f28fd96-8686-48a8-ba22-18f19e06f2b9/ReportSection4f90d29e0ed7a22306cf?experience=power-bi"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Accès et sécurité D365
+        </a>
+        . Ajustez au besoin ci-dessous.
+      </div>
+
       <form onSubmit={handleAdd} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 24 }}>
         <div className="field" style={{ marginBottom: 0 }}>
           <label className="field__label">Code d'emploi</label>
