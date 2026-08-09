@@ -35,7 +35,7 @@ public class AdDirectoryService : IAdDirectoryService
             Filter = "(&(objectCategory=person)(objectClass=user)(extensionAttribute2=T))",
             PageSize = 1000,
         };
-        searcher.PropertiesToLoad.AddRange(new[] { "sAMAccountName", "cn", "userAccountControl", "employeeID" });
+        searcher.PropertiesToLoad.AddRange(new[] { "sAMAccountName", "cn", "userAccountControl", "employeeID", "mail" });
 
         using var found = searcher.FindAll();
         foreach (SearchResult r in found)
@@ -48,7 +48,7 @@ public class AdDirectoryService : IAdDirectoryService
                 : 0;
             var enabled = (uac & 0x2) == 0; // 0x2 = ACCOUNTDISABLE
 
-            results.Add(new AdAccount(sam, GetProp(r, "cn"), enabled, GetProp(r, "employeeID")));
+            results.Add(new AdAccount(sam, GetProp(r, "cn"), enabled, GetProp(r, "employeeID"), GetProp(r, "mail")));
         }
         return results;
     }
@@ -73,7 +73,7 @@ public class AdDirectoryService : IAdDirectoryService
                 Filter = $"(&(objectCategory=person)(objectClass=user)(|{or}))",
                 PageSize = 1000,
             };
-            searcher.PropertiesToLoad.AddRange(new[] { "sAMAccountName", "cn", "userAccountControl", "employeeID" });
+            searcher.PropertiesToLoad.AddRange(new[] { "sAMAccountName", "cn", "userAccountControl", "employeeID", "mail" });
 
             using var found = searcher.FindAll();
             foreach (SearchResult r in found)
@@ -83,7 +83,7 @@ public class AdDirectoryService : IAdDirectoryService
                 var uac = r.Properties["userAccountControl"].Count > 0
                     ? Convert.ToInt32(r.Properties["userAccountControl"][0])
                     : 0;
-                results.Add(new AdAccount(sam, GetProp(r, "cn"), (uac & 0x2) == 0, GetProp(r, "employeeID")));
+                results.Add(new AdAccount(sam, GetProp(r, "cn"), (uac & 0x2) == 0, GetProp(r, "employeeID"), GetProp(r, "mail")));
             }
         }
         return results;

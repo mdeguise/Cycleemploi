@@ -71,10 +71,16 @@ public class DiscrepanciesController : ControllerBase
             .GroupBy(u => Norm(u.UserName))
             .ToDictionary(g => g.Key, g => g.First());
 
-        // Tremblant AD roster (ext2=T) keyed by login — for the Dynaway side.
-        var adBySam = _ad.GetTremblantAccounts()
+        // Tremblant AD roster (ext2=T) — by login (Dynaway side) and by normalized CN (to reach an
+        // unlinked D365 user's AD account, and through it their email → Workday).
+        var adTremblant = _ad.GetTremblantAccounts();
+        var adBySam = adTremblant
             .Where(a => !string.IsNullOrEmpty(a.Sam))
             .GroupBy(a => a.Sam.ToLowerInvariant())
+            .ToDictionary(g => g.Key, g => g.First());
+        var adByCn = adTremblant
+            .Where(a => !string.IsNullOrEmpty(a.Cn))
+            .GroupBy(a => Norm(a.Cn!))
             .ToDictionary(g => g.Key, g => g.First());
 
         // AD accounts for the D365 users, resolved by employeeID across the whole directory
@@ -84,13 +90,32 @@ public class DiscrepanciesController : ControllerBase
             .GroupBy(a => a.EmployeeId!, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
-        // Workday employment status for the linked D365 users.
+        // Workday employment status for the linked D365 users (by EmployeeId).
         var wdByEmp = (await _workday.WorkdayDemographics
                 .Where(w => w.PrimaryJob == 1 && d365EmpIds.Contains(w.EmployeeId))
                 .Select(w => new { w.EmployeeId, w.EmploymentStatus })
                 .ToListAsync(ct))
             .GroupBy(w => w.EmployeeId)
             .ToDictionary(g => g.Key, g => g.First().EmploymentStatus);
+
+        // Fallback path for #2c: unlinked D365 users (no EmployeeId) reached via their AD account's
+        // email → Workday Work_Email. Resolves people whose D365↔Workday name match failed at import
+        // but whose AD account we can find by name.
+        var unlinkedEmails = d365Users
+            .Where(u => string.IsNullOrEmpty(u.EmployeeId))
+            .Select(u => adByCn.TryGetValue(Norm(u.UserName), out var a) ? a.Email : null)
+            .Where(e => !string.IsNullOrEmpty(e))
+            .Select(e => e!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var wdByEmail = unlinkedEmails.Count == 0
+            ? new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
+            : (await _workday.WorkdayDemographics
+                    .Where(w => w.PrimaryJob == 1 && w.WorkEmail != null && unlinkedEmails.Contains(w.WorkEmail))
+                    .Select(w => new { w.WorkEmail, w.EmploymentStatus })
+                    .ToListAsync(ct))
+                .GroupBy(w => w.WorkEmail!, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First().EmploymentStatus, StringComparer.OrdinalIgnoreCase);
 
         // ---- #1 Tremblant Dynaway (login resolves to a Tremblant AD account, ext2=T) ----
         var tremDyn = dyn
@@ -144,20 +169,31 @@ public class DiscrepanciesController : ControllerBase
         var inactive = new List<D365InactiveWorkdayRowDto>();
         foreach (var u in d365Users)
         {
+            // Resolve the Workday record: linked EmployeeId first, else AD-account email → Work_Email.
+            string? wdStatus = null;
+            var resolved = false;
+            var refEmpId = u.EmployeeId;
+            if (!string.IsNullOrEmpty(u.EmployeeId))
+            {
+                resolved = wdByEmp.TryGetValue(u.EmployeeId!, out wdStatus);
+            }
+            else if (adByCn.TryGetValue(Norm(u.UserName), out var a) && !string.IsNullOrEmpty(a.Email)
+                     && wdByEmail.TryGetValue(a.Email!, out wdStatus))
+            {
+                resolved = true;
+                refEmpId = a.EmployeeId; // AD-derived id, useful for linking on the Corrections tab
+            }
+
             string status;
-            if (string.IsNullOrEmpty(u.EmployeeId))
-                status = "Not linked";
-            else if (!wdByEmp.TryGetValue(u.EmployeeId!, out var st) || string.IsNullOrEmpty(st))
-                status = "No Workday record";
-            else if (string.Equals(st, "Active", StringComparison.OrdinalIgnoreCase))
-                continue; // Active -> not a discrepancy
-            else
-                status = st!; // Inactive / Terminated
+            if (!resolved) status = string.IsNullOrEmpty(u.EmployeeId) ? "Not linked" : "No Workday record";
+            else if (string.IsNullOrEmpty(wdStatus)) status = "No Workday record";
+            else if (string.Equals(wdStatus, "Active", StringComparison.OrdinalIgnoreCase)) continue; // Active -> not a discrepancy
+            else status = wdStatus!; // Inactive / Terminated
 
             inactive.Add(new D365InactiveWorkdayRowDto
             {
                 UserName = u.UserName,
-                EmployeeId = u.EmployeeId,
+                EmployeeId = refEmpId,
                 WorkdayStatus = status,
                 D365RoleCount = u.Roles.Count,
                 Roles = string.Join("; ", u.Roles),

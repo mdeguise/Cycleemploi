@@ -2,12 +2,12 @@ namespace TremblantLifecycle.Api.Services;
 
 public record AdUserInfo(string? DisplayName, string? Email);
 
-/// <summary>A Tremblant AD account (extensionAttribute2 = "T"), including disabled ones.
-/// <paramref name="Sam"/> is the sAMAccountName (join key to Dynaway's User_ login);
-/// <paramref name="Cn"/> is the display name incl. the "(T)" suffix (join key to the D365 user
-/// name); <paramref name="Enabled"/> is false when the account is disabled; <paramref name="EmployeeId"/>
-/// is the Workday EmployeeId when set on the account.</summary>
-public record AdAccount(string Sam, string? Cn, bool Enabled, string? EmployeeId);
+/// <summary>An AD account. <paramref name="Sam"/> is the sAMAccountName (join key to Dynaway's
+/// User_ login); <paramref name="Cn"/> is the display name incl. the "(T)" suffix; <paramref name="Enabled"/>
+/// is false when disabled; <paramref name="EmployeeId"/> is the Workday EmployeeId when set on the
+/// account; <paramref name="Email"/> is the mail attribute — matches Workday's Work_Email, a reliable
+/// fallback link to a Workday record when the EmployeeId join is missing.</summary>
+public record AdAccount(string Sam, string? Cn, bool Enabled, string? EmployeeId, string? Email);
 
 /// <summary>Checks AD group membership and looks up basic profile info for the current caller via
 /// System.DirectoryServices.AccountManagement (LDAP against the domain the app server is joined
