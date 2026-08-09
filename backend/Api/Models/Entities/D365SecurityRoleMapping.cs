@@ -29,6 +29,13 @@ public static class D365SecurityRoles
     public const string AccountsReceivableClerk = "Accounts Receivable - Clerk";
     public const string AccountsReceivableManager = "Accounts Receivable - Manager";
 
+    /// <summary>Not one of the original 10 TDX form checkboxes — added when deriving the base
+    /// JobCode→role mapping from real D365UserSecurityRoles assignment data, which turned out to
+    /// include Dynaway/maintenance roles (AMC_Maintenance Worker/Manager/etc., Dynaway mobile user)
+    /// bundled into the same export. Kept as a placeholder bucket for those until "Dynaway Access"
+    /// gets its own dedicated form/mapping.</summary>
+    public const string DynawayMaintenanceAccess = "Dynaway - Maintenance Access";
+
     public static readonly IReadOnlyList<string> All =
     [
         ProcurementApproverRequester,
@@ -41,5 +48,6 @@ public static class D365SecurityRoles
         FinancialReportingDenverCorp,
         AccountsReceivableClerk,
         AccountsReceivableManager,
+        DynawayMaintenanceAccess,
     ];
 }
