@@ -3,6 +3,9 @@ import { useQuery } from '@tanstack/react-query';
 import { useApi } from '../api/ApiContext';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import type { D365UserSecurityRoleDto, EmployeeDto } from '../api/types';
+import { DiscrepancyTables } from './DiscrepanciesPage';
+
+type Mode = 'corrections' | 'ecarts';
 
 function initials(prenom: string, nom: string) {
   return `${prenom[0] ?? ''}${nom[0] ?? ''}`.toUpperCase();
@@ -91,6 +94,7 @@ function LinkRow({ row, onLinked, onDeleted }: { row: D365UserSecurityRoleDto; o
 
 export function D365UserRolesCorrectionPage() {
   const api = useApi();
+  const [mode, setMode] = useState<Mode>('corrections');
   const [rows, setRows] = useState<D365UserSecurityRoleDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -119,10 +123,33 @@ export function D365UserRolesCorrectionPage() {
         </div>
       </div>
 
-      {isLoading && <div>Chargement…</div>}
-      {loadError && <div className="big-notice">{loadError}</div>}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        {(['corrections', 'ecarts'] as Mode[]).map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => setMode(m)}
+            style={{
+              padding: '8px 14px',
+              borderRadius: 6,
+              border: '1px solid var(--border, #ddd)',
+              background: mode === m ? 'var(--brand, #c8102e)' : '#fff',
+              color: mode === m ? '#fff' : 'inherit',
+              cursor: 'pointer',
+              fontWeight: mode === m ? 600 : 400,
+            }}
+          >
+            {m === 'corrections' ? 'Corrections non liées' : 'Écarts / Réconciliation'}
+          </button>
+        ))}
+      </div>
 
-      {!isLoading && !loadError && (
+      {mode === 'ecarts' && <DiscrepancyTables />}
+
+      {mode === 'corrections' && isLoading && <div>Chargement…</div>}
+      {mode === 'corrections' && loadError && <div className="big-notice">{loadError}</div>}
+
+      {mode === 'corrections' && !isLoading && !loadError && (
         <>
           <div style={{ marginBottom: 16, color: '#666' }}>{rows.length} ligne(s) à corriger</div>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>

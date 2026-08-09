@@ -25,6 +25,7 @@ public class AppDbContext : DbContext
     public DbSet<Attachment> Attachments => Set<Attachment>();
     public DbSet<D365SecurityRoleMapping> D365SecurityRoleMappings => Set<D365SecurityRoleMapping>();
     public DbSet<D365UserSecurityRole> D365UserSecurityRoles => Set<D365UserSecurityRole>();
+    public DbSet<DynawayUser> DynawayUsers => Set<DynawayUser>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -111,6 +112,14 @@ public class AppDbContext : DbContext
             entity.Property(m => m.EmployeeId).HasMaxLength(50);
             entity.Property(m => m.JobCode).HasMaxLength(50);
             entity.Property(m => m.PositionTitle).HasMaxLength(200);
+        });
+
+        modelBuilder.Entity<DynawayUser>(entity =>
+        {
+            entity.Property(m => m.Name).HasMaxLength(200);
+            entity.Property(m => m.Login).HasMaxLength(100);
+            entity.Property(m => m.PersonnelNumber).HasMaxLength(50);
+            entity.HasIndex(m => m.Login);
         });
 
         // Transactionally-safe request numbering — see RequestNumberService.

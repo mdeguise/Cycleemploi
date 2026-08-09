@@ -5,6 +5,7 @@ import type {
   CreateRequestDto,
   D365SecurityRoleMappingDto,
   D365UserSecurityRoleDto,
+  DiscrepanciesDto,
   EmployeeDto,
   MeDto,
   RequestDto,
@@ -43,6 +44,9 @@ export function createApi(client: ApiClient) {
       link: (id: number, employeeId: string) =>
         client.put<D365UserSecurityRoleDto>(`/api/d365-user-security-roles/${id}/link`, { employeeId }),
       remove: (id: number) => client.delete<void>(`/api/d365-user-security-roles/${id}`),
+    },
+    discrepancies: {
+      get: () => client.get<DiscrepanciesDto>('/api/discrepancies'),
     },
   };
 }

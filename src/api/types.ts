@@ -126,3 +126,51 @@ export interface D365UserSecurityRoleDto {
   jobCode?: string | null;
   positionTitle?: string | null;
 }
+
+// --- Reconciliation / "Écarts" (DiscrepanciesController) ---
+
+export interface DiscrepancySummaryDto {
+  generatedUtc: string;
+  dynawayLicensesTotal: number;
+  tremblantDynawayCount: number;
+  noActiveAdCount: number;
+  dynawayNoD365RoleCount: number;
+  d365InactiveWorkdayCount: number;
+}
+
+export interface TremblantDynawayRowDto {
+  name: string | null;
+  login: string | null;
+  adEnabled: boolean;
+  hasD365Role: boolean;
+  d365RoleCount: number;
+}
+
+export interface NoActiveAdRowDto {
+  source: string;
+  name: string;
+  login: string | null;
+  status: string;
+}
+
+export interface DynawayNoRoleRowDto {
+  name: string | null;
+  login: string | null;
+  adEnabled: boolean;
+}
+
+export interface D365InactiveWorkdayRowDto {
+  userName: string;
+  employeeId: string | null;
+  workdayStatus: string;
+  d365RoleCount: number;
+  roles: string;
+}
+
+export interface DiscrepanciesDto {
+  summary: DiscrepancySummaryDto;
+  tremblantDynaway: TremblantDynawayRowDto[];
+  noActiveAd: NoActiveAdRowDto[];
+  dynawayNoD365Role: DynawayNoRoleRowDto[];
+  d365InactiveWorkday: D365InactiveWorkdayRowDto[];
+}
