@@ -24,6 +24,7 @@ public class AppDbContext : DbContext
     public DbSet<OffboardingConfidentialComment> OffboardingConfidentialComments => Set<OffboardingConfidentialComment>();
     public DbSet<Attachment> Attachments => Set<Attachment>();
     public DbSet<D365SecurityRoleMapping> D365SecurityRoleMappings => Set<D365SecurityRoleMapping>();
+    public DbSet<D365UserSecurityRole> D365UserSecurityRoles => Set<D365UserSecurityRole>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -101,6 +102,15 @@ public class AppDbContext : DbContext
             entity.Property(m => m.JobCode).HasMaxLength(50).IsRequired();
             entity.Property(m => m.Role).HasMaxLength(200).IsRequired();
             entity.HasIndex(m => new { m.JobCode, m.Role }).IsUnique();
+        });
+
+        modelBuilder.Entity<D365UserSecurityRole>(entity =>
+        {
+            entity.Property(m => m.UserName).HasMaxLength(200).IsRequired();
+            entity.Property(m => m.SecurityRole).HasMaxLength(200).IsRequired();
+            entity.Property(m => m.EmployeeId).HasMaxLength(50);
+            entity.Property(m => m.JobCode).HasMaxLength(50);
+            entity.Property(m => m.PositionTitle).HasMaxLength(200);
         });
 
         // Transactionally-safe request numbering — see RequestNumberService.
