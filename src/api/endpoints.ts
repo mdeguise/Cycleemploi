@@ -34,6 +34,7 @@ export function createApi(client: ApiClient) {
     },
     d365SecurityRoles: {
       list: () => client.get<D365SecurityRoleMappingDto[]>('/api/d365-security-roles'),
+      catalog: () => client.get<string[]>('/api/d365-security-roles/catalog'),
       create: (dto: CreateD365SecurityRoleMappingDto) =>
         client.post<D365SecurityRoleMappingDto>('/api/d365-security-roles', dto),
       remove: (id: number) => client.delete<void>(`/api/d365-security-roles/${id}`),

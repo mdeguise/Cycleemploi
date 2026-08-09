@@ -8,8 +8,11 @@ using TremblantLifecycle.Api.Models.Entities;
 namespace TremblantLifecycle.Api.Controllers;
 
 /// <summary>Manages the JobCode → D365 security role mappings used when a request selects "Accès
-/// D365" — see D365SecurityRoleMapping's doc comment. Starts empty; populated by hand via this
-/// admin API as IT figures out which job codes need which roles.</summary>
+/// D365" — see D365SecurityRoleMapping's doc comment. The Role value must be the exact real D365
+/// role name (e.g. "AMC_GL_Preparer"), not an abstracted label — it has to match D365 itself
+/// verbatim for the eventual TDX ticket to be meaningful. The catalog of valid roles is therefore
+/// sourced dynamically from D365UserSecurityRoles (a real export of current role assignments)
+/// rather than a fixed list — see that entity's doc comment.</summary>
 [ApiController]
 [Route("api/d365-security-roles")]
 [Authorize]
@@ -53,14 +56,19 @@ public class D365SecurityRolesController : ControllerBase
         return Ok(mappings);
     }
 
-    /// <summary>The fixed set of valid role values — the frontend also hardcodes this list (see
-    /// src/data/catalogs.ts's D365_SECURITY_ROLES), this endpoint exists so the two can never drift
-    /// silently; the frontend could switch to fetching this instead of duplicating it if that
-    /// becomes worth doing.</summary>
+    /// <summary>Distinct real D365 role names observed in D365UserSecurityRoles, sorted — this is
+    /// what the admin page's Role dropdown is built from, so IT can only pick names that are
+    /// confirmed to actually exist in D365, no typos/inventions.</summary>
     [HttpGet("catalog")]
-    public ActionResult<List<string>> Catalog()
+    public async Task<ActionResult<List<string>>> Catalog(CancellationToken ct)
     {
-        return Ok(D365SecurityRoles.All);
+        var roles = await _db.D365UserSecurityRoles
+            .Select(r => r.SecurityRole)
+            .Distinct()
+            .OrderBy(r => r)
+            .ToListAsync(ct);
+
+        return Ok(roles);
     }
 
     [HttpPost]
@@ -72,9 +80,10 @@ public class D365SecurityRolesController : ControllerBase
             return BadRequest("JobCode is required.");
         }
 
-        if (!D365SecurityRoles.All.Contains(dto.Role))
+        var knownRoles = await _db.D365UserSecurityRoles.Select(r => r.SecurityRole).Distinct().ToListAsync(ct);
+        if (!knownRoles.Contains(dto.Role))
         {
-            return BadRequest($"Role must be one of: {string.Join(", ", D365SecurityRoles.All)}");
+            return BadRequest("Role must be a real D365 role name (pick from the dropdown).");
         }
 
         var alreadyExists = await _db.D365SecurityRoleMappings

@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useApi } from '../api/ApiContext';
 import { ApiError } from '../api/client';
 import type { D365SecurityRoleMappingDto } from '../api/types';
-import { D365_SECURITY_ROLES } from '../data/catalogs';
 
 export function D365RolesAdminPage() {
   const api = useApi();
@@ -10,8 +9,9 @@ export function D365RolesAdminPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  const [roleCatalog, setRoleCatalog] = useState<string[]>([]);
   const [jobCode, setJobCode] = useState('');
-  const [role, setRole] = useState(D365_SECURITY_ROLES[0]);
+  const [role, setRole] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -26,6 +26,13 @@ export function D365RolesAdminPage() {
   };
 
   useEffect(load, [api]);
+
+  useEffect(() => {
+    api.d365SecurityRoles.catalog().then((roles) => {
+      setRoleCatalog(roles);
+      setRole((current) => current || roles[0] || '');
+    });
+  }, [api]);
 
   const handleAdd = async (ev: React.FormEvent) => {
     ev.preventDefault();
@@ -86,7 +93,7 @@ export function D365RolesAdminPage() {
           <label className="field__label">Rôle D365</label>
           <div className="field__input-wrap">
             <select value={role} onChange={(ev) => setRole(ev.target.value)} style={{ minWidth: 320 }}>
-              {D365_SECURITY_ROLES.map((r) => (
+              {roleCatalog.map((r) => (
                 <option key={r} value={r}>
                   {r}
                 </option>
