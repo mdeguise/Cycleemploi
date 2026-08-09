@@ -4,6 +4,7 @@ import type {
   CreateD365SecurityRoleMappingDto,
   CreateRequestDto,
   D365SecurityRoleMappingDto,
+  D365UserSecurityRoleDto,
   EmployeeDto,
   MeDto,
   RequestDto,
@@ -35,6 +36,13 @@ export function createApi(client: ApiClient) {
       create: (dto: CreateD365SecurityRoleMappingDto) =>
         client.post<D365SecurityRoleMappingDto>('/api/d365-security-roles', dto),
       remove: (id: number) => client.delete<void>(`/api/d365-security-roles/${id}`),
+    },
+    d365UserSecurityRoles: {
+      list: (unmatchedOnly: boolean) =>
+        client.get<D365UserSecurityRoleDto[]>(`/api/d365-user-security-roles?unmatchedOnly=${unmatchedOnly}`),
+      link: (id: number, employeeId: string) =>
+        client.put<D365UserSecurityRoleDto>(`/api/d365-user-security-roles/${id}/link`, { employeeId }),
+      remove: (id: number) => client.delete<void>(`/api/d365-user-security-roles/${id}`),
     },
   };
 }

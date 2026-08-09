@@ -1,4 +1,5 @@
 import './App.css';
+import type { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Link } from 'react-router-dom';
@@ -21,6 +22,7 @@ import { TYPE_DEMANDE_TERMINAISON } from './types';
 import { ApiProvider } from './api/ApiContext';
 import { useApi } from './api/ApiContext';
 import { D365RolesAdminPage } from './admin/D365RolesAdminPage';
+import { D365UserRolesCorrectionPage } from './admin/D365UserRolesCorrectionPage';
 
 const ONBOARDING_STEP_COMPONENTS = [
   Step1Employee,
@@ -34,6 +36,25 @@ const ONBOARDING_STEP_COMPONENTS = [
 const OFFBOARDING_STEP_COMPONENTS = [Step1Employee, Step2Cessation, Step3DepartmentComments, StepReviewOffboarding];
 
 const queryClient = new QueryClient();
+
+function AdminLayout({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="app-shell">
+      <header className="app-header">
+        <div className="app-header__brand">
+          <img src={tremblantLogo} alt="Tremblant" className="app-header__logo" />
+          <div className="app-header__title">{title}</div>
+        </div>
+        <div style={{ display: 'flex', gap: 16 }}>
+          <Link to="/admin/d365-roles">Rôles D365 par code d'emploi</Link>
+          <Link to="/admin/d365-user-roles">Correction des rôles D365</Link>
+          <Link to="/">Retour à l'application</Link>
+        </div>
+      </header>
+      <div className="app-body">{children}</div>
+    </div>
+  );
+}
 
 function WizardBody() {
   const { currentStep, request } = useWizard();
@@ -88,18 +109,17 @@ function AuthenticatedApp() {
         <Route
           path="/admin/d365-roles"
           element={
-            <div className="app-shell">
-              <header className="app-header">
-                <div className="app-header__brand">
-                  <img src={tremblantLogo} alt="Tremblant" className="app-header__logo" />
-                  <div className="app-header__title">Administration — Rôles de sécurité D365</div>
-                </div>
-                <Link to="/">Retour à l'application</Link>
-              </header>
-              <div className="app-body">
-                <D365RolesAdminPage />
-              </div>
-            </div>
+            <AdminLayout title="Administration — Rôles de sécurité D365">
+              <D365RolesAdminPage />
+            </AdminLayout>
+          }
+        />
+        <Route
+          path="/admin/d365-user-roles"
+          element={
+            <AdminLayout title="Administration — Correction des rôles D365">
+              <D365UserRolesCorrectionPage />
+            </AdminLayout>
           }
         />
         <Route
