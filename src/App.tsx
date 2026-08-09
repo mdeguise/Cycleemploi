@@ -23,6 +23,8 @@ import { ApiProvider } from './api/ApiContext';
 import { useApi } from './api/ApiContext';
 import { D365RolesAdminPage } from './admin/D365RolesAdminPage';
 import { D365UserRolesCorrectionPage } from './admin/D365UserRolesCorrectionPage';
+import { D365JobCodeTemplatesListPage } from './admin/D365JobCodeTemplatesListPage';
+import { D365JobCodeTemplateEditPage } from './admin/D365JobCodeTemplateEditPage';
 
 const ONBOARDING_STEP_COMPONENTS = [
   Step1Employee,
@@ -48,6 +50,7 @@ function AdminLayout({ title, children }: { title: string; children: ReactNode }
         <div style={{ display: 'flex', gap: 16 }}>
           <Link to="/admin/d365-roles">Rôles D365 par code d'emploi</Link>
           <Link to="/admin/d365-user-roles">Correction des rôles D365</Link>
+          <Link to="/admin/d365-jobcode-templates">Formulaires D365 par code d'emploi</Link>
           <Link to="/">Retour à l'application</Link>
         </div>
       </header>
@@ -119,6 +122,22 @@ function AuthenticatedApp() {
           element={
             <AdminLayout title="Administration — Correction des rôles D365">
               <D365UserRolesCorrectionPage />
+            </AdminLayout>
+          }
+        />
+        <Route
+          path="/admin/d365-jobcode-templates"
+          element={
+            <AdminLayout title="Administration — Formulaires D365 par code d'emploi">
+              <D365JobCodeTemplatesListPage />
+            </AdminLayout>
+          }
+        />
+        <Route
+          path="/admin/d365-jobcode-templates/:jobCode"
+          element={
+            <AdminLayout title="Administration — Formulaires D365 par code d'emploi">
+              <D365JobCodeTemplateEditPage />
             </AdminLayout>
           }
         />

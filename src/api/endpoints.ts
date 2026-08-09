@@ -3,6 +3,8 @@ import type {
   CatalogsDto,
   CreateD365SecurityRoleMappingDto,
   CreateRequestDto,
+  D365JobCodeTemplateDto,
+  D365JobCodeTemplateSummaryDto,
   D365SecurityRoleMappingDto,
   D365UserSecurityRoleDto,
   DiscrepanciesDto,
@@ -10,6 +12,7 @@ import type {
   MeDto,
   RequestDto,
   UpdateRequestDto,
+  UpsertD365JobCodeTemplateDto,
 } from './types';
 
 export function createApi(client: ApiClient) {
@@ -48,6 +51,15 @@ export function createApi(client: ApiClient) {
     },
     discrepancies: {
       get: () => client.get<DiscrepanciesDto>('/api/discrepancies'),
+    },
+    d365JobCodeTemplates: {
+      list: () => client.get<D365JobCodeTemplateSummaryDto[]>('/api/d365-jobcode-templates'),
+      catalog: () => client.get<string[]>('/api/d365-jobcode-templates/catalog'),
+      get: (jobCode: string) =>
+        client.get<D365JobCodeTemplateDto>(`/api/d365-jobcode-templates/${encodeURIComponent(jobCode)}`),
+      upsert: (jobCode: string, dto: UpsertD365JobCodeTemplateDto) =>
+        client.put<D365JobCodeTemplateDto>(`/api/d365-jobcode-templates/${encodeURIComponent(jobCode)}`, dto),
+      remove: (jobCode: string) => client.delete<void>(`/api/d365-jobcode-templates/${encodeURIComponent(jobCode)}`),
     },
   };
 }

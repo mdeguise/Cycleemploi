@@ -26,6 +26,8 @@ public class AppDbContext : DbContext
     public DbSet<D365SecurityRoleMapping> D365SecurityRoleMappings => Set<D365SecurityRoleMapping>();
     public DbSet<D365UserSecurityRole> D365UserSecurityRoles => Set<D365UserSecurityRole>();
     public DbSet<DynawayUser> DynawayUsers => Set<DynawayUser>();
+    public DbSet<D365JobCodeTemplate> D365JobCodeTemplates => Set<D365JobCodeTemplate>();
+    public DbSet<D365JobCodeTemplateRole> D365JobCodeTemplateRoles => Set<D365JobCodeTemplateRole>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -120,6 +122,25 @@ public class AppDbContext : DbContext
             entity.Property(m => m.Login).HasMaxLength(100);
             entity.Property(m => m.PersonnelNumber).HasMaxLength(50);
             entity.HasIndex(m => m.Login);
+        });
+
+        modelBuilder.Entity<D365JobCodeTemplate>(entity =>
+        {
+            entity.Property(m => m.JobCode).HasMaxLength(50).IsRequired();
+            entity.Property(m => m.LegalEntity).HasMaxLength(200).IsRequired();
+            entity.Property(m => m.DepartmentNumber).HasMaxLength(50).IsRequired();
+            entity.Property(m => m.ApprovalLimit).HasColumnType("decimal(18,2)");
+            entity.Property(m => m.ApAccessDetails).HasMaxLength(2000);
+            entity.Property(m => m.AdditionalLegalEntities).HasMaxLength(2000);
+            entity.HasIndex(m => m.JobCode).IsUnique();
+        });
+
+        modelBuilder.Entity<D365JobCodeTemplateRole>(entity =>
+        {
+            entity.Property(m => m.Role).HasMaxLength(200).IsRequired();
+            entity.HasOne(m => m.D365JobCodeTemplate).WithMany(t => t.Roles)
+                .HasForeignKey(m => m.D365JobCodeTemplateId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(m => new { m.D365JobCodeTemplateId, m.Role }).IsUnique();
         });
 
         // Transactionally-safe request numbering — see RequestNumberService.

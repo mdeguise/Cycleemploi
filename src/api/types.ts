@@ -128,6 +128,33 @@ export interface D365UserSecurityRoleDto {
   positionTitle?: string | null;
 }
 
+export interface D365JobCodeTemplateSummaryDto {
+  jobCode: string;
+  positionTitle?: string | null;
+  isFilled: boolean;
+}
+
+export interface D365JobCodeTemplateDto {
+  jobCode: string;
+  positionTitle?: string | null;
+  legalEntity: string;
+  departmentNumber: string;
+  approvalLimit: number;
+  apAccessDetails?: string | null;
+  additionalLegalEntities?: string | null;
+  roles: string[];
+  isFilled: boolean;
+}
+
+export interface UpsertD365JobCodeTemplateDto {
+  legalEntity: string;
+  departmentNumber: string;
+  approvalLimit: number;
+  apAccessDetails?: string | null;
+  additionalLegalEntities?: string | null;
+  roles: string[];
+}
+
 // --- Reconciliation / "Écarts" (DiscrepanciesController) ---
 
 export interface DiscrepancySummaryDto {

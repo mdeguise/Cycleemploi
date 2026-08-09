@@ -116,7 +116,7 @@ export function D365RolesAdminPage() {
           </div>
         </div>
 
-        <button type="submit" className="btn btn--primary" disabled={isSaving}>
+        <button type="submit" className="btn btn-primary" disabled={isSaving}>
           Ajouter
         </button>
       </form>
