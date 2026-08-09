@@ -11,10 +11,11 @@ using TremblantLifecycle.Api.Services;
 
 namespace TremblantLifecycle.Api.Controllers;
 
-/// <summary>Read-only reconciliation ("Écarts") view for HR/IT: cross-references the imported D365
+/// <summary>Read-only reconciliation ("Écarts") view: cross-references the imported D365
 /// security-role users, the imported Dynaway licenses, live Active Directory (Tremblant accounts),
-/// and the read-only Workday demographic table to surface four kinds of discrepancy. HR-admin only
-/// (TRM-RH-ADM) — it exposes account-status data across the whole Tremblant population.</summary>
+/// and the read-only Workday demographic table to surface four kinds of discrepancy. Restricted to
+/// the AD group TRM-CYCLEEMPLOI-D365-ADMIN — it exposes account-status data across the whole
+/// Tremblant population.</summary>
 [ApiController]
 [Route("api/discrepancies")]
 [Authorize]
@@ -23,7 +24,7 @@ public class DiscrepanciesController : ControllerBase
     private readonly AppDbContext _db;
     private readonly WorkdayContext _workday;
     private readonly IAdDirectoryService _ad;
-    private readonly string _hrGroup;
+    private readonly string _adminGroup;
 
     public DiscrepanciesController(AppDbContext db, WorkdayContext workday, IAdDirectoryService ad,
         IOptions<HrGroupOptions> hr)
@@ -31,14 +32,14 @@ public class DiscrepanciesController : ControllerBase
         _db = db;
         _workday = workday;
         _ad = ad;
-        _hrGroup = hr.Value.TrmRhAdmGroupName;
+        _adminGroup = hr.Value.CycleEmploiD365AdminGroupName;
     }
 
     [HttpGet]
     public async Task<ActionResult<DiscrepanciesDto>> Get(CancellationToken ct)
     {
         var caller = User.Identity?.Name ?? "";
-        if (!_ad.IsUserInGroup(caller, _hrGroup)) return Forbid();
+        if (!_ad.IsUserInGroup(caller, _adminGroup)) return Forbid();
 
         var d365 = await _db.D365UserSecurityRoles.AsNoTracking().ToListAsync(ct);
         var dyn = await _db.DynawayUsers.AsNoTracking().ToListAsync(ct);

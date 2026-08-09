@@ -91,7 +91,7 @@ export function DiscrepancyTables() {
       {isLoading && <div>Chargement…</div>}
       {isError && (
         <div className="big-notice">
-          {error instanceof Error ? error.message : 'Erreur inconnue'} — réservé au groupe RH (TRM-RH-ADM).
+          {error instanceof Error ? error.message : 'Erreur inconnue'} — réservé au groupe TRM-CYCLEEMPLOI-D365-ADMIN.
         </div>
       )}
 

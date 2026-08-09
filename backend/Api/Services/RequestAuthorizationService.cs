@@ -6,6 +6,10 @@ namespace TremblantLifecycle.Api.Services;
 public class HrGroupOptions
 {
     public string TrmRhAdmGroupName { get; set; } = null!;
+
+    /// <summary>AD security group that gates the Écarts/Réconciliation (discrepancy) view — distinct
+    /// from the RH group, which gates the confidential offboarding comment. Set in appsettings.json.</summary>
+    public string CycleEmploiD365AdminGroupName { get; set; } = null!;
 }
 
 /// <summary>The single source of truth for the RH-comment access rule described in the plan:
