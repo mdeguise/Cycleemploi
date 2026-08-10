@@ -4,6 +4,7 @@ import { StepFooter } from '../components/StepFooter';
 import { LogOutIcon, InfoIcon, AlertTriangleIcon, PaperclipIcon, XIcon } from '../components/icons';
 import { OUI_NON, RAISONS_ARRET, REEMBAUCHERIEZ_OPTIONS } from '../data/catalogs';
 import { formatFileSize } from '../utils/formatFileSize';
+import { DateInput } from '../components/DateInput';
 import type { OffboardingInfo } from '../types';
 
 export function Step2Cessation() {
@@ -54,7 +55,7 @@ export function Step2Cessation() {
       )}
 
       <Field label="Quelle est la dernière journée de travail de l'employé" required valid={Boolean(o.derniereJournee)}>
-        <input type="date" value={o.derniereJournee} onChange={(ev) => update({ derniereJournee: ev.target.value })} />
+        <DateInput value={o.derniereJournee} onChange={(derniereJournee) => update({ derniereJournee })} />
       </Field>
 
       <Field

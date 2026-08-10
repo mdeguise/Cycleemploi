@@ -6,6 +6,7 @@ import { StepFooter } from '../components/StepFooter';
 import { UserIcon, SearchIcon, InfoIcon } from '../components/icons';
 import { REGLE_DE_PAYE_AUTRE } from '../data/catalogs';
 import { RegleDePayeSelect } from '../components/RegleDePayeSelect';
+import { DateInput } from '../components/DateInput';
 import { TYPE_DEMANDE_TERMINAISON, type EmployeeSelectionInfo, type EmployeeSnapshot, type TypeDemande } from '../types';
 import { useApi } from '../api/ApiContext';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
@@ -316,7 +317,7 @@ export function Step1Employee() {
 
           <div className="field-grid field-grid--2">
             <Field label="Date d'entrée prévue" required valid={Boolean(e.dateEntreePrevue)}>
-              <input type="date" value={e.dateEntreePrevue} onChange={(ev) => update({ dateEntreePrevue: ev.target.value })} />
+              <DateInput value={e.dateEntreePrevue} onChange={(dateEntreePrevue) => update({ dateEntreePrevue })} />
             </Field>
             <Field label="Règle de paye" required valid={Boolean(e.regleDePaye)}>
               <RegleDePayeSelect value={e.regleDePaye} onChange={(regleDePaye) => update({ regleDePaye })} />

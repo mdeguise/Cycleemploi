@@ -591,6 +591,115 @@
   background: var(--bg-page);
 }
 
+.date-input {
+  position: relative;
+}
+
+.date-input__trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.date-input__trigger:focus {
+  outline: none;
+  border-color: var(--tremblant-red);
+  box-shadow: 0 0 0 3px var(--tremblant-red-light);
+}
+
+.date-input__placeholder {
+  color: #a7acb9;
+}
+
+.date-input__popup {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 260px;
+  padding: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  z-index: 10;
+}
+
+.date-input__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.date-input__month-label {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.date-input__nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.date-input__nav:hover {
+  background: var(--bg-page);
+}
+
+.date-input__weekdays,
+.date-input__days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.date-input__weekdays {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.date-input__day {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  border: none;
+  background: none;
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.date-input__day:hover {
+  background: var(--bg-page);
+}
+
+.date-input__day--selected {
+  background: var(--tremblant-red);
+  color: #fff;
+}
+
 .employee-selected-card {
   display: flex;
   align-items: center;
