@@ -3,7 +3,10 @@ namespace TremblantLifecycle.Api.Services;
 /// <summary>Username/Password deliberately left empty here — the real values live only in
 /// appsettings.Production.json on the server (gitignored, never committed). AppId/FormId/AccountId/
 /// ResponsibleGroupId/ResponsibleGroupName confirmed against the real TDX instance: FormID 1162 is
-/// "Quick Incident" under AppID 278 ("OneIT"), AccountID 8811 is "Information Technology".</summary>
+/// "Quick Incident" under AppID 278 ("OneIT"), AccountID 8811 is "Information Technology".
+/// D365AccessFormId/D365AccessResponsibleGroupId/Name are for the separate "D365 - Access" form
+/// (FormID 10799) — confirmed against real historical tickets on that form: newly-created tickets
+/// land in ResponsibleGroupID 4078 ("ENT - FinApp Triage") before being triaged elsewhere.</summary>
 public class TdxOptions
 {
     public string BaseUrl { get; set; } = "https://get.alterra.support/TDWebApi";
@@ -14,4 +17,7 @@ public class TdxOptions
     public int AccountId { get; set; }
     public int ResponsibleGroupId { get; set; }
     public string ResponsibleGroupName { get; set; } = "";
+    public int D365AccessFormId { get; set; }
+    public int D365AccessResponsibleGroupId { get; set; }
+    public string D365AccessResponsibleGroupName { get; set; } = "";
 }

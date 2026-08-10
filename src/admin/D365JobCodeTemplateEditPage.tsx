@@ -9,6 +9,7 @@ export function D365JobCodeTemplateEditPage() {
 
   const [positionTitle, setPositionTitle] = useState<string | null>(null);
   const [roleCatalog, setRoleCatalog] = useState<string[]>([]);
+  const [jobTitleEnglish, setJobTitleEnglish] = useState('');
   const [legalEntity, setLegalEntity] = useState('');
   const [departmentNumber, setDepartmentNumber] = useState('');
   const [approvalLimit, setApprovalLimit] = useState('0');
@@ -28,6 +29,7 @@ export function D365JobCodeTemplateEditPage() {
     Promise.all([api.d365JobCodeTemplates.get(jobCode), api.d365JobCodeTemplates.catalog()])
       .then(([template, catalog]) => {
         setPositionTitle(template.positionTitle ?? null);
+        setJobTitleEnglish(template.jobTitleEnglish);
         setLegalEntity(template.legalEntity);
         setDepartmentNumber(template.departmentNumber);
         setApprovalLimit(String(template.approvalLimit));
@@ -49,8 +51,8 @@ export function D365JobCodeTemplateEditPage() {
     ev.preventDefault();
     setSaveError(null);
 
-    if (!legalEntity.trim() || !departmentNumber.trim()) {
-      setSaveError("L'entité légale et le numéro de département sont requis.");
+    if (!jobTitleEnglish.trim() || !legalEntity.trim() || !departmentNumber.trim()) {
+      setSaveError("Le titre du poste (en anglais), l'entité légale et le numéro de département sont requis.");
       return;
     }
     const limit = Number(approvalLimit);
@@ -62,6 +64,7 @@ export function D365JobCodeTemplateEditPage() {
     setIsSaving(true);
     try {
       await api.d365JobCodeTemplates.upsert(jobCode, {
+        jobTitleEnglish: jobTitleEnglish.trim(),
         legalEntity: legalEntity.trim(),
         departmentNumber: departmentNumber.trim(),
         approvalLimit: limit,
@@ -86,7 +89,9 @@ export function D365JobCodeTemplateEditPage() {
             Formulaire D365 — {jobCode} {positionTitle ? `(${positionTitle})` : ''}
           </div>
           <div className="step-panel__subtitle">
-            Réponses au billet TDX « D365 - Access » pour ce code d'emploi.
+            Réponses au billet TDX « D365 - Access » pour ce code d'emploi. Le billet TDX doit être entièrement en
+            anglais — tous les champs texte ci-dessous (titre du poste, détails d'accès AP, etc.) doivent être
+            saisis en anglais.
           </div>
         </div>
       </div>
@@ -96,6 +101,18 @@ export function D365JobCodeTemplateEditPage() {
 
       {!isLoading && !loadError && (
         <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 640 }}>
+          <div className="field">
+            <label className="field__label">Titre du poste (en anglais) *</label>
+            <div className="field__input-wrap">
+              <input
+                type="text"
+                value={jobTitleEnglish}
+                onChange={(ev) => setJobTitleEnglish(ev.target.value)}
+                placeholder="Ex. Accounting Clerk I"
+              />
+            </div>
+          </div>
+
           <div className="field">
             <label className="field__label">Entité légale *</label>
             <div className="field__input-wrap">
@@ -151,19 +168,19 @@ export function D365JobCodeTemplateEditPage() {
           </div>
 
           <div className="field">
-            <label className="field__label">Détails d'accès AP</label>
+            <label className="field__label">Détails d'accès AP (en anglais)</label>
             <div className="field__input-wrap">
               <textarea
                 value={apAccessDetails}
                 onChange={(ev) => setApAccessDetails(ev.target.value)}
                 rows={3}
-                placeholder="Ex. compte existant à répliquer, précisions sur l'accès requis"
+                placeholder="Ex. mirror setup of an existing account, access details required"
               />
             </div>
           </div>
 
           <div className="field">
-            <label className="field__label">Entités légales additionnelles</label>
+            <label className="field__label">Entités légales additionnelles (en anglais)</label>
             <div className="field__input-wrap">
               <textarea
                 value={additionalLegalEntities}

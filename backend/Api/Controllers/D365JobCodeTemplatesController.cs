@@ -93,6 +93,7 @@ public class D365JobCodeTemplatesController : ControllerBase
         {
             JobCode = template.JobCode,
             PositionTitle = positionTitle,
+            JobTitleEnglish = template.JobTitleEnglish,
             LegalEntity = template.LegalEntity,
             DepartmentNumber = template.DepartmentNumber,
             ApprovalLimit = template.ApprovalLimit,
@@ -107,6 +108,10 @@ public class D365JobCodeTemplatesController : ControllerBase
     [HttpPut("{jobCode}")]
     public async Task<ActionResult<D365JobCodeTemplateDto>> Upsert(string jobCode, UpsertD365JobCodeTemplateDto dto, CancellationToken ct)
     {
+        if (string.IsNullOrWhiteSpace(dto.JobTitleEnglish))
+        {
+            return BadRequest("Job Title (English) is required.");
+        }
         if (string.IsNullOrWhiteSpace(dto.LegalEntity))
         {
             return BadRequest("Legal Entity is required.");
@@ -135,6 +140,7 @@ public class D365JobCodeTemplatesController : ControllerBase
             _db.D365JobCodeTemplates.Add(template);
         }
 
+        template.JobTitleEnglish = dto.JobTitleEnglish.Trim();
         template.LegalEntity = dto.LegalEntity.Trim();
         template.DepartmentNumber = dto.DepartmentNumber.Trim();
         template.ApprovalLimit = dto.ApprovalLimit;
@@ -157,6 +163,7 @@ public class D365JobCodeTemplatesController : ControllerBase
         {
             JobCode = template.JobCode,
             PositionTitle = positionTitle,
+            JobTitleEnglish = template.JobTitleEnglish,
             LegalEntity = template.LegalEntity,
             DepartmentNumber = template.DepartmentNumber,
             ApprovalLimit = template.ApprovalLimit,

@@ -39,10 +39,12 @@ export const SYSTEMES_ACCES: AccessSystem[] = [
   { nom: 'Accès VPN', description: 'Accès à distance au réseau corporatif' },
   { nom: 'Badge d\'accès aux édifices', description: 'Accès physique aux bureaux et installations' },
   { nom: 'Besoin de code d\'alarme', description: 'Un code d\'alarme doit être créé pour cet employé' },
+  { nom: 'Accès D365', description: 'Accès à Dynamics 365 (Comptes fournisseurs, Grand livre, Comptes clients, Approvisionnement)' },
 ];
 
 export const ACCES_BADGE = 'Badge d\'accès aux édifices';
 export const BESOIN_CODE_ALARME = 'Besoin de code d\'alarme';
+export const ACCES_D365 = 'Accès D365';
 
 export const POS_HEBERGEMENT_SYSTEMES = ['RTP', 'SMS', 'OPERA', 'SYMPHONIE', 'APROPOS'];
 

@@ -11,6 +11,7 @@ public class D365JobCodeTemplateDto
 {
     public string JobCode { get; set; } = null!;
     public string? PositionTitle { get; set; }
+    public string JobTitleEnglish { get; set; } = "";
     public string LegalEntity { get; set; } = "";
     public string DepartmentNumber { get; set; } = "";
     public decimal ApprovalLimit { get; set; }
@@ -23,6 +24,7 @@ public class D365JobCodeTemplateDto
 
 public class UpsertD365JobCodeTemplateDto
 {
+    public string JobTitleEnglish { get; set; } = null!;
     public string LegalEntity { get; set; } = null!;
     public string DepartmentNumber { get; set; } = null!;
     public decimal ApprovalLimit { get; set; }

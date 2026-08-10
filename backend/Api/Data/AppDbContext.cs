@@ -127,6 +127,7 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<D365JobCodeTemplate>(entity =>
         {
             entity.Property(m => m.JobCode).HasMaxLength(50).IsRequired();
+            entity.Property(m => m.JobTitleEnglish).HasMaxLength(200).IsRequired();
             entity.Property(m => m.LegalEntity).HasMaxLength(200).IsRequired();
             entity.Property(m => m.DepartmentNumber).HasMaxLength(50).IsRequired();
             entity.Property(m => m.ApprovalLimit).HasColumnType("decimal(18,2)");

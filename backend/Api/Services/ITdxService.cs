@@ -2,13 +2,37 @@ using TremblantLifecycle.Api.Models.Entities;
 
 namespace TremblantLifecycle.Api.Services;
 
-/// <summary>Creates a ticket in TeamDynamix (TDX) for a submitted request, in the "OneIT" app's
-/// "Quick Incident" form, routed to the IT Operations group. Third downstream system after
-/// Freshdesk and D365, same best-effort contract — the caller decides what "best-effort" means.</summary>
+/// <summary>Creates tickets in TeamDynamix (TDX). CreateTicketAsync is the "OneIT" app's "Quick
+/// Incident" form, routed to IT Operations — third downstream system after Freshdesk and D365, same
+/// best-effort contract — the caller decides what "best-effort" means. CreateD365AccessTicketAsync
+/// is the separate "D365 - Access" form (FormID 10799).</summary>
 public interface ITdxService
 {
     /// <returns>The created TDX ticket's numeric ID.</returns>
     Task<int> CreateTicketAsync(Request request, RequestEmployee employee, string requesterName, string requesterEmail, CancellationToken ct);
+
+    /// <returns>The created TDX ticket's numeric ID.</returns>
+    Task<int> CreateD365AccessTicketAsync(D365AccessTicketInput input, CancellationToken ct);
 }
+
+/// <summary>Everything needed to fill out the "D365 - Access" TDX form (FormID 10799) for one
+/// employee — resolved by the caller (job code lookups, Workday queries) so this service stays a
+/// pure TDX API wrapper, same pattern as CreateTicketAsync's parameters.</summary>
+public record D365AccessTicketInput(
+    string RequesterName,
+    string RequesterEmail,
+    string EmployeeName,
+    string EmployeeEmail,
+    string? JobTitle,
+    string LegalEntity,
+    string DepartmentNumber,
+    bool LevyEmployee,
+    string? ManagerName,
+    DateOnly? StartDate,
+    IReadOnlyList<string> Roles,
+    decimal ApprovalLimit,
+    string? ApAccessDetails,
+    string? AdditionalLegalEntities
+);
 
 public class TdxTicketException(string message) : Exception(message);

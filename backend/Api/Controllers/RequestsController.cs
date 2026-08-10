@@ -15,6 +15,7 @@ namespace TremblantLifecycle.Api.Controllers;
 public class RequestsController : ControllerBase
 {
     private readonly AppDbContext _db;
+    private readonly WorkdayContext _workday;
     private readonly RequestNumberService _requestNumbers;
     private readonly RequestAuthorizationService _authz;
     private readonly IAdDirectoryService _ad;
@@ -26,13 +27,15 @@ public class RequestsController : ControllerBase
     private readonly ILogger<RequestsController> _logger;
 
     /// <summary>Systèmes junction rows store the catalog's display text directly (see
-    /// AccessDetail's doc comment) — these must match src/data/catalogs.ts's ACCES_BADGE and
-    /// BESOIN_CODE_ALARME exactly.</summary>
+    /// AccessDetail's doc comment) — these must match src/data/catalogs.ts's ACCES_BADGE,
+    /// BESOIN_CODE_ALARME and ACCES_D365 exactly.</summary>
     private const string AccesBadgeSystemeValue = "Badge d'accès aux édifices";
     private const string BesoinCodeAlarmeSystemeValue = "Besoin de code d'alarme";
+    private const string AccesD365SystemeValue = "Accès D365";
 
     public RequestsController(
         AppDbContext db,
+        WorkdayContext workday,
         RequestNumberService requestNumbers,
         RequestAuthorizationService authz,
         IAdDirectoryService ad,
@@ -44,6 +47,7 @@ public class RequestsController : ControllerBase
         ILogger<RequestsController> logger)
     {
         _db = db;
+        _workday = workday;
         _requestNumbers = requestNumbers;
         _authz = authz;
         _ad = ad;
@@ -220,6 +224,7 @@ public class RequestsController : ControllerBase
         var freshdeskTicketId = await TryCreateFreshdeskTicketAsync(request, ct);
         await TryCreateD365BadgeTicketAsync(request, freshdeskTicketId, ct);
         await TryCreateTdxTicketAsync(request, ct);
+        await TryCreateD365AccessTicketAsync(request, ct);
 
         return NoContent();
     }
@@ -461,6 +466,129 @@ public class RequestsController : ControllerBase
                 {
                     _logger.LogError(emailEx, "Also failed to send the TDX-failure notification email for request {RequestNumber}, employee {EmployeeName}", request.RequestNumber, employee.NameSnapshot);
                 }
+            }
+        }
+    }
+
+    /// <summary>Creates a TDX ticket on the "D365 - Access" form (FormID 10799) when "Accès D365"
+    /// was selected — Onboarding/Réactivation only, for the primary employee, same gating pattern as
+    /// the badge/alarm D365 integration. Looks up the employee's job code in D365JobCodeTemplate for
+    /// the roles/legal entity/approval limit/etc. answers; if no template has been filled out yet for
+    /// that job code, fails open (email notifies IT to fill it in and create the ticket by hand)
+    /// rather than blocking the submission or guessing at values.</summary>
+    private async Task TryCreateD365AccessTicketAsync(Request request, CancellationToken ct)
+    {
+        if (request.RequestType == RequestType.Offboarding) return;
+
+        var systemes = (request.AccessDetail?.Systemes.Select(s => s.Value) ?? []).ToList();
+        if (!systemes.Contains(AccesD365SystemeValue)) return;
+
+        var employee = request.Employees.FirstOrDefault(e => e.IsPrimary) ?? request.Employees.FirstOrDefault();
+        if (employee is null) return;
+
+        try
+        {
+            var requesterInfo = _ad.GetUserInfo(User.GetSamAccountName());
+            var requesterName = requesterInfo.DisplayName ?? request.CreatedByDisplayName;
+            var requesterEmail = requesterInfo.Email;
+            if (string.IsNullOrWhiteSpace(requesterEmail))
+            {
+                throw new InvalidOperationException("Could not resolve requester email from AD.");
+            }
+
+            var workdayInfo = await _workday.WorkdayDemographics
+                .Where(w => w.EmployeeId == employee.WorkdayEmployeeId && w.PrimaryJob == 1)
+                .Select(w => new { w.JobCode, w.PositionTitle, w.WorkEmail, w.Email, w.ManagerId, w.Manager })
+                .FirstOrDefaultAsync(ct);
+            if (workdayInfo is null)
+            {
+                throw new InvalidOperationException($"No active Workday record found for employee {employee.WorkdayEmployeeId}.");
+            }
+
+            var jobCode = workdayInfo.JobCode ?? employee.CodeEmploiSnapshot;
+            if (string.IsNullOrWhiteSpace(jobCode))
+            {
+                throw new InvalidOperationException("Employee has no job code — cannot look up their D365 access template.");
+            }
+
+            var template = await _db.D365JobCodeTemplates
+                .Include(t => t.Roles)
+                .FirstOrDefaultAsync(t => t.JobCode == jobCode, ct);
+            if (template is null)
+            {
+                throw new InvalidOperationException(
+                    $"No D365 access template has been filled out yet for job code {jobCode} — see Formulaires D365 par code d'emploi.");
+            }
+
+            var employeeEmail = workdayInfo.WorkEmail ?? workdayInfo.Email;
+            if (string.IsNullOrWhiteSpace(employeeEmail))
+            {
+                throw new InvalidOperationException("Employee has no email address on file in Workday.");
+            }
+
+            var managerName = workdayInfo.Manager;
+            if (!string.IsNullOrWhiteSpace(workdayInfo.ManagerId))
+            {
+                var manager = await _workday.WorkdayDemographics
+                    .Where(w => w.EmployeeId == workdayInfo.ManagerId && w.PrimaryJob == 1)
+                    .Select(w => new { w.FirstName, w.PreferredFirstName, w.LastName })
+                    .FirstOrDefaultAsync(ct);
+                if (manager is not null)
+                {
+                    managerName = $"{manager.PreferredFirstName ?? manager.FirstName} {manager.LastName}";
+                }
+            }
+
+            var input = new D365AccessTicketInput(
+                RequesterName: requesterName,
+                RequesterEmail: requesterEmail,
+                EmployeeName: employee.NameSnapshot,
+                EmployeeEmail: employeeEmail,
+                JobTitle: template.JobTitleEnglish,
+                LegalEntity: template.LegalEntity,
+                DepartmentNumber: template.DepartmentNumber,
+                LevyEmployee: template.LevyEmployee,
+                ManagerName: managerName,
+                StartDate: request.OnboardingDetail?.DateEntreePrevue,
+                Roles: template.Roles.Select(r => r.Role).ToList(),
+                ApprovalLimit: template.ApprovalLimit,
+                ApAccessDetails: template.ApAccessDetails,
+                AdditionalLegalEntities: template.AdditionalLegalEntities);
+
+            var ticketId = await _tdx.CreateD365AccessTicketAsync(input, ct);
+            _logger.LogInformation("Created D365 Access TDX ticket {TicketId} for request {RequestNumber}, employee {EmployeeName}", ticketId, request.RequestNumber, employee.NameSnapshot);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create D365 Access TDX ticket for request {RequestNumber}, employee {EmployeeName}", request.RequestNumber, employee.NameSnapshot);
+
+            var subject = $"[Cycle Emploi] Échec de création de billet TDX D365 Access — demande #{request.RequestNumber} — {employee.NameSnapshot}";
+            var body =
+                $"La demande #{request.RequestNumber} ({request.RequestType.ToFrenchLabel()}) a été soumise avec succès, " +
+                $"mais la création automatique du billet TDX « D365 - Access » pour {employee.NameSnapshot} a échoué. Le billet devra être créé manuellement.\n\n" +
+                "== Détails de la demande ==\n" +
+                $"Employé: {employee.NameSnapshot}\n" +
+                $"Code d'emploi: {employee.CodeEmploiSnapshot}\n" +
+                $"Demandé par: {request.CreatedByDisplayName}\n" +
+                $"Date de soumission: {request.SubmittedAt:yyyy-MM-dd HH:mm} UTC\n\n" +
+                "== Détails de l'erreur ==\n" +
+                $"Type: {ex.GetType().Name}\n" +
+                $"Message: {ex.Message}\n" +
+                (ex.InnerException is not null ? $"Cause interne: {ex.InnerException.Message}\n" : "") +
+                $"Survenue: {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC\n\n" +
+                "== Étapes à vérifier ==\n" +
+                "1. Si l'erreur mentionne « No D365 access template has been filled out »: remplir le formulaire D365 pour ce code d'emploi dans Formulaires D365 par code d'emploi, puis créer le billet TDX manuellement pour cette demande (il ne sera pas recréé automatiquement après coup).\n" +
+                "2. Si l'erreur mentionne « No active Workday record » ou « no email address »: vérifier les données Workday de l'employé.\n" +
+                "3. Consulter les journaux applicatifs sur vm-trm-live pour la trace complète, en recherchant le numéro de demande ci-dessus.\n" +
+                "4. Une fois la cause corrigée, créer le billet manuellement dans TDX (application OneIT, formulaire D365 - Access) avec les détails ci-dessus.";
+
+            try
+            {
+                await _email.SendAsync(subject, body, ct);
+            }
+            catch (Exception emailEx)
+            {
+                _logger.LogError(emailEx, "Also failed to send the D365-Access-ticket-failure notification email for request {RequestNumber}, employee {EmployeeName}", request.RequestNumber, employee.NameSnapshot);
             }
         }
     }

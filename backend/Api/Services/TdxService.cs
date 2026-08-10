@@ -1,5 +1,7 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
@@ -9,6 +11,24 @@ namespace TremblantLifecycle.Api.Services;
 
 public class TdxService : ITdxService
 {
+    /// <summary>Maps our TdxD365RoleCheckboxes long-form catalog names (used in our own admin UI for
+    /// clarity) to the short labels the real TDX form uses as row names when a submission's
+    /// Description table is rendered — confirmed against a real historical "D365 - Access" ticket for
+    /// the Procurement roles; the rest (Accounts Payable/GL/Financial Reporting/AR) are inferred by
+    /// the same "strip the section prefix and parenthetical" pattern the confirmed ones follow.</summary>
+    private static readonly Dictionary<string, string> RoleShortLabels = new()
+    {
+        [TdxD365RoleCheckboxes.ProcurementApproverRequester] = "Approver/Requester",
+        [TdxD365RoleCheckboxes.ProcurementProjectManager] = "Project Manager",
+        [TdxD365RoleCheckboxes.ProcurementReceiver] = "Receiver",
+        [TdxD365RoleCheckboxes.AccountsPayableAccess] = "Accounts Payable Access",
+        [TdxD365RoleCheckboxes.GeneralLedgerJePreparer] = "JE Preparer / Accountant",
+        [TdxD365RoleCheckboxes.GeneralLedgerJeReviewer] = "JE Reviewer / Sr. Accountant",
+        [TdxD365RoleCheckboxes.FinancialReportingResortSpecific] = "Resort Specific",
+        [TdxD365RoleCheckboxes.FinancialReportingDenverCorp] = "Denver/Corp",
+        [TdxD365RoleCheckboxes.AccountsReceivableClerk] = "Clerk",
+        [TdxD365RoleCheckboxes.AccountsReceivableManager] = "Manager",
+    };
     private readonly HttpClient _http;
     private readonly TdxOptions _options;
 
@@ -47,6 +67,94 @@ public class TdxService : ITdxService
             ResponsibleGroupName = _options.ResponsibleGroupName
         };
 
+        return await PostTicketAsync(payload, token, ct);
+    }
+
+    /// <summary>The "D365 - Access" form (FormID 10799) doesn't use TDX custom attributes for its
+    /// visible fields — a real submission bakes them all into the ticket Description as an HTML
+    /// table instead (confirmed by inspecting a real historical ticket on this form). This replicates
+    /// that same table structure/row order so an automated ticket looks like a manually-submitted
+    /// one. Rows for optional fields (AP Access Details, Additional Legal Entities) are only included
+    /// when there's a value, matching what real submissions do; unchecked roles don't get a row at
+    /// all — only checked ones appear, each with value "True".</summary>
+    public async Task<int> CreateD365AccessTicketAsync(D365AccessTicketInput input, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(_options.Username) || string.IsNullOrWhiteSpace(_options.Password))
+        {
+            throw new TdxTicketException("TDX username/password not configured.");
+        }
+
+        var token = await GetTokenAsync(ct);
+        var requesterUid = await LookupRequesterUidAsync(input.RequesterEmail, token, ct);
+
+        var rows = new List<(string Label, string Value)>
+        {
+            ("Requested on behalf of:", $"{input.RequesterName} <{input.RequesterEmail}>"),
+            ("Resort", "Tremblant"),
+            ("Access Type", "New Access"),
+            ("Levy Employee", input.LevyEmployee ? "Yes" : "No"),
+            ("User's Legal Name", input.EmployeeName),
+            ("User's Email Address", input.EmployeeEmail),
+        };
+        if (!string.IsNullOrWhiteSpace(input.JobTitle))
+        {
+            rows.Add(("Job Title", input.JobTitle));
+        }
+        rows.Add(("Resort", "Tremblant"));
+        rows.Add(("Department Number", input.DepartmentNumber));
+        rows.Add(("Legal Entity", input.LegalEntity));
+        if (!string.IsNullOrWhiteSpace(input.ManagerName))
+        {
+            rows.Add(("Manager's Name", input.ManagerName));
+        }
+        if (input.StartDate is { } startDate)
+        {
+            rows.Add(("User's Start Date", startDate.ToDateTime(TimeOnly.MinValue).ToString("dddd, MMMM d, yyyy")));
+        }
+        foreach (var role in input.Roles)
+        {
+            var shortLabel = RoleShortLabels.GetValueOrDefault(role, role);
+            rows.Add((shortLabel, "True"));
+        }
+        if (!string.IsNullOrWhiteSpace(input.ApAccessDetails))
+        {
+            rows.Add(("AP Access Details", input.ApAccessDetails));
+        }
+        if (!string.IsNullOrWhiteSpace(input.AdditionalLegalEntities))
+        {
+            rows.Add(("Additional Legal Entities Needing Access To", input.AdditionalLegalEntities));
+        }
+        rows.Add(("Approval Limit", input.ApprovalLimit.ToString("C0", System.Globalization.CultureInfo.GetCultureInfo("en-US"))));
+
+        var sb = new StringBuilder();
+        sb.Append("<table class=\"table table-hover table-striped\">");
+        sb.Append("<thead><tr><th colspan=\"2\">&nbsp;</th></tr></thead><tbody>");
+        foreach (var (label, value) in rows)
+        {
+            sb.Append("<tr><td><strong>").Append(WebUtility.HtmlEncode(label)).Append("</strong></td><td>")
+              .Append(WebUtility.HtmlEncode(value)).Append("</td></tr>");
+        }
+        sb.Append("</tbody></table>");
+
+        var payload = new
+        {
+            FormID = _options.D365AccessFormId,
+            Title = $"{input.EmployeeName} - D365 Access",
+            Description = sb.ToString(),
+            IsRichHtml = true,
+            RequestorName = input.RequesterName,
+            RequestorEmail = input.RequesterEmail,
+            RequestorUid = requesterUid,
+            AccountID = _options.AccountId,
+            ResponsibleGroupID = _options.D365AccessResponsibleGroupId,
+            ResponsibleGroupName = _options.D365AccessResponsibleGroupName
+        };
+
+        return await PostTicketAsync(payload, token, ct);
+    }
+
+    private async Task<int> PostTicketAsync(object payload, string token, CancellationToken ct)
+    {
         using var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"{_options.BaseUrl}/api/{_options.AppId}/tickets")
         {
             Content = JsonContent.Create(payload)

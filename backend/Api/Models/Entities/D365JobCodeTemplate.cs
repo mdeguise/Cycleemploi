@@ -12,6 +12,12 @@ public class D365JobCodeTemplate
 {
     public int Id { get; set; }
     public string JobCode { get; set; } = null!;
+
+    /// <summary>English translation of the job code's Workday PositionTitle (which is French-only at
+    /// Tremblant) — the TDX ticket must be entirely in English, so we can't send the Workday title
+    /// directly. Filled in once per job code here rather than translated per employee/per ticket.</summary>
+    public string JobTitleEnglish { get; set; } = null!;
+
     public string LegalEntity { get; set; } = null!;
     public string DepartmentNumber { get; set; } = null!;
     public decimal ApprovalLimit { get; set; }

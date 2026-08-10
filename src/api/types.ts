@@ -137,6 +137,7 @@ export interface D365JobCodeTemplateSummaryDto {
 export interface D365JobCodeTemplateDto {
   jobCode: string;
   positionTitle?: string | null;
+  jobTitleEnglish: string;
   legalEntity: string;
   departmentNumber: string;
   approvalLimit: number;
@@ -148,6 +149,7 @@ export interface D365JobCodeTemplateDto {
 }
 
 export interface UpsertD365JobCodeTemplateDto {
+  jobTitleEnglish: string;
   legalEntity: string;
   departmentNumber: string;
   approvalLimit: number;
