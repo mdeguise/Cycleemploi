@@ -121,3 +121,8 @@ public class MeDto
     public string? Email { get; set; }
     public bool IsHr { get; set; }
 }
+
+public class HelpUrlDto
+{
+    public string Url { get; set; } = null!;
+}

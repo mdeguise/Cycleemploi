@@ -13,6 +13,12 @@ public interface ITdxService
 
     /// <returns>The created TDX ticket's numeric ID.</returns>
     Task<int> CreateD365AccessTicketAsync(D365AccessTicketInput input, CancellationToken ct);
+
+    /// <returns>The TDX person UID for the given email, or null if the lookup fails for any reason
+    /// (no match, TDX unreachable, auth failure). Used to personalize the "Besoin d'aide?" link —
+    /// a non-critical UI convenience, so a failed lookup should silently degrade rather than block
+    /// the caller the way the ticket-creation methods' exceptions are meant to.</returns>
+    Task<string?> TryLookupPersonUidAsync(string email, CancellationToken ct);
 }
 
 /// <summary>Everything needed to fill out the "D365 - Access" TDX form (FormID 10799) for one

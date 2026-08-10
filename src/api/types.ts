@@ -50,6 +50,10 @@ export interface MeDto {
   isHr: boolean;
 }
 
+export interface HelpUrlDto {
+  url: string;
+}
+
 export type RequestTypeApi = 'Onboarding' | 'Reactivation' | 'Offboarding';
 export type RequestStatusApi = 'Brouillon' | 'Soumise' | 'EnTraitement' | 'Completee';
 

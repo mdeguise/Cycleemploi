@@ -1,8 +1,19 @@
+import { useQuery } from '@tanstack/react-query';
 import { useWizard } from '../context/WizardContext';
+import { useApi } from '../api/ApiContext';
 import { CheckIcon, LifeBuoyIcon } from './icons';
+
+const FALLBACK_HELP_URL = 'https://form.jotform.com/260824989239069';
 
 export function StepNav() {
   const { steps, currentStep, furthestStep, goToStep } = useWizard();
+  const api = useApi();
+  const { data: helpUrl } = useQuery({
+    queryKey: ['help-url'],
+    queryFn: () => api.auth.helpUrl(),
+    staleTime: Infinity,
+    retry: false,
+  });
 
   return (
     <nav className="step-nav">
@@ -28,7 +39,7 @@ export function StepNav() {
         );
       })}
 
-      <a className="help-box" href="https://form.jotform.com/260824989239069" target="_blank" rel="noopener noreferrer">
+      <a className="help-box" href={helpUrl?.url ?? FALLBACK_HELP_URL} target="_blank" rel="noopener noreferrer">
         <span className="help-box__icon">
           <LifeBuoyIcon style={{ width: 18, height: 18 }} />
         </span>

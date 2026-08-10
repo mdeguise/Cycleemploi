@@ -153,6 +153,24 @@ public class TdxService : ITdxService
         return await PostTicketAsync(payload, token, ct);
     }
 
+    public async Task<string?> TryLookupPersonUidAsync(string email, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(_options.Username) || string.IsNullOrWhiteSpace(_options.Password))
+        {
+            return null;
+        }
+
+        try
+        {
+            var token = await GetTokenAsync(ct);
+            return await LookupRequesterUidAsync(email, token, ct);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
     private async Task<int> PostTicketAsync(object payload, string token, CancellationToken ct)
     {
         using var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"{_options.BaseUrl}/api/{_options.AppId}/tickets")

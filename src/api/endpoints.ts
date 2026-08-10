@@ -9,6 +9,7 @@ import type {
   D365UserSecurityRoleDto,
   DiscrepanciesDto,
   EmployeeDto,
+  HelpUrlDto,
   MeDto,
   RequestDto,
   UpdateRequestDto,
@@ -19,6 +20,7 @@ export function createApi(client: ApiClient) {
   return {
     auth: {
       me: () => client.get<MeDto>('/api/auth/me'),
+      helpUrl: () => client.get<HelpUrlDto>('/api/auth/help-url'),
     },
     catalogs: {
       get: () => client.get<CatalogsDto>('/api/catalogs'),

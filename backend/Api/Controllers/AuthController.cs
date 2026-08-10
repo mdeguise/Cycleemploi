@@ -13,11 +13,15 @@ public class AuthController : ControllerBase
 {
     private readonly IAdDirectoryService _ad;
     private readonly HrGroupOptions _hrGroupOptions;
+    private readonly ITdxService _tdx;
+    private readonly TdxOptions _tdxOptions;
 
-    public AuthController(IAdDirectoryService ad, IOptions<HrGroupOptions> hrGroupOptions)
+    public AuthController(IAdDirectoryService ad, IOptions<HrGroupOptions> hrGroupOptions, ITdxService tdx, IOptions<TdxOptions> tdxOptions)
     {
         _ad = ad;
         _hrGroupOptions = hrGroupOptions.Value;
+        _tdx = tdx;
+        _tdxOptions = tdxOptions.Value;
     }
 
     [HttpGet("me")]
@@ -35,5 +39,31 @@ public class AuthController : ControllerBase
             Email = info.Email,
             IsHr = isHr
         });
+    }
+
+    /// <summary>Builds the "Besoin d'aide?" link to the TDX client-portal Incident form, with the
+    /// current user's TDX UID attached as the userId param so the form opens pre-associated with
+    /// them as requester. The UID lookup is best-effort: if it fails for any reason, the URL is
+    /// still returned, just without userId — same as the form behaves for someone typing the base
+    /// URL by hand.</summary>
+    [HttpGet("help-url")]
+    public async Task<ActionResult<HelpUrlDto>> HelpUrl(CancellationToken ct)
+    {
+        var sam = User.GetSamAccountName();
+        var info = _ad.GetUserInfo(sam);
+        var uid = string.IsNullOrWhiteSpace(info.Email) ? null : await _tdx.TryLookupPersonUidAsync(info.Email, ct);
+
+        var query = $"resortId={_tdxOptions.HelpFormResortId}" +
+            $"&categoryId={_tdxOptions.HelpFormCategoryId}" +
+            $"&serviceId={_tdxOptions.HelpFormServiceId}" +
+            $"&offeringId={_tdxOptions.HelpFormOfferingId}" +
+            $"&__cust={Uri.EscapeDataString(_tdxOptions.HelpFormCustomer)}" +
+            $"&i={Uri.EscapeDataString(_tdxOptions.HelpFormItemId)}";
+        if (!string.IsNullOrWhiteSpace(uid))
+        {
+            query += $"&userId={Uri.EscapeDataString(uid)}";
+        }
+
+        return Ok(new HelpUrlDto { Url = $"{_tdxOptions.HelpFormBaseUrl}?{query}" });
     }
 }
