@@ -1,7 +1,7 @@
 import { useWizard } from '../context/WizardContext';
 import { Field } from '../components/FormField';
 import { StepFooter } from '../components/StepFooter';
-import { ShieldIcon, LaptopIcon, LockIcon, ShirtIcon, AlertTriangleIcon } from '../components/icons';
+import { ShieldIcon, LaptopIcon, LockIcon, ShirtIcon, AlertTriangleIcon, InfoIcon } from '../components/icons';
 import type { OffboardingInfo } from '../types';
 
 export function Step3DepartmentComments() {
@@ -19,7 +19,7 @@ export function Step3DepartmentComments() {
           <ShieldIcon style={{ width: 22, height: 22 }} />
         </span>
         <div>
-          <div className="step-panel__title">Commentaires par département</div>
+          <div className="step-panel__title">Commentaires et suivis</div>
           <div className="step-panel__subtitle">
             Ajoutez les informations nécessaires pour chaque équipe impliquée dans le traitement de cet avis
           </div>
@@ -41,7 +41,10 @@ export function Step3DepartmentComments() {
             <span className="dept-comment-label">
               <ShieldIcon style={{ width: 15, height: 15 }} />
               Ressources humaines
-              <span className="confidential-badge">Confidentiel</span>
+              <span className="confidential-badge">
+                <LockIcon style={{ width: 10, height: 10 }} />
+                Visible uniquement par les ressources humaines
+              </span>
             </span>
           }
         >
@@ -50,6 +53,12 @@ export function Step3DepartmentComments() {
             onChange={(ev) => update({ commentairesRH: ev.target.value })}
             placeholder="Commentaires destinés uniquement à l'équipe des ressources humaines"
           />
+          <div className="field-hint">
+            Assurez-vous d'inscrire vos commentaires dans la section appropriée. Les renseignements saisis ici sont
+            accessibles uniquement à l'équipe des ressources humaines. Il est de votre responsabilité de protéger la
+            confidentialité des renseignements personnels de l'employé. Ex. : renseignements confidentiels
+            concernant le départ, entente particulière, suivi RH requis.
+          </div>
         </Field>
       </div>
 
@@ -66,6 +75,7 @@ export function Step3DepartmentComments() {
           onChange={(ev) => update({ commentairesIT: ev.target.value })}
           placeholder="Commentaires concernant les comptes, ordinateurs ou autre matériel informatique de l'employé"
         />
+        <div className="field-hint">Ex. : ordinateur à récupérer, transfert de fichiers requis, accès à désactiver en priorité.</div>
       </Field>
 
       <Field
@@ -81,13 +91,14 @@ export function Step3DepartmentComments() {
           onChange={(ev) => update({ commentairesStationnement: ev.target.value })}
           placeholder="Commentaires concernant le stationnement de l'employé"
         />
+        <div className="field-hint">Ex. : permis à annuler, vignette à récupérer, stationnement réservé.</div>
       </Field>
 
       <Field
         label={
           <span className="dept-comment-label">
             <LockIcon style={{ width: 15, height: 15 }} />
-            Puce d'accès
+            Carte ou puce d'accès
           </span>
         }
       >
@@ -96,13 +107,14 @@ export function Step3DepartmentComments() {
           onChange={(ev) => update({ commentairesPuceAcces: ev.target.value })}
           placeholder="Commentaires concernant la puce d'accès de l'employé"
         />
+        <div className="field-hint">Ex. : carte récupérée, accès à désactiver immédiatement.</div>
       </Field>
 
       <Field
         label={
           <span className="dept-comment-label">
             <ShirtIcon style={{ width: 15, height: 15 }} />
-            Redingote (vêtements et matériel à retourner)
+            Uniformes et matériel à récupérer
           </span>
         }
       >
@@ -111,7 +123,16 @@ export function Step3DepartmentComments() {
           onChange={(ev) => update({ commentairesRedingote: ev.target.value })}
           placeholder="Précisez les vêtements ou tout autre matériel que l'employé doit retourner"
         />
+        <div className="field-hint">Ex. : manteau corporatif, uniforme, radio, outils ou autre matériel fourni à l'employé.</div>
       </Field>
+
+      <div className="workday-notice">
+        <InfoIcon className="workday-notice__icon" />
+        <div className="workday-notice__text">
+          Les commentaires saisis dans cette section serviront aux équipes concernées pour coordonner la récupération
+          du matériel, la désactivation des accès et les suivis administratifs.
+        </div>
+      </div>
 
       <StepFooter />
     </div>

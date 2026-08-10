@@ -173,6 +173,10 @@ public class RequestsController : ControllerBase
             request.OffboardingDetail.CommentairesStationnement = dto.CommentairesStationnement;
             request.OffboardingDetail.CommentairesPuceAcces = dto.CommentairesPuceAcces;
             request.OffboardingDetail.CommentairesRedingote = dto.CommentairesRedingote;
+            request.OffboardingDetail.DateRetourConnue = dto.DateRetourConnue;
+            request.OffboardingDetail.DateRetourTravail = dto.DateRetourTravail;
+            request.OffboardingDetail.PreavisRecu = dto.PreavisRecu;
+            request.OffboardingDetail.MotifNonAdmissibilite = dto.MotifNonAdmissibilite;
 
             // Written unconditionally here — the author can always write this as normal form entry.
             // Whether it can be READ BACK is a separate, later check (RequestAuthorizationService),
@@ -683,7 +687,11 @@ public class RequestsController : ControllerBase
         CommentairesIT = r.OffboardingDetail?.CommentairesIT,
         CommentairesStationnement = r.OffboardingDetail?.CommentairesStationnement,
         CommentairesPuceAcces = r.OffboardingDetail?.CommentairesPuceAcces,
-        CommentairesRedingote = r.OffboardingDetail?.CommentairesRedingote
+        CommentairesRedingote = r.OffboardingDetail?.CommentairesRedingote,
+        DateRetourConnue = r.OffboardingDetail?.DateRetourConnue,
+        DateRetourTravail = r.OffboardingDetail?.DateRetourTravail,
+        PreavisRecu = r.OffboardingDetail?.PreavisRecu,
+        MotifNonAdmissibilite = r.OffboardingDetail?.MotifNonAdmissibilite
         // CommentairesRH deliberately not mapped here — see GetInternal.
     };
 

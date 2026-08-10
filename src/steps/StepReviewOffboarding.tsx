@@ -2,8 +2,22 @@ import { useState } from 'react';
 import { useWizard } from '../context/WizardContext';
 import { StepFooter } from '../components/StepFooter';
 import { SubmissionModal } from '../components/SubmissionModal';
-import { CheckCircleIcon, UserIcon, LogOutIcon, ShieldIcon, LaptopIcon, LockIcon, ShirtIcon } from '../components/icons';
+import {
+  CheckCircleIcon,
+  UserIcon,
+  LogOutIcon,
+  ShieldIcon,
+  LaptopIcon,
+  LockIcon,
+  ShirtIcon,
+  AlertTriangleIcon,
+} from '../components/icons';
 import { formatDateFr } from '../utils/formatDate';
+import {
+  RAISON_ARRET_MISE_A_PIED_TEMPORAIRE,
+  RAISON_ARRET_DEMISSION_VOLONTAIRE,
+  REEMBAUCHERIEZ_NON,
+} from '../data/catalogs';
 
 export function StepReviewOffboarding() {
   const { request, goToStep, submitRequest } = useWizard();
@@ -84,6 +98,26 @@ export function StepReviewOffboarding() {
             <div className="review-item__label">Raison de l'arrêt de travail</div>
             <div className="review-item__value">{o.raisonArret || '—'}</div>
           </div>
+          {o.raisonArret === RAISON_ARRET_MISE_A_PIED_TEMPORAIRE && (
+            <>
+              <div>
+                <div className="review-item__label">Date de retour au travail connue?</div>
+                <div className="review-item__value">{o.dateRetourConnue || '—'}</div>
+              </div>
+              {o.dateRetourConnue === 'Oui' && (
+                <div>
+                  <div className="review-item__label">Date prévue de retour au travail</div>
+                  <div className="review-item__value">{o.dateRetourTravail ? formatDateFr(o.dateRetourTravail) : '—'}</div>
+                </div>
+              )}
+            </>
+          )}
+          {o.raisonArret === RAISON_ARRET_DEMISSION_VOLONTAIRE && (
+            <div>
+              <div className="review-item__label">Préavis reçu?</div>
+              <div className="review-item__value">{o.preavisRecu || '—'}</div>
+            </div>
+          )}
           <div>
             <div className="review-item__label">Détails de la raison</div>
             <div className="review-item__value">{o.detailsRaison || '—'}</div>
@@ -92,6 +126,12 @@ export function StepReviewOffboarding() {
             <div className="review-item__label">Réembaucheriez-vous cet équipier?</div>
             <div className="review-item__value">{o.reembaucheriez || '—'}</div>
           </div>
+          {o.reembaucheriez === REEMBAUCHERIEZ_NON && (
+            <div>
+              <div className="review-item__label">Motif de non-admissibilité à la réembauche</div>
+              <div className="review-item__value">{o.motifNonAdmissibilite || '—'}</div>
+            </div>
+          )}
           <div>
             <div className="review-item__label">Pièces jointes</div>
             <div className="review-tag-list">
@@ -112,7 +152,7 @@ export function StepReviewOffboarding() {
       <div className="review-section">
         <div className="review-section__header">
           <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <ShieldIcon style={{ width: 15, height: 15 }} /> Commentaires par département
+            <ShieldIcon style={{ width: 15, height: 15 }} /> Commentaires et suivis
           </span>
           <span className="review-section__edit" onClick={() => goToStep(2)}>
             Modifier
@@ -122,7 +162,11 @@ export function StepReviewOffboarding() {
           <div>
             <div className="review-item__label">
               <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                Ressources humaines <span className="confidential-badge">Confidentiel</span>
+                Ressources humaines
+                <span className="confidential-badge">
+                  <LockIcon style={{ width: 10, height: 10 }} />
+                  Visible uniquement par les ressources humaines
+                </span>
               </span>
             </div>
             <div className="review-item__value">{o.commentairesRH || '—'}</div>
@@ -146,7 +190,7 @@ export function StepReviewOffboarding() {
           <div>
             <div className="review-item__label">
               <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <LockIcon style={{ width: 12, height: 12 }} /> Puce d'accès
+                <LockIcon style={{ width: 12, height: 12 }} /> Carte ou puce d'accès
               </span>
             </div>
             <div className="review-item__value">{o.commentairesPuceAcces || '—'}</div>
@@ -154,11 +198,20 @@ export function StepReviewOffboarding() {
           <div>
             <div className="review-item__label">
               <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <ShirtIcon style={{ width: 12, height: 12 }} /> Redingote
+                <ShirtIcon style={{ width: 12, height: 12 }} /> Uniformes et matériel à récupérer
               </span>
             </div>
             <div className="review-item__value">{o.commentairesRedingote || '—'}</div>
           </div>
+        </div>
+      </div>
+
+      <div className="important-notice">
+        <AlertTriangleIcon className="important-notice__icon" />
+        <div>
+          <strong>Important</strong> — La transmission de cet avis déclenche les processus de désactivation des
+          accès, de récupération du matériel et les interventions requises par les équipes concernées. Assurez-vous
+          que les renseignements fournis sont exacts et complets.
         </div>
       </div>
 

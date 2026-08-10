@@ -58,6 +58,10 @@ export interface OffboardingInfo {
   commentairesStationnement: string;
   commentairesPuceAcces: string;
   commentairesRedingote: string;
+  dateRetourConnue: string;
+  dateRetourTravail: string;
+  preavisRecu: string;
+  motifNonAdmissibilite: string;
 }
 
 export interface OnboardingRequest {
@@ -119,6 +123,10 @@ export function createEmptyRequest(demandePar: string): OnboardingRequest {
       commentairesStationnement: '',
       commentairesPuceAcces: '',
       commentairesRedingote: '',
+      dateRetourConnue: '',
+      dateRetourTravail: '',
+      preavisRecu: '',
+      motifNonAdmissibilite: '',
     },
   };
 }

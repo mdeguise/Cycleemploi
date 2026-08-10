@@ -93,6 +93,10 @@ export interface RequestDto {
   commentairesStationnement?: string | null;
   commentairesPuceAcces?: string | null;
   commentairesRedingote?: string | null;
+  dateRetourConnue?: string | null;
+  dateRetourTravail?: string | null;
+  preavisRecu?: string | null;
+  motifNonAdmissibilite?: string | null;
   /** Omitted from the JSON entirely (not just null) when the caller isn't authorized to read it —
    * see backend/Api/Controllers/RequestsController.cs. */
   commentairesRH?: string | null;

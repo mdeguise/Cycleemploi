@@ -64,6 +64,10 @@ public class RequestDto
     public string? CommentairesStationnement { get; set; }
     public string? CommentairesPuceAcces { get; set; }
     public string? CommentairesRedingote { get; set; }
+    public string? DateRetourConnue { get; set; }
+    public DateOnly? DateRetourTravail { get; set; }
+    public string? PreavisRecu { get; set; }
+    public string? MotifNonAdmissibilite { get; set; }
 
     /// <summary>Only populated when the caller passed the RequestAuthorizationService check —
     /// omitted entirely (not just null) from the JSON when access is denied, so its absence itself
@@ -99,6 +103,10 @@ public class UpdateRequestDto
     public string? CommentairesStationnement { get; set; }
     public string? CommentairesPuceAcces { get; set; }
     public string? CommentairesRedingote { get; set; }
+    public string? DateRetourConnue { get; set; }
+    public DateOnly? DateRetourTravail { get; set; }
+    public string? PreavisRecu { get; set; }
+    public string? MotifNonAdmissibilite { get; set; }
 
     /// <summary>Write-only from this DTO's perspective — the author can always write this as
     /// normal form entry; whether it can be READ BACK later is a separate check

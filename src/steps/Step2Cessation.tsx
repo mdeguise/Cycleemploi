@@ -2,7 +2,14 @@ import { useWizard } from '../context/WizardContext';
 import { Field } from '../components/FormField';
 import { StepFooter } from '../components/StepFooter';
 import { LogOutIcon, InfoIcon, AlertTriangleIcon, PaperclipIcon, XIcon } from '../components/icons';
-import { OUI_NON, RAISONS_ARRET, REEMBAUCHERIEZ_OPTIONS } from '../data/catalogs';
+import {
+  OUI_NON,
+  RAISONS_ARRET,
+  REEMBAUCHERIEZ_OPTIONS,
+  RAISON_ARRET_MISE_A_PIED_TEMPORAIRE,
+  RAISON_ARRET_DEMISSION_VOLONTAIRE,
+  REEMBAUCHERIEZ_NON,
+} from '../data/catalogs';
 import { formatFileSize } from '../utils/formatFileSize';
 import { DateInput } from '../components/DateInput';
 import type { OffboardingInfo } from '../types';
@@ -38,7 +45,7 @@ export function Step2Cessation() {
           <LogOutIcon style={{ width: 22, height: 22 }} />
         </span>
         <div>
-          <div className="step-panel__title">Détails de la cessation</div>
+          <div className="step-panel__title">Détails de la fin d'emploi ou de la mise à pied</div>
           <div className="step-panel__subtitle">Précisez les informations relatives à l'arrêt de travail</div>
         </div>
       </div>
@@ -59,7 +66,7 @@ export function Step2Cessation() {
       </Field>
 
       <Field
-        label="L'équipier désire recevoir son indemnité de vacances au moment de sa mise à pied"
+        label="L'équipier souhaite-t-il recevoir le paiement de ses vacances accumulées lors de sa mise à pied?"
         required
         valid={Boolean(o.indemniteVacances)}
       >
@@ -73,7 +80,7 @@ export function Step2Cessation() {
         </select>
       </Field>
 
-      <Field label="Raison de l'arrêt de travail" required valid={Boolean(o.raisonArret)}>
+      <Field label="Motif de la fin d'emploi ou de la mise à pied" required valid={Boolean(o.raisonArret)}>
         <select value={o.raisonArret} onChange={(ev) => update({ raisonArret: ev.target.value })}>
           <option value="">Sélectionner</option>
           {RAISONS_ARRET.map((r) => (
@@ -84,15 +91,49 @@ export function Step2Cessation() {
         </select>
       </Field>
 
-      <Field label="Détails de la raison (réponse obligatoire)" required valid={Boolean(o.detailsRaison)}>
+      {o.raisonArret === RAISON_ARRET_MISE_A_PIED_TEMPORAIRE && (
+        <>
+          <Field label="La date de retour au travail est-elle connue?" valid={Boolean(o.dateRetourConnue)}>
+            <select value={o.dateRetourConnue} onChange={(ev) => update({ dateRetourConnue: ev.target.value })}>
+              <option value="">Sélectionner</option>
+              {OUI_NON.map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </Field>
+          {o.dateRetourConnue === 'Oui' && (
+            <Field label="Date prévue de retour au travail" valid={Boolean(o.dateRetourTravail)}>
+              <DateInput value={o.dateRetourTravail} onChange={(dateRetourTravail) => update({ dateRetourTravail })} />
+            </Field>
+          )}
+        </>
+      )}
+
+      {o.raisonArret === RAISON_ARRET_DEMISSION_VOLONTAIRE && (
+        <Field label="Préavis reçu?" valid={Boolean(o.preavisRecu)}>
+          <select value={o.preavisRecu} onChange={(ev) => update({ preavisRecu: ev.target.value })}>
+            <option value="">Sélectionner</option>
+            {OUI_NON.map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
+
+      <Field label="Précisions sur le motif (réponse obligatoire)" required valid={Boolean(o.detailsRaison)}>
         <textarea
           value={o.detailsRaison}
           onChange={(ev) => update({ detailsRaison: ev.target.value })}
           placeholder="Précisez les détails de la raison"
         />
+        <div className="field-hint">Fournissez les informations pertinentes permettant de comprendre le contexte de la demande.</div>
       </Field>
 
-      <Field label="Réembaucheriez-vous cet équipier?" required valid={Boolean(o.reembaucheriez)}>
+      <Field label="Cet équipier est-il admissible à une réembauche?" required valid={Boolean(o.reembaucheriez)}>
         <select value={o.reembaucheriez} onChange={(ev) => update({ reembaucheriez: ev.target.value })}>
           <option value="">Sélectionner</option>
           {REEMBAUCHERIEZ_OPTIONS.map((v) => (
@@ -103,7 +144,17 @@ export function Step2Cessation() {
         </select>
       </Field>
 
-      <Field label="Pièces jointes (optionnel)">
+      {o.reembaucheriez === REEMBAUCHERIEZ_NON && (
+        <Field label="Motif de non-admissibilité à la réembauche" valid={Boolean(o.motifNonAdmissibilite)}>
+          <textarea
+            value={o.motifNonAdmissibilite}
+            onChange={(ev) => update({ motifNonAdmissibilite: ev.target.value })}
+            placeholder="Précisez le motif de non-admissibilité"
+          />
+        </Field>
+      )}
+
+      <Field label="Documents justificatifs (facultatif)">
         <label className="file-upload__dropzone">
           <PaperclipIcon style={{ width: 18, height: 18 }} />
           Cliquez pour joindre un ou plusieurs documents
@@ -116,6 +167,7 @@ export function Step2Cessation() {
             }}
           />
         </label>
+        <div className="field-hint">Lettre de démission, entente de départ, document RH ou tout autre fichier pertinent.</div>
         {o.attachments.length > 0 && (
           <div className="file-list">
             {o.attachments.map((file, index) => (

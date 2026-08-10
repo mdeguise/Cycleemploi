@@ -19,4 +19,15 @@ public class OffboardingDetail
     public string? CommentairesStationnement { get; set; }
     public string? CommentairesPuceAcces { get; set; }
     public string? CommentairesRedingote { get; set; }
+
+    /// <summary>Shown only when RaisonArret is "Mise à pied temporaire (manque de travail)" — asks
+    /// whether the return date is known before optionally capturing it.</summary>
+    public string? DateRetourConnue { get; set; }
+    public DateOnly? DateRetourTravail { get; set; }
+
+    /// <summary>Shown only when RaisonArret is "Démission volontaire".</summary>
+    public string? PreavisRecu { get; set; }
+
+    /// <summary>Shown only when Reembaucheriez is "Non".</summary>
+    public string? MotifNonAdmissibilite { get; set; }
 }

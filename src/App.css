@@ -370,6 +370,12 @@
   position: relative;
 }
 
+.field-hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
 .field input[type="text"],
 .field input[type="email"],
 .field input[type="tel"],
@@ -1290,15 +1296,14 @@
 .confidential-badge {
   display: inline-flex;
   align-items: center;
+  gap: 4px;
   margin-left: 8px;
-  padding: 2px 8px;
+  padding: 3px 9px;
   border-radius: 999px;
   background: var(--tremblant-red);
   color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 600;
   vertical-align: middle;
 }
 

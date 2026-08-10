@@ -23,7 +23,7 @@ export const ONBOARDING_STEPS: StepDescriptor[] = [
 export const OFFBOARDING_STEPS: StepDescriptor[] = [
   { key: 'employees', numero: 1, titre: 'Employé(s)', sousTitre: 'Sélection des employés' },
   { key: 'cessation', numero: 2, titre: 'Détails de la cessation', sousTitre: 'Informations requises' },
-  { key: 'comments', numero: 3, titre: 'Commentaires par département', sousTitre: 'RH, TI, stationnement, matériel' },
+  { key: 'comments', numero: 3, titre: 'Commentaires et suivis', sousTitre: 'RH, TI, stationnement, matériel' },
   { key: 'review', numero: 4, titre: 'Révision et soumission', sousTitre: 'Vérifier et envoyer' },
 ];
 
@@ -88,6 +88,10 @@ function toUpdateDto(request: OnboardingRequest): UpdateRequestDto {
     commentairesStationnement: request.offboarding.commentairesStationnement || null,
     commentairesPuceAcces: request.offboarding.commentairesPuceAcces || null,
     commentairesRedingote: request.offboarding.commentairesRedingote || null,
+    dateRetourConnue: request.offboarding.dateRetourConnue || null,
+    dateRetourTravail: request.offboarding.dateRetourTravail || null,
+    preavisRecu: request.offboarding.preavisRecu || null,
+    motifNonAdmissibilite: request.offboarding.motifNonAdmissibilite || null,
     commentairesRH: request.offboarding.commentairesRH || null,
   };
 }

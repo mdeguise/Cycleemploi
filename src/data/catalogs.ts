@@ -113,14 +113,18 @@ export const APPLICATIONS: ApplicationItem[] = [
 
 export const OUI_NON = ['Oui', 'Non'];
 
+export const RAISON_ARRET_MISE_A_PIED_TEMPORAIRE = 'Mise à pied temporaire (manque de travail)';
+export const RAISON_ARRET_DEMISSION_VOLONTAIRE = 'Démission volontaire';
+
 export const RAISONS_ARRET = [
   'Fin de saison / mise à pied saisonnière',
-  'Mise à pied temporaire (manque de travail)',
-  'Démission volontaire',
+  RAISON_ARRET_MISE_A_PIED_TEMPORAIRE,
+  RAISON_ARRET_DEMISSION_VOLONTAIRE,
   'Congédiement',
   'Fin de contrat',
   'Retraite',
   'Autre',
 ];
 
-export const REEMBAUCHERIEZ_OPTIONS = ['Oui', 'Non', 'À déterminer'];
+export const REEMBAUCHERIEZ_NON = 'Non';
+export const REEMBAUCHERIEZ_OPTIONS = ['Oui', REEMBAUCHERIEZ_NON, 'À déterminer'];
