@@ -4,7 +4,8 @@ import { useWizard } from '../context/WizardContext';
 import { Field } from '../components/FormField';
 import { StepFooter } from '../components/StepFooter';
 import { UserIcon, SearchIcon, InfoIcon } from '../components/icons';
-import { REGLES_DE_PAYE, REGLE_DE_PAYE_AUTRE } from '../data/catalogs';
+import { REGLE_DE_PAYE_AUTRE } from '../data/catalogs';
+import { RegleDePayeSelect } from '../components/RegleDePayeSelect';
 import { TYPE_DEMANDE_TERMINAISON, type EmployeeSelectionInfo, type EmployeeSnapshot, type TypeDemande } from '../types';
 import { useApi } from '../api/ApiContext';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
@@ -123,7 +124,7 @@ export function Step1Employee() {
             <span>
               <div className="type-demande-option__title">Nouvelle intégration</div>
               <div className="type-demande-option__desc">
-                Cette personne n'a jamais eu de dossier actif chez Tremblant
+                Cette personne n'a jamais occupé un emploi ou ne possède aucun dossier d'employé actif à Tremblant
               </div>
             </span>
           </button>
@@ -151,7 +152,7 @@ export function Step1Employee() {
             <span>
               <div className="type-demande-option__title">Avis de terminaison ou mise à pied temporaire</div>
               <div className="type-demande-option__desc">
-                Cette personne quitte définitivement ou temporairement son poste
+                Cette personne quitte son poste de façon permanente ou temporaire
               </div>
             </span>
           </button>
@@ -164,8 +165,9 @@ export function Step1Employee() {
           <InfoIcon className="workday-notice__icon" />
           <ul>
             <li>
-              Seuls les employés actifs dans Workday apparaîtront dans la liste ci-dessous. Par <strong>actif</strong>,
-              on entend un dossier qui n'est pas en mode Terminaison — un employé en mode mise à pied est considéré actif.
+              Seuls les employés actifs dans Workday apparaîtront dans la liste ci-dessous. Un employé est considéré
+              comme <strong>actif</strong> lorsque son dossier n'est pas associé à un statut de fin d'emploi — un
+              employé en mise à pied demeure considéré actif.
             </li>
             <li>
               Si l'employé n'apparaît pas dans la liste déroulante, veuillez contacter votre partenaire d'affaires RH
@@ -317,14 +319,7 @@ export function Step1Employee() {
               <input type="date" value={e.dateEntreePrevue} onChange={(ev) => update({ dateEntreePrevue: ev.target.value })} />
             </Field>
             <Field label="Règle de paye" required valid={Boolean(e.regleDePaye)}>
-              <select value={e.regleDePaye} onChange={(ev) => update({ regleDePaye: ev.target.value })}>
-                <option value="">Sélectionner</option>
-                {REGLES_DE_PAYE.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
+              <RegleDePayeSelect value={e.regleDePaye} onChange={(regleDePaye) => update({ regleDePaye })} />
             </Field>
           </div>
 

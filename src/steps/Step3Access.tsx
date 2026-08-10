@@ -3,7 +3,7 @@ import { useWizard } from '../context/WizardContext';
 import { Field, SectionTitle } from '../components/FormField';
 import { StepFooter } from '../components/StepFooter';
 import { ChoiceCard } from '../components/ChoiceCard';
-import { LockIcon } from '../components/icons';
+import { LockIcon, AlertTriangleIcon } from '../components/icons';
 import { SYSTEMES_ACCES, POS_HEBERGEMENT_SYSTEMES, ACCES_BADGE, BESOIN_CODE_ALARME } from '../data/catalogs';
 
 export function Step3Access() {
@@ -52,7 +52,17 @@ export function Step3Access() {
         </span>
         <div>
           <div className="step-panel__title">Accès et comptes</div>
-          <div className="step-panel__subtitle">Sélectionnez les systèmes et accès requis pour ce poste</div>
+          <div className="step-panel__subtitle">
+            Sélectionnez les accès et les applications dont l'employé a besoin pour exercer ses fonctions.
+          </div>
+        </div>
+      </div>
+
+      <div className="important-notice">
+        <AlertTriangleIcon className="important-notice__icon" />
+        <div>
+          <strong>Important</strong> — Sélectionnez uniquement les accès nécessaires aux fonctions de l'employé. Les
+          demandes d'accès sont traitées selon les autorisations et les politiques de sécurité de l'entreprise.
         </div>
       </div>
 
@@ -90,13 +100,18 @@ export function Step3Access() {
       </div>
 
       <SectionTitle icon={<LockIcon style={{ width: 16, height: 16 }} />}>Système POS et Hébergement</SectionTitle>
+      <div className="step-panel__subtitle" style={{ marginTop: -8, marginBottom: 16 }}>
+        Sélectionnez les applications requises pour ce poste
+      </div>
       <div className="choice-list">
-        {POS_HEBERGEMENT_SYSTEMES.map((nom) => (
+        {POS_HEBERGEMENT_SYSTEMES.map((sys) => (
           <ChoiceCard
-            key={nom}
-            title={nom}
-            selected={a.posHebergement.includes(nom)}
-            onToggle={() => togglePosHebergement(nom)}
+            key={sys.nom}
+            title={sys.nom}
+            description={sys.description}
+            badge={sys.facultatif ? 'Facultatif' : undefined}
+            selected={a.posHebergement.includes(sys.nom)}
+            onToggle={() => togglePosHebergement(sys.nom)}
           />
         ))}
       </div>
@@ -106,7 +121,7 @@ export function Step3Access() {
           type="text"
           value={a.stationnement}
           onChange={(ev) => updateStationnement(ev.target.value)}
-          placeholder="Indiquez quel stationnement"
+          placeholder="Sélectionnez ou précisez le ou les stationnements requis"
         />
       </Field>
 

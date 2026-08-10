@@ -3,7 +3,7 @@ import { Field, SectionTitle } from '../components/FormField';
 import { StepFooter } from '../components/StepFooter';
 import { ChoiceCard } from '../components/ChoiceCard';
 import { LaptopIcon, InfoIcon } from '../components/icons';
-import { EQUIPEMENTS } from '../data/catalogs';
+import { EQUIPEMENTS, CATEGORIE_TELECOMMUNICATIONS_DESCRIPTION } from '../data/catalogs';
 
 export function Step4Equipment() {
   const { request, setRequest } = useWizard();
@@ -32,7 +32,9 @@ export function Step4Equipment() {
         </span>
         <div>
           <div className="step-panel__title">Équipement requis</div>
-          <div className="step-panel__subtitle">Sélectionnez le matériel nécessaire pour ce nouvel employé</div>
+          <div className="step-panel__subtitle">
+            Sélectionnez l'équipement nécessaire à l'employé selon les fonctions qui lui sont confiées.
+          </div>
         </div>
       </div>
 
@@ -56,12 +58,20 @@ export function Step4Equipment() {
 
       {categories.map((cat) => (
         <div key={cat} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <SectionTitle icon={<LaptopIcon style={{ width: 16, height: 16 }} />}>{cat}</SectionTitle>
+          <SectionTitle icon={<LaptopIcon style={{ width: 16, height: 16 }} />}>
+            {cat}
+            {cat === 'Télécommunications' && (
+              <span style={{ marginLeft: 8, fontWeight: 400, color: 'var(--muted)', fontSize: 13 }}>
+                — {CATEGORIE_TELECOMMUNICATIONS_DESCRIPTION}
+              </span>
+            )}
+          </SectionTitle>
           <div className="choice-list">
             {EQUIPEMENTS.filter((e) => e.categorie === cat).map((item) => (
               <ChoiceCard
                 key={item.nom}
                 title={item.nom}
+                description={item.description}
                 selected={eq.equipements.includes(item.nom)}
                 onToggle={() => toggle(item.nom)}
               />
@@ -70,11 +80,11 @@ export function Step4Equipment() {
         </div>
       ))}
 
-      <Field label="Notes sur l'équipement">
+      <Field label="Précision sur l'équipement demandé">
         <textarea
           value={eq.notes}
           onChange={(ev) => updateNotes(ev.target.value)}
-          placeholder="Ex. taille d'uniforme, préférences particulières"
+          placeholder="ex.: taille d'uniforme, besoins ergonomiques, équipement spécialisé ou toute autre précision pertinente."
         />
       </Field>
 

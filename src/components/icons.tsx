@@ -233,3 +233,11 @@ export function AppsIcon({ className, style }: IconProps) {
     </svg>
   );
 }
+
+export function UtensilsIcon({ className, style }: IconProps) {
+  return (
+    <svg className={className} style={style} {...base}>
+      <path d="M7 2v7a2 2 0 0 0 2 2v11M7 2v7a2 2 0 0 1-2 2v0M7 2v7M4 2v7M17 2c-1.7 0-3 2.2-3 5s1.3 5 3 5v9M17 2v20" />
+    </svg>
+  );
+}

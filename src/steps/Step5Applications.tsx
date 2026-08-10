@@ -1,8 +1,8 @@
 import { useWizard } from '../context/WizardContext';
-import { Field } from '../components/FormField';
+import { Field, SectionTitle } from '../components/FormField';
 import { StepFooter } from '../components/StepFooter';
 import { ChoiceCard } from '../components/ChoiceCard';
-import { AppsIcon } from '../components/icons';
+import { AppsIcon, FileTextIcon } from '../components/icons';
 import { APPLICATIONS } from '../data/catalogs';
 
 export function Step5Applications() {
@@ -30,7 +30,7 @@ export function Step5Applications() {
         </span>
         <div>
           <div className="step-panel__title">Applications et licences</div>
-          <div className="step-panel__subtitle">Sélectionnez les logiciels requis pour ce poste</div>
+          <div className="step-panel__subtitle">Sélectionnez les applications requises pour ce poste</div>
         </div>
       </div>
 
@@ -39,20 +39,25 @@ export function Step5Applications() {
           <ChoiceCard
             key={app.nom}
             title={app.nom}
-            description={app.editeur}
+            description={app.description}
             selected={apps.applications.includes(app.nom)}
             onToggle={() => toggle(app.nom)}
           />
         ))}
       </div>
 
-      <Field label="Spécifiez tout autre logiciel requis pour le poste de l'employé (selon disponibilité et approbation)">
+      <SectionTitle icon={<FileTextIcon style={{ width: 16, height: 16 }} />}>Autres applications requises</SectionTitle>
+      <Field label="Indiquez toute autre application ou licence nécessaire qui ne figure pas dans la liste ci-dessus.">
         <textarea
           value={apps.autreLogiciel}
           onChange={(ev) => updateAutreLogiciel(ev.target.value)}
-          placeholder="Nommez tout autre logiciel requis"
+          placeholder="ex.: Foxit, Visio, Project, Power BI."
         />
       </Field>
+      <div className="step-panel__subtitle" style={{ marginTop: -12 }}>
+        Les licences logicielles sont attribuées selon les besoins du poste et les autorisations en vigueur. Certaines
+        demandes peuvent nécessiter une approbation supplémentaire.
+      </div>
 
       <StepFooter />
     </div>

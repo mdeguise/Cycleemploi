@@ -523,6 +523,74 @@
   text-align: center;
 }
 
+.regle-paye-select {
+  position: relative;
+}
+
+.regle-paye-select__trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.regle-paye-select__trigger:focus {
+  outline: none;
+  border-color: var(--tremblant-red);
+  box-shadow: 0 0 0 3px var(--tremblant-red-light);
+}
+
+.regle-paye-select__placeholder {
+  color: #a7acb9;
+}
+
+.regle-paye-select__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+}
+
+.regle-paye-select__sep {
+  color: var(--border);
+  margin: 0 2px;
+}
+
+.regle-paye-select__list {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  max-height: 280px;
+  overflow-y: auto;
+  z-index: 10;
+}
+
+.regle-paye-select__option {
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.regle-paye-select__option:last-child {
+  border-bottom: none;
+}
+
+.regle-paye-select__option:hover {
+  background: var(--bg-page);
+}
+
 .employee-selected-card {
   display: flex;
   align-items: center;
@@ -628,6 +696,19 @@
   font-size: 12px;
   color: var(--muted);
   margin-top: 2px;
+}
+
+.choice-card__badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--bg-page);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  vertical-align: middle;
 }
 
 /* Notice banner inside form */
@@ -958,6 +1039,27 @@
 
 .workday-notice__text p {
   margin: 0;
+}
+
+.important-notice {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+  border-radius: var(--radius-md);
+  background: var(--tremblant-red-light);
+  border: 1px solid var(--tremblant-red-border);
+  color: var(--tremblant-red-dark);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.important-notice__icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--tremblant-red);
 }
 
 .required-note {
