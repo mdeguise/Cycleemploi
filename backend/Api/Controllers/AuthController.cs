@@ -66,4 +66,33 @@ public class AuthController : ControllerBase
 
         return Ok(new HelpUrlDto { Url = $"{_tdxOptions.HelpFormBaseUrl}?{query}" });
     }
+
+    /// <summary>Creates a real TDX ticket from the in-app French "Besoin d'aide?" form — unlike the
+    /// background integrations elsewhere in this app, this is a direct user action awaiting a
+    /// result, so failures are surfaced to the caller rather than swallowed/emailed.</summary>
+    [HttpPost("help-ticket")]
+    public async Task<ActionResult<HelpTicketResultDto>> CreateHelpTicket([FromBody] CreateHelpTicketDto dto, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Description))
+        {
+            return BadRequest("La description est requise.");
+        }
+
+        var sam = User.GetSamAccountName();
+        var info = _ad.GetUserInfo(sam);
+        if (string.IsNullOrWhiteSpace(info.Email))
+        {
+            return Problem("Impossible de déterminer votre adresse courriel.", statusCode: StatusCodes.Status500InternalServerError);
+        }
+
+        try
+        {
+            var ticketId = await _tdx.CreateHelpTicketAsync(info.DisplayName ?? sam, info.Email, dto.Description, ct);
+            return Ok(new HelpTicketResultDto { TicketId = ticketId });
+        }
+        catch (TdxTicketException ex)
+        {
+            return Problem(ex.Message, statusCode: StatusCodes.Status502BadGateway);
+        }
+    }
 }

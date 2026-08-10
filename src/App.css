@@ -55,6 +55,37 @@
   margin: 0;
 }
 
+/* ---------- Help modal ---------- */
+.help-modal-card {
+  max-width: 480px;
+  text-align: left;
+  align-items: stretch;
+}
+
+.help-modal-card .modal-card__icon,
+.help-modal-card .modal-card__title,
+.help-modal-card .modal-card__text {
+  align-self: center;
+  text-align: center;
+}
+
+.help-modal__field {
+  width: 100%;
+}
+
+.help-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.help-modal__fallback-link {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  text-decoration: underline;
+}
+
 /* ---------- Header ---------- */
 .app-header {
   display: flex;
@@ -233,12 +264,15 @@
   align-items: center;
   gap: 12px;
   padding: 14px;
+  width: 100%;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--bg-card);
   cursor: pointer;
   text-decoration: none;
   color: inherit;
+  text-align: left;
+  font: inherit;
 }
 
 .help-box:hover {

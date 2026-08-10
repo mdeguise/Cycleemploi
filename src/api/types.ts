@@ -54,6 +54,14 @@ export interface HelpUrlDto {
   url: string;
 }
 
+export interface CreateHelpTicketDto {
+  description: string;
+}
+
+export interface HelpTicketResultDto {
+  ticketId: number;
+}
+
 export type RequestTypeApi = 'Onboarding' | 'Reactivation' | 'Offboarding';
 export type RequestStatusApi = 'Brouillon' | 'Soumise' | 'EnTraitement' | 'Completee';
 

@@ -1,19 +1,11 @@
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { useWizard } from '../context/WizardContext';
-import { useApi } from '../api/ApiContext';
+import { HelpModal } from './HelpModal';
 import { CheckIcon, LifeBuoyIcon } from './icons';
-
-const FALLBACK_HELP_URL = 'https://form.jotform.com/260824989239069';
 
 export function StepNav() {
   const { steps, currentStep, furthestStep, goToStep } = useWizard();
-  const api = useApi();
-  const { data: helpUrl } = useQuery({
-    queryKey: ['help-url'],
-    queryFn: () => api.auth.helpUrl(),
-    staleTime: Infinity,
-    retry: false,
-  });
+  const [helpOpen, setHelpOpen] = useState(false);
 
   return (
     <nav className="step-nav">
@@ -39,7 +31,7 @@ export function StepNav() {
         );
       })}
 
-      <a className="help-box" href={helpUrl?.url ?? FALLBACK_HELP_URL} target="_blank" rel="noopener noreferrer">
+      <button type="button" className="help-box" onClick={() => setHelpOpen(true)}>
         <span className="help-box__icon">
           <LifeBuoyIcon style={{ width: 18, height: 18 }} />
         </span>
@@ -47,7 +39,9 @@ export function StepNav() {
           <div className="help-box__title">Besoin d'aide?</div>
           <div className="help-box__subtitle">Communiquez avec l'équipe TI</div>
         </span>
-      </a>
+      </button>
+
+      <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
     </nav>
   );
 }

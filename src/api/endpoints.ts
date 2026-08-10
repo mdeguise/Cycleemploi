@@ -2,6 +2,7 @@ import type { ApiClient } from './client';
 import type {
   CatalogsDto,
   CreateD365SecurityRoleMappingDto,
+  CreateHelpTicketDto,
   CreateRequestDto,
   D365JobCodeTemplateDto,
   D365JobCodeTemplateSummaryDto,
@@ -9,6 +10,7 @@ import type {
   D365UserSecurityRoleDto,
   DiscrepanciesDto,
   EmployeeDto,
+  HelpTicketResultDto,
   HelpUrlDto,
   MeDto,
   RequestDto,
@@ -21,6 +23,8 @@ export function createApi(client: ApiClient) {
     auth: {
       me: () => client.get<MeDto>('/api/auth/me'),
       helpUrl: () => client.get<HelpUrlDto>('/api/auth/help-url'),
+      createHelpTicket: (dto: CreateHelpTicketDto) =>
+        client.post<HelpTicketResultDto>('/api/auth/help-ticket', dto),
     },
     catalogs: {
       get: () => client.get<CatalogsDto>('/api/catalogs'),

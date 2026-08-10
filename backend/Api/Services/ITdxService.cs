@@ -19,6 +19,13 @@ public interface ITdxService
     /// a non-critical UI convenience, so a failed lookup should silently degrade rather than block
     /// the caller the way the ticket-creation methods' exceptions are meant to.</returns>
     Task<string?> TryLookupPersonUidAsync(string email, CancellationToken ct);
+
+    /// <summary>Creates a ticket for the in-app French "Besoin d'aide?" form — same FormID/
+    /// AccountID/ResponsibleGroupID as CreateTicketAsync ("Quick Incident"), with Subject/Category/
+    /// Priority fixed to identify these as coming from this app, and the free-text description
+    /// supplied by the user.</summary>
+    /// <returns>The created TDX ticket's numeric ID.</returns>
+    Task<int> CreateHelpTicketAsync(string requesterName, string requesterEmail, string description, CancellationToken ct);
 }
 
 /// <summary>Everything needed to fill out the "D365 - Access" TDX form (FormID 10799) for one

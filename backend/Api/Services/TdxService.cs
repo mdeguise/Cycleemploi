@@ -153,6 +153,41 @@ public class TdxService : ITdxService
         return await PostTicketAsync(payload, token, ct);
     }
 
+    /// <summary>Fixed subject for every ticket created through the "Besoin d'aide?" form — lets IT
+    /// spot at a glance that a ticket came from this app rather than a generic incident.</summary>
+    private const string HelpTicketTitle = "FORMULAIRE CYCLE D'EMPLOI";
+
+    public async Task<int> CreateHelpTicketAsync(string requesterName, string requesterEmail, string description, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(_options.Username) || string.IsNullOrWhiteSpace(_options.Password))
+        {
+            throw new TdxTicketException("TDX username/password not configured.");
+        }
+
+        var token = await GetTokenAsync(ct);
+        var requesterUid = await LookupRequesterUidAsync(requesterEmail, token, ct);
+
+        var payload = new
+        {
+            FormID = _options.FormId,
+            Title = HelpTicketTitle,
+            Description = description,
+            RequestorName = requesterName,
+            RequestorEmail = requesterEmail,
+            RequestorUid = requesterUid,
+            AccountID = _options.AccountId,
+            ResponsibleGroupID = _options.ResponsibleGroupId,
+            ResponsibleGroupName = _options.ResponsibleGroupName,
+            PriorityID = _options.HelpTicketPriorityId,
+            Attributes = new[]
+            {
+                new { ID = _options.HelpTicketCategoryAttributeId, Value = _options.HelpTicketCategoryChoiceId.ToString() }
+            }
+        };
+
+        return await PostTicketAsync(payload, token, ct);
+    }
+
     public async Task<string?> TryLookupPersonUidAsync(string email, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(_options.Username) || string.IsNullOrWhiteSpace(_options.Password))

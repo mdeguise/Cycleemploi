@@ -126,3 +126,13 @@ public class HelpUrlDto
 {
     public string Url { get; set; } = null!;
 }
+
+public class CreateHelpTicketDto
+{
+    public string Description { get; set; } = null!;
+}
+
+public class HelpTicketResultDto
+{
+    public int TicketId { get; set; }
+}
