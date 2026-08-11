@@ -48,6 +48,9 @@ public class TdxService : ITdxService
         var token = await GetTokenAsync(ct);
         var requesterUid = await LookupRequesterUidAsync(requesterEmail, token, ct);
 
+        // Also sent as the ticket's Due date (EndDate below) — for Onboarding/Réactivation this is
+        // "Date d'entrée prévue"; for Offboarding it's "Quelle est la dernière journée de travail de
+        // l'employé", confirmed against a real test ticket (EndDate maps to the "Due" column/field).
         var isOffboarding = request.RequestType == RequestType.Offboarding;
         var effectiveDate = isOffboarding
             ? request.OffboardingDetail?.DerniereJournee
@@ -64,7 +67,8 @@ public class TdxService : ITdxService
             RequestorUid = requesterUid,
             AccountID = _options.AccountId,
             ResponsibleGroupID = _options.ResponsibleGroupId,
-            ResponsibleGroupName = _options.ResponsibleGroupName
+            ResponsibleGroupName = _options.ResponsibleGroupName,
+            EndDate = effectiveDate?.ToDateTime(TimeOnly.MinValue)
         };
 
         return await PostTicketAsync(payload, token, ct);
