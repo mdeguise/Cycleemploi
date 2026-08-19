@@ -21,6 +21,21 @@ public class WorkdayDemographic
     public string? Manager { get; set; }
     public string? ManagerId { get; set; }
     public string? PayGroup { get; set; }
+    public DateTime? HireDate { get; set; }
+
+    /// <summary>Workday's internal position code (e.g. "P-01059305-TR") — distinct from
+    /// PositionTitle (the human-readable job title).</summary>
+    public string? Position { get; set; }
+
+    public string? CostCenter { get; set; }
+    public DateTime? SeniorityDate { get; set; }
+
+    /// <summary>True/false, distinct from EmploymentStatus (which is the "Active"/"Inactive"/
+    /// "Terminated" text field) — confirmed against real data as a bit column.</summary>
+    public bool? ActiveStatus { get; set; }
+
+    public string? LeaveType { get; set; }
+    public string? EstimatedLastDayOfLeave { get; set; }
 
     /// <summary>Real values confirmed against live data: "Active", "Inactive", "Terminated".
     /// "Inactive" covers on-leave/layoff, which the business treats as active for this app's

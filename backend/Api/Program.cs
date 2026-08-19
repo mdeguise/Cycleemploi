@@ -55,6 +55,7 @@ builder.Services.AddScoped<RequestAuthorizationService>();
 builder.Services.AddScoped<RequestNumberService>();
 builder.Services.AddScoped<IAppUserService, AppUserService>();
 builder.Services.AddScoped<ITicketTemplateService, TicketTemplateService>();
+builder.Services.AddScoped<IEmployeeFieldsService, EmployeeFieldsService>();
 
 // --- Ticket-system integrations (submit-time, best-effort — see RequestsController.Submit) ---
 builder.Services.Configure<FreshdeskOptions>(builder.Configuration.GetSection("Freshdesk"));

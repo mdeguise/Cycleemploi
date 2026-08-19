@@ -32,6 +32,13 @@ public class WorkdayContext : DbContext
             entity.Property(e => e.Manager).HasColumnName("Manager");
             entity.Property(e => e.ManagerId).HasColumnName("Manager_ID");
             entity.Property(e => e.PayGroup).HasColumnName("Pay_Group");
+            entity.Property(e => e.HireDate).HasColumnName("Hire_Date");
+            entity.Property(e => e.Position).HasColumnName("Position");
+            entity.Property(e => e.CostCenter).HasColumnName("Cost_Center");
+            entity.Property(e => e.SeniorityDate).HasColumnName("Seniority_Date");
+            entity.Property(e => e.ActiveStatus).HasColumnName("Active_Status");
+            entity.Property(e => e.LeaveType).HasColumnName("Leave_Type");
+            entity.Property(e => e.EstimatedLastDayOfLeave).HasColumnName("Estimated_Last_Day_of_Leave");
             entity.Property(e => e.EmploymentStatus).HasColumnName("Employment_Status");
             entity.Property(e => e.TerminationReason).HasColumnName("Termination_Reason");
             entity.Property(e => e.TerminationDate).HasColumnName("Termination_Date");

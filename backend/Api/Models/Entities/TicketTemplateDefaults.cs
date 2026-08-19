@@ -1,183 +1,284 @@
+using System.Text.Json;
+
 namespace TremblantLifecycle.Api.Models.Entities;
 
-/// <summary>One available {{Placeholder}} for a given template, shown to the admin as a reference
-/// alongside the editable text box.</summary>
-public record TicketTemplatePlaceholder(string Name, string Description);
-
-public record TicketTemplateDefinition(string Key, string Label, string Description, string DefaultContent, IReadOnlyList<TicketTemplatePlaceholder> Placeholders);
-
 /// <summary>Fixed catalog of every admin-editable ticket template Key, its French admin-facing
-/// label, its available placeholders, and its DEFAULT content — the exact wording this app sent
-/// before this feature existed (see FreshdeskService/TdxService git history), so seeding these
-/// defaults into TicketTemplates on migration is a no-behavior-change deploy. Two placeholders
-/// ("EmployeesListe" on FreshdeskMainOffboarding, "EmployeesDetailBloc" on the two Freshdesk child
-/// templates) are pre-rendered HTML blocks built server-side — one entry per employee on the
-/// request — because their per-employee formatting depends on an async Workday lookup (pay group,
-/// job codes) that can't be reduced to a flat placeholder; the admin can reposition the whole block
-/// but not restyle individual employee lines.</summary>
+/// label, the fields it exposes, its structural shape (Inline or Block — see
+/// TicketTemplateShape), and its DEFAULT structured content (serialized to JSON on Content) — the
+/// starting point every template ships with, so seeding these into TicketTemplates on migration is
+/// a working, sensible deploy from day one.
+///
+/// Every ticket type is fully split by request type (Onboarding/Réactivation vs Offboarding) —
+/// they never share a template, even where the default wording happens to be similar, so editing
+/// one can never surprise the other. Freshdesk's two "child" tickets (fanned to two different real
+/// Freshdesk groups) are also each their own template per request type.
+///
+/// Employee-level content (name, poste, gestionnaire, the Workday-only fields like date
+/// d'embauche/centre de coûts/...) can only be placed inside a Block template's "employeeGroup"
+/// block, or directly in a TDX Inline template (which always concerns exactly one employee) — never
+/// as a flat request-level line in a Freshdesk body, since a termination can list several people at
+/// once and a single-employee value there would be ambiguous. The employeeGroup block repeats
+/// automatically once per employee on the request; the admin builds what ONE employee's lines look
+/// like and never sees or configures a loop.</summary>
 public static class TicketTemplateKeys
 {
-    public const string FreshdeskSubject = "FreshdeskSubject";
+    public const string FreshdeskSubjectOnboarding = "FreshdeskSubjectOnboarding";
+    public const string FreshdeskSubjectOffboarding = "FreshdeskSubjectOffboarding";
     public const string FreshdeskMainOnboarding = "FreshdeskMainOnboarding";
     public const string FreshdeskMainOffboarding = "FreshdeskMainOffboarding";
-    public const string FreshdeskChildWithJobCodes = "FreshdeskChildWithJobCodes";
-    public const string FreshdeskChildWithoutJobCodes = "FreshdeskChildWithoutJobCodes";
-    public const string TdxQuickIncidentTitle = "TdxQuickIncidentTitle";
-    public const string TdxQuickIncidentDescription = "TdxQuickIncidentDescription";
+    public const string FreshdeskChildWithCodesOnboarding = "FreshdeskChildWithCodesOnboarding";
+    public const string FreshdeskChildWithoutCodesOnboarding = "FreshdeskChildWithoutCodesOnboarding";
+    public const string FreshdeskChildWithCodesOffboarding = "FreshdeskChildWithCodesOffboarding";
+    public const string FreshdeskChildWithoutCodesOffboarding = "FreshdeskChildWithoutCodesOffboarding";
+    public const string TdxTitleOnboarding = "TdxTitleOnboarding";
+    public const string TdxTitleOffboarding = "TdxTitleOffboarding";
+    public const string TdxDescriptionOnboarding = "TdxDescriptionOnboarding";
+    public const string TdxDescriptionOffboarding = "TdxDescriptionOffboarding";
 }
+
+public record TicketTemplateDefinition(
+    string Key,
+    string Label,
+    string Description,
+    TicketTemplateShape Shape,
+    IReadOnlyList<TicketTemplateField> RequestFields,
+    bool AllowsEmployeeFields,
+    string DefaultContent);
 
 public static class TicketTemplateDefaults
 {
+    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
+    private static InlinePart F(string key) => new() { Type = "field", FieldKey = key };
+    private static InlinePart T(string text) => new() { Type = "text", Text = text };
+    private static string Inline(params InlinePart[] parts) =>
+        JsonSerializer.Serialize(new InlineTemplateContent { Parts = [.. parts] }, JsonOptions);
+
+    private static TemplateBlock Heading(string text) => new() { Type = "heading", HeadingText = text };
+    private static TemplateBlock Field(string label, string key) => new() { Type = "field", Label = label, FieldKey = key };
+    private static TemplateBlock EmployeeGroup(string? heading, params (string Label, string Key)[] fields) => new()
+    {
+        Type = "employeeGroup",
+        EmployeeGroupHeading = heading,
+        EmployeeFields = [.. fields.Select(f => new EmployeeFieldLine { Label = f.Label, FieldKey = f.Key })]
+    };
+    private static string Block(params TemplateBlock[] blocks) =>
+        JsonSerializer.Serialize(new BlockTemplateContent { Blocks = [.. blocks] }, JsonOptions);
+
+    private static readonly IReadOnlyList<TicketTemplateField> SubjectRequestFields =
+    [
+        new("RequestNumber", "Numéro de la demande", TicketFieldCategory.Request),
+        new("RequestTypeLabel", "Type de demande", TicketFieldCategory.Request),
+        new("EmployeeNames", "Nom(s) des employé(s) visé(s), séparés par des virgules", TicketFieldCategory.Request),
+    ];
+
+    private static readonly IReadOnlyList<TicketTemplateField> OnboardingMainRequestFields =
+    [
+        new("RequestNumber", "Numéro de la demande", TicketFieldCategory.Request),
+        new("RequestTypeLabel", "Type de demande", TicketFieldCategory.Request),
+        new("RequestedBy", "Nom de la personne qui a soumis la demande", TicketFieldCategory.Request),
+        new("CreatedDate", "Date de création de la demande", TicketFieldCategory.Request),
+        new("DateEntreePrevue", "Date d'entrée prévue", TicketFieldCategory.Request),
+        new("RegleDePaye", "Règle de paye sélectionnée", TicketFieldCategory.Request),
+        new("RegleDePayeCommentaire", "Commentaire libre sur la règle de paye", TicketFieldCategory.Request),
+        new("SystemesAcces", "Systèmes et accès sélectionnés", TicketFieldCategory.Request),
+        new("ZonesBadge", "Zones ou édifices requis pour le badge", TicketFieldCategory.Request),
+        new("PosHebergement", "Systèmes POS et hébergement sélectionnés", TicketFieldCategory.Request),
+        new("Stationnement", "Stationnement requis", TicketFieldCategory.Request),
+        new("JustificationAcces", "Justification des accès demandés", TicketFieldCategory.Request),
+        new("Equipements", "Équipement sélectionné", TicketFieldCategory.Request),
+        new("NotesEquipement", "Notes libres sur l'équipement", TicketFieldCategory.Request),
+        new("Applications", "Applications sélectionnées", TicketFieldCategory.Request),
+        new("AutreLogiciel", "Autre logiciel requis", TicketFieldCategory.Request),
+    ];
+
+    private static readonly IReadOnlyList<TicketTemplateField> OffboardingMainRequestFields =
+    [
+        new("RequestNumber", "Numéro de la demande", TicketFieldCategory.Request),
+        new("RequestTypeLabel", "Type de demande", TicketFieldCategory.Request),
+        new("RequestedBy", "Nom de la personne qui a soumis la demande", TicketFieldCategory.Request),
+        new("CreatedDate", "Date de création de la demande", TicketFieldCategory.Request),
+        new("DerniereJournee", "Dernière journée de travail", TicketFieldCategory.Request),
+        new("IndemniteVacances", "Indemnité de vacances au moment de la mise à pied", TicketFieldCategory.Request),
+        new("RaisonArret", "Raison de l'arrêt de travail", TicketFieldCategory.Request),
+        new("DetailsRaison", "Détails sur la raison", TicketFieldCategory.Request),
+        new("Reembaucheriez", "Admissibilité à la réembauche", TicketFieldCategory.Request),
+        new("CommentaireRH", "Commentaire confidentiel des ressources humaines", TicketFieldCategory.Request),
+    ];
+
+    private static readonly IReadOnlyList<TicketTemplateField> OnboardingChildRequestFields =
+    [
+        new("RequestTypeLabel", "Type de demande", TicketFieldCategory.Request),
+        new("DateEntreePrevue", "Date d'entrée prévue", TicketFieldCategory.Request),
+    ];
+
+    private static readonly IReadOnlyList<TicketTemplateField> OffboardingChildRequestFields =
+    [
+        new("RequestTypeLabel", "Type de demande", TicketFieldCategory.Request),
+        new("DerniereJournee", "Dernière journée de travail", TicketFieldCategory.Request),
+    ];
+
+    private static readonly IReadOnlyList<TicketTemplateField> TdxTitleRequestFields =
+    [
+        new("RequestTypeLabel", "Type de demande", TicketFieldCategory.Request),
+    ];
+
+    private static readonly IReadOnlyList<TicketTemplateField> TdxDescriptionRequestFields =
+    [
+        new("DateEffective", "Date d'entrée prévue (Intégration/Réactivation) ou dernière journée (Terminaison)", TicketFieldCategory.Request),
+    ];
+
     public static readonly IReadOnlyList<TicketTemplateDefinition> All =
     [
         new(
-            TicketTemplateKeys.FreshdeskSubject,
-            "Freshdesk — Sujet (billet principal et billets enfants)",
-            "Sujet utilisé pour le billet Freshdesk principal (RH - Général) et ses deux billets enfants.",
-            "{{RequestTypeLabel}} - {{EmployeeNames}} (#{{RequestNumber}})",
-            [
-                new("RequestTypeLabel", "Type de demande (ex. Nouvelle intégration)"),
-                new("EmployeeNames", "Nom(s) des employé(s) visé(s), séparés par des virgules"),
-                new("RequestNumber", "Numéro de la demande (ex. INT-2026-00024)"),
-            ]),
+            TicketTemplateKeys.FreshdeskSubjectOnboarding,
+            "Freshdesk — Sujet (Intégration / Réactivation)",
+            "Sujet du billet Freshdesk principal et de ses deux billets enfants, pour une intégration ou une réactivation.",
+            TicketTemplateShape.Inline,
+            SubjectRequestFields,
+            AllowsEmployeeFields: false,
+            Inline(F("RequestTypeLabel"), T(" - "), F("EmployeeNames"), T(" (#"), F("RequestNumber"), T(")"))),
+
+        new(
+            TicketTemplateKeys.FreshdeskSubjectOffboarding,
+            "Freshdesk — Sujet (Terminaison)",
+            "Sujet du billet Freshdesk principal et de ses deux billets enfants, pour un avis de terminaison ou mise à pied.",
+            TicketTemplateShape.Inline,
+            SubjectRequestFields,
+            AllowsEmployeeFields: false,
+            Inline(F("RequestTypeLabel"), T(" - "), F("EmployeeNames"), T(" (#"), F("RequestNumber"), T(")"))),
 
         new(
             TicketTemplateKeys.FreshdeskMainOnboarding,
             "Freshdesk — Billet principal (Intégration / Réactivation)",
             "Contenu du billet Freshdesk principal (groupe RH - Général) pour une intégration ou une réactivation.",
-            "<h3>Demande #{{RequestNumber}} — {{RequestTypeLabel}}</h3>\n" +
-            "<p><b>Demandé par:</b> {{RequestedBy}}<br>\n" +
-            "<b>Date de création:</b> {{CreatedDate}}</p>\n" +
-            "<h4>Employé</h4><p>\n" +
-            "{{EmployeeName}} (#{{EmployeeId}})<br>\n" +
-            "Poste: {{Poste}}<br>\n" +
-            "Département: {{Departement}}<br>\n" +
-            "Gestionnaire: {{Gestionnaire}}<br>\n" +
-            "Type d'emploi: {{TypeEmploi}}\n" +
-            "</p>\n" +
-            "<h4>Détails</h4><p>\n" +
-            "Date d'entrée prévue: {{DateEntreePrevue}}<br>\n" +
-            "Règle de paye: {{RegleDePaye}}<br>\n" +
-            "Commentaire règle de paye: {{RegleDePayeCommentaire}}\n" +
-            "</p>\n" +
-            "<h4>Accès demandés</h4><p>\n" +
-            "Systèmes: {{SystemesAcces}}<br>\n" +
-            "Zones badge: {{ZonesBadge}}<br>\n" +
-            "POS/Hébergement: {{PosHebergement}}<br>\n" +
-            "Stationnement: {{Stationnement}}<br>\n" +
-            "Justification: {{JustificationAcces}}\n" +
-            "</p>\n" +
-            "<h4>Équipement</h4><p>\n" +
-            "{{Equipements}}<br>\n" +
-            "Notes: {{NotesEquipement}}\n" +
-            "</p>\n" +
-            "<h4>Applications</h4><p>\n" +
-            "{{Applications}}<br>\n" +
-            "Autre logiciel: {{AutreLogiciel}}\n" +
-            "</p>",
-            [
-                new("RequestNumber", "Numéro de la demande"),
-                new("RequestTypeLabel", "Type de demande"),
-                new("RequestedBy", "Nom de la personne qui a soumis la demande"),
-                new("CreatedDate", "Date de création de la demande (aaaa-mm-jj)"),
-                new("EmployeeName", "Nom complet de l'employé"),
-                new("EmployeeId", "Numéro d'employé Workday"),
-                new("Poste", "Titre du poste"),
-                new("Departement", "Département"),
-                new("Gestionnaire", "Nom du gestionnaire"),
-                new("TypeEmploi", "Type d'emploi"),
-                new("DateEntreePrevue", "Date d'entrée prévue (aaaa-mm-jj)"),
-                new("RegleDePaye", "Règle de paye sélectionnée"),
-                new("RegleDePayeCommentaire", "Commentaire libre sur la règle de paye"),
-                new("SystemesAcces", "Systèmes et accès sélectionnés, séparés par des virgules"),
-                new("ZonesBadge", "Zones ou édifices requis pour le badge"),
-                new("PosHebergement", "Systèmes POS et hébergement sélectionnés"),
-                new("Stationnement", "Stationnement requis"),
-                new("JustificationAcces", "Justification des accès demandés"),
-                new("Equipements", "Équipement sélectionné, séparé par des virgules"),
-                new("NotesEquipement", "Notes libres sur l'équipement"),
-                new("Applications", "Applications sélectionnées, séparées par des virgules"),
-                new("AutreLogiciel", "Autre logiciel requis (texte libre)"),
-            ]),
+            TicketTemplateShape.Block,
+            OnboardingMainRequestFields,
+            AllowsEmployeeFields: true,
+            Block(
+                Field("Demandé par", "RequestedBy"),
+                Field("Date de création", "CreatedDate"),
+                EmployeeGroup("Employé", ("Nom", "EmployeeName"), ("Poste", "Poste"), ("Département", "Departement"), ("Gestionnaire", "Gestionnaire"), ("Type d'emploi", "TypeEmploi")),
+                Heading("Détails"),
+                Field("Date d'entrée prévue", "DateEntreePrevue"),
+                Field("Règle de paye", "RegleDePaye"),
+                Field("Commentaire règle de paye", "RegleDePayeCommentaire"),
+                Heading("Accès demandés"),
+                Field("Systèmes", "SystemesAcces"),
+                Field("Zones badge", "ZonesBadge"),
+                Field("POS/Hébergement", "PosHebergement"),
+                Field("Stationnement", "Stationnement"),
+                Field("Justification", "JustificationAcces"),
+                Heading("Équipement"),
+                Field("Équipement", "Equipements"),
+                Field("Notes", "NotesEquipement"),
+                Heading("Applications"),
+                Field("Applications", "Applications"),
+                Field("Autre logiciel", "AutreLogiciel"))),
 
         new(
             TicketTemplateKeys.FreshdeskMainOffboarding,
             "Freshdesk — Billet principal (Terminaison)",
             "Contenu du billet Freshdesk principal (groupe RH - Général) pour un avis de terminaison ou mise à pied.",
-            "<h3>Demande #{{RequestNumber}} — {{RequestTypeLabel}}</h3>\n" +
-            "<p><b>Demandé par:</b> {{RequestedBy}}<br>\n" +
-            "<b>Date de création:</b> {{CreatedDate}}</p>\n" +
-            "<h4>Employé(s) visé(s)</h4><ul>{{EmployeesListe}}</ul>\n" +
-            "<h4>Détails de la cessation</h4><p>\n" +
-            "Dernière journée: {{DerniereJournee}}<br>\n" +
-            "Indemnité de vacances: {{IndemniteVacances}}<br>\n" +
-            "Raison de l'arrêt: {{RaisonArret}}<br>\n" +
-            "Détails: {{DetailsRaison}}<br>\n" +
-            "Réembaucheriez-vous: {{Reembaucheriez}}\n" +
-            "</p>\n" +
-            "<h4>Commentaires RH (confidentiel)</h4><p>{{CommentaireRH}}</p>",
-            [
-                new("RequestNumber", "Numéro de la demande"),
-                new("RequestTypeLabel", "Type de demande"),
-                new("RequestedBy", "Nom de la personne qui a soumis la demande"),
-                new("CreatedDate", "Date de création de la demande (aaaa-mm-jj)"),
-                new("EmployeesListe", "Bloc pré-formaté : un <li> par employé visé (nom, numéro, poste, département) — ne peut pas être personnalisé par employé individuellement, seulement repositionné"),
-                new("DerniereJournee", "Dernière journée de travail (aaaa-mm-jj)"),
-                new("IndemniteVacances", "Indemnité de vacances au moment de la mise à pied"),
-                new("RaisonArret", "Raison de l'arrêt de travail"),
-                new("DetailsRaison", "Détails sur la raison"),
-                new("Reembaucheriez", "Admissibilité à la réembauche"),
-                new("CommentaireRH", "Commentaire confidentiel des ressources humaines"),
-            ]),
+            TicketTemplateShape.Block,
+            OffboardingMainRequestFields,
+            AllowsEmployeeFields: true,
+            Block(
+                Field("Demandé par", "RequestedBy"),
+                Field("Date de création", "CreatedDate"),
+                EmployeeGroup("Employé(s) visé(s)", ("Nom", "EmployeeName"), ("Poste", "Poste"), ("Département", "Departement")),
+                Heading("Détails de la cessation"),
+                Field("Dernière journée", "DerniereJournee"),
+                Field("Indemnité de vacances", "IndemniteVacances"),
+                Field("Raison de l'arrêt", "RaisonArret"),
+                Field("Détails", "DetailsRaison"),
+                Field("Réembaucheriez-vous", "Reembaucheriez"),
+                Heading("Commentaires RH (confidentiel)"),
+                Field("Commentaire", "CommentaireRH"))),
 
         new(
-            TicketTemplateKeys.FreshdeskChildWithJobCodes,
-            "Freshdesk — Billet enfant (avec codes d'emploi)",
-            "Contenu du billet Freshdesk enfant destiné au groupe incluant la liste complète des codes d'emploi de chaque employé.",
-            "<h3>Demande #{{RequestNumber}} — {{RequestTypeLabel}}</h3>\n" +
-            "<p><b>Type de demande:</b> {{RequestTypeLabel}}</p>\n" +
-            "{{EmployeesDetailBloc}}",
-            [
-                new("RequestNumber", "Numéro de la demande"),
-                new("RequestTypeLabel", "Type de demande"),
-                new("EmployeesDetailBloc", "Bloc pré-formaté : un paragraphe par employé visé (nom, date, gestionnaire, poste, groupe de paye, tous les codes d'emploi) — ne peut pas être personnalisé par employé individuellement, seulement repositionné"),
-            ]),
+            TicketTemplateKeys.FreshdeskChildWithCodesOnboarding,
+            "Freshdesk — Billet enfant, avec codes d'emploi (Intégration / Réactivation)",
+            "Billet enfant Freshdesk destiné au groupe qui a besoin de l'historique des codes d'emploi, pour une intégration ou une réactivation.",
+            TicketTemplateShape.Block,
+            OnboardingChildRequestFields,
+            AllowsEmployeeFields: true,
+            Block(
+                Field("Type de demande", "RequestTypeLabel"),
+                Field("Date de début prévue", "DateEntreePrevue"),
+                EmployeeGroup(null, ("Nom employé", "EmployeeName"), ("Gestionnaire", "Gestionnaire"), ("Titre du poste", "Poste"), ("Groupe de paye", "PayGroup"), ("Tous les codes d'emploi", "AllJobCodes")))),
 
         new(
-            TicketTemplateKeys.FreshdeskChildWithoutJobCodes,
-            "Freshdesk — Billet enfant (sans codes d'emploi)",
-            "Contenu du billet Freshdesk enfant destiné au groupe qui n'a pas besoin des codes d'emploi.",
-            "<h3>Demande #{{RequestNumber}} — {{RequestTypeLabel}}</h3>\n" +
-            "<p><b>Type de demande:</b> {{RequestTypeLabel}}</p>\n" +
-            "{{EmployeesDetailBloc}}",
-            [
-                new("RequestNumber", "Numéro de la demande"),
-                new("RequestTypeLabel", "Type de demande"),
-                new("EmployeesDetailBloc", "Bloc pré-formaté : un paragraphe par employé visé (nom, date, gestionnaire, poste, groupe de paye) — ne peut pas être personnalisé par employé individuellement, seulement repositionné"),
-            ]),
+            TicketTemplateKeys.FreshdeskChildWithoutCodesOnboarding,
+            "Freshdesk — Billet enfant, sans codes d'emploi (Intégration / Réactivation)",
+            "Billet enfant Freshdesk destiné au groupe qui n'a pas besoin des codes d'emploi, pour une intégration ou une réactivation.",
+            TicketTemplateShape.Block,
+            OnboardingChildRequestFields,
+            AllowsEmployeeFields: true,
+            Block(
+                Field("Type de demande", "RequestTypeLabel"),
+                Field("Date de début prévue", "DateEntreePrevue"),
+                EmployeeGroup(null, ("Nom employé", "EmployeeName"), ("Gestionnaire", "Gestionnaire"), ("Titre du poste", "Poste"), ("Groupe de paye", "PayGroup")))),
 
         new(
-            TicketTemplateKeys.TdxQuickIncidentTitle,
-            "TDX — Titre du billet (Quick Incident)",
-            "Titre du billet TDX \"Quick Incident\" (application OneIT, groupe IT Operations) créé pour chaque demande.",
-            "{{RequestTypeLabel}} - {{EmployeeName}}",
-            [
-                new("RequestTypeLabel", "Type de demande"),
-                new("EmployeeName", "Nom complet de l'employé"),
-            ]),
+            TicketTemplateKeys.FreshdeskChildWithCodesOffboarding,
+            "Freshdesk — Billet enfant, avec codes d'emploi (Terminaison)",
+            "Billet enfant Freshdesk destiné au groupe qui a besoin de l'historique des codes d'emploi, pour un avis de terminaison ou mise à pied.",
+            TicketTemplateShape.Block,
+            OffboardingChildRequestFields,
+            AllowsEmployeeFields: true,
+            Block(
+                Field("Type de demande", "RequestTypeLabel"),
+                Field("Date de fin (dernière journée)", "DerniereJournee"),
+                EmployeeGroup(null, ("Nom employé", "EmployeeName"), ("Gestionnaire", "Gestionnaire"), ("Titre du poste", "Poste"), ("Groupe de paye", "PayGroup"), ("Tous les codes d'emploi", "AllJobCodes")))),
 
         new(
-            TicketTemplateKeys.TdxQuickIncidentDescription,
-            "TDX — Description du billet (Quick Incident)",
-            "Description (texte simple, non HTML) du billet TDX \"Quick Incident\".",
-            "{{EmployeeName}} - {{Gestionnaire}} - {{Poste}} - {{CodeEmploi}} - {{DateEffective}}",
-            [
-                new("EmployeeName", "Nom complet de l'employé"),
-                new("Gestionnaire", "Nom du gestionnaire"),
-                new("Poste", "Titre du poste"),
-                new("CodeEmploi", "Code d'emploi Workday"),
-                new("DateEffective", "Date d'entrée prévue (Intégration/Réactivation) ou dernière journée (Terminaison), aaaa-mm-jj"),
-            ]),
+            TicketTemplateKeys.FreshdeskChildWithoutCodesOffboarding,
+            "Freshdesk — Billet enfant, sans codes d'emploi (Terminaison)",
+            "Billet enfant Freshdesk destiné au groupe qui n'a pas besoin des codes d'emploi, pour un avis de terminaison ou mise à pied.",
+            TicketTemplateShape.Block,
+            OffboardingChildRequestFields,
+            AllowsEmployeeFields: true,
+            Block(
+                Field("Type de demande", "RequestTypeLabel"),
+                Field("Date de fin (dernière journée)", "DerniereJournee"),
+                EmployeeGroup(null, ("Nom employé", "EmployeeName"), ("Gestionnaire", "Gestionnaire"), ("Titre du poste", "Poste"), ("Groupe de paye", "PayGroup")))),
+
+        new(
+            TicketTemplateKeys.TdxTitleOnboarding,
+            "TDX — Titre du billet (Intégration / Réactivation)",
+            "Titre du billet TDX \"Quick Incident\" (application OneIT, groupe IT Operations) pour une intégration ou une réactivation.",
+            TicketTemplateShape.Inline,
+            TdxTitleRequestFields,
+            AllowsEmployeeFields: true,
+            Inline(F("RequestTypeLabel"), T(" - "), F("EmployeeName"))),
+
+        new(
+            TicketTemplateKeys.TdxTitleOffboarding,
+            "TDX — Titre du billet (Terminaison)",
+            "Titre du billet TDX \"Quick Incident\" pour un avis de terminaison ou mise à pied.",
+            TicketTemplateShape.Inline,
+            TdxTitleRequestFields,
+            AllowsEmployeeFields: true,
+            Inline(F("RequestTypeLabel"), T(" - "), F("EmployeeName"))),
+
+        new(
+            TicketTemplateKeys.TdxDescriptionOnboarding,
+            "TDX — Description du billet (Intégration / Réactivation)",
+            "Description (texte simple, non HTML) du billet TDX \"Quick Incident\" pour une intégration ou une réactivation.",
+            TicketTemplateShape.Inline,
+            TdxDescriptionRequestFields,
+            AllowsEmployeeFields: true,
+            Inline(F("EmployeeName"), T(" - "), F("Gestionnaire"), T(" - "), F("Poste"), T(" - "), F("CodeEmploi"), T(" - "), F("DateEffective"))),
+
+        new(
+            TicketTemplateKeys.TdxDescriptionOffboarding,
+            "TDX — Description du billet (Terminaison)",
+            "Description (texte simple, non HTML) du billet TDX \"Quick Incident\" pour un avis de terminaison ou mise à pied.",
+            TicketTemplateShape.Inline,
+            TdxDescriptionRequestFields,
+            AllowsEmployeeFields: true,
+            Inline(F("EmployeeName"), T(" - "), F("Gestionnaire"), T(" - "), F("Poste"), T(" - "), F("CodeEmploi"), T(" - "), F("DateEffective"))),
     ];
 
     public static readonly IReadOnlyDictionary<string, TicketTemplateDefinition> ByKey =

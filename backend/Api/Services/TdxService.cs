@@ -32,12 +32,14 @@ public class TdxService : ITdxService
     private readonly HttpClient _http;
     private readonly TdxOptions _options;
     private readonly ITicketTemplateService _templates;
+    private readonly IEmployeeFieldsService _employeeFields;
 
-    public TdxService(HttpClient http, IOptions<TdxOptions> options, ITicketTemplateService templates)
+    public TdxService(HttpClient http, IOptions<TdxOptions> options, ITicketTemplateService templates, IEmployeeFieldsService employeeFields)
     {
         _http = http;
         _options = options.Value;
         _templates = templates;
+        _employeeFields = employeeFields;
     }
 
     public async Task<int> CreateTicketAsync(Request request, RequestEmployee employee, string requesterName, string requesterEmail, CancellationToken ct)
@@ -59,21 +61,17 @@ public class TdxService : ITdxService
             : request.OnboardingDetail?.DateEntreePrevue;
         var effectiveDateText = effectiveDate is { } date ? date.ToString("yyyy-MM-dd") : null;
 
-        var titleTemplate = await _templates.GetContentAsync(TicketTemplateKeys.TdxQuickIncidentTitle, ct);
-        var descriptionTemplate = await _templates.GetContentAsync(TicketTemplateKeys.TdxQuickIncidentDescription, ct);
-        var title = TicketTemplateRenderer.Render(titleTemplate, new Dictionary<string, string?>
-        {
-            ["RequestTypeLabel"] = request.RequestType.ToFrenchLabel(),
-            ["EmployeeName"] = employee.NameSnapshot
-        });
-        var description = TicketTemplateRenderer.Render(descriptionTemplate, new Dictionary<string, string?>
-        {
-            ["EmployeeName"] = employee.NameSnapshot,
-            ["Gestionnaire"] = employee.GestionnaireSnapshot,
-            ["Poste"] = employee.PositionSnapshot,
-            ["CodeEmploi"] = employee.CodeEmploiSnapshot,
-            ["DateEffective"] = effectiveDateText
-        });
+        var titleKey = isOffboarding ? TicketTemplateKeys.TdxTitleOffboarding : TicketTemplateKeys.TdxTitleOnboarding;
+        var descriptionKey = isOffboarding ? TicketTemplateKeys.TdxDescriptionOffboarding : TicketTemplateKeys.TdxDescriptionOnboarding;
+        var titleTemplate = await _templates.GetContentAsync(titleKey, ct);
+        var descriptionTemplate = await _templates.GetContentAsync(descriptionKey, ct);
+
+        var values = await _employeeFields.ResolveAsync(employee, ct);
+        values["RequestTypeLabel"] = request.RequestType.ToFrenchLabel();
+        values["DateEffective"] = effectiveDateText;
+
+        var title = TicketTemplateRenderer.RenderInline(titleTemplate, values);
+        var description = TicketTemplateRenderer.RenderInline(descriptionTemplate, values);
 
         var payload = new
         {

@@ -225,25 +225,60 @@ export interface DiscrepanciesDto {
 }
 
 // --- Ticket templates (admin) ---
+// Content/defaultContent are JSON strings the frontend parses/builds itself, matching
+// backend/Api/Models/Entities/TicketTemplateContent.cs (InlineTemplateContent / BlockTemplateContent,
+// per `shape`) — the admin never sees this JSON or any {{placeholder}} syntax directly.
 
-export interface TicketTemplatePlaceholderDto {
-  name: string;
-  description: string;
+export interface TicketTemplateFieldDto {
+  key: string;
+  label: string;
 }
+
+export type TicketTemplateShape = 'Inline' | 'Block';
 
 export interface TicketTemplateDto {
   key: string;
   label: string;
   description: string;
+  shape: TicketTemplateShape;
   content: string;
   defaultContent: string;
-  placeholders: TicketTemplatePlaceholderDto[];
+  requestFields: TicketTemplateFieldDto[];
+  employeeFields: TicketTemplateFieldDto[];
   updatedAt?: string | null;
   updatedByDisplayName?: string | null;
 }
 
 export interface UpdateTicketTemplateDto {
   content: string;
+}
+
+export interface InlinePart {
+  type: 'field' | 'text';
+  fieldKey?: string;
+  text?: string;
+}
+
+export interface InlineTemplateContent {
+  parts: InlinePart[];
+}
+
+export interface EmployeeFieldLine {
+  label: string;
+  fieldKey: string;
+}
+
+export interface TemplateBlock {
+  type: 'heading' | 'field' | 'employeeGroup';
+  headingText?: string | null;
+  label?: string | null;
+  fieldKey?: string | null;
+  employeeGroupHeading?: string | null;
+  employeeFields: EmployeeFieldLine[];
+}
+
+export interface BlockTemplateContent {
+  blocks: TemplateBlock[];
 }
 
 // --- App users / Ticket Template admins ---

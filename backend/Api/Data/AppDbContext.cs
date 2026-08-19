@@ -157,7 +157,7 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<TicketTemplate>(entity =>
         {
             entity.Property(m => m.Key).HasMaxLength(100).IsRequired();
-            entity.Property(m => m.Content).HasMaxLength(8000).IsRequired();
+            entity.Property(m => m.Content).IsRequired();
             entity.Property(m => m.UpdatedByDisplayName).HasMaxLength(200);
             entity.HasIndex(m => m.Key).IsUnique();
         });
