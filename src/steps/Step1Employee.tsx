@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useWizard } from '../context/WizardContext';
 import { Field } from '../components/FormField';
 import { StepFooter } from '../components/StepFooter';
-import { UserIcon, SearchIcon, InfoIcon } from '../components/icons';
+import { UserIcon, SearchIcon, InfoIcon, AlertTriangleIcon } from '../components/icons';
 import { REGLE_DE_PAYE_AUTRE } from '../data/catalogs';
 import { RegleDePayeSelect } from '../components/RegleDePayeSelect';
 import { DateInput } from '../components/DateInput';
@@ -174,12 +174,18 @@ export function Step1Employee() {
               Si l'employé n'apparaît pas dans la liste déroulante, veuillez contacter votre partenaire d'affaires RH
               afin de faire activer le dossier de l'employé dans Workday.
             </li>
-            <li>
-              Veuillez également noter que l'équipe informatique ne peut créer les comptes utilisateurs informatiques,
-              incluant le compte AD, qu'à partir de 48 heures avant la première journée de travail de l'employé, selon
-              la date de début du poste principal indiquée dans Workday.
-            </li>
           </ul>
+        </div>
+      )}
+
+      {!isTermination && (
+        <div className="big-notice">
+          <AlertTriangleIcon className="big-notice__icon" />
+          <div className="big-notice__text">
+            Veuillez noter que l'équipe informatique ne peut créer les comptes utilisateurs informatiques, incluant le
+            compte AD, qu'à partir de 48 heures avant la première journée de travail de l'employé, selon la date de
+            début du poste principal indiquée dans Workday.
+          </div>
         </div>
       )}
 
