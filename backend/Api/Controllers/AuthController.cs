@@ -15,29 +15,33 @@ public class AuthController : ControllerBase
     private readonly HrGroupOptions _hrGroupOptions;
     private readonly ITdxService _tdx;
     private readonly TdxOptions _tdxOptions;
+    private readonly IAppUserService _appUsers;
 
-    public AuthController(IAdDirectoryService ad, IOptions<HrGroupOptions> hrGroupOptions, ITdxService tdx, IOptions<TdxOptions> tdxOptions)
+    public AuthController(IAdDirectoryService ad, IOptions<HrGroupOptions> hrGroupOptions, ITdxService tdx, IOptions<TdxOptions> tdxOptions, IAppUserService appUsers)
     {
         _ad = ad;
         _hrGroupOptions = hrGroupOptions.Value;
         _tdx = tdx;
         _tdxOptions = tdxOptions.Value;
+        _appUsers = appUsers;
     }
 
     [HttpGet("me")]
-    public ActionResult<MeDto> Me()
+    public async Task<ActionResult<MeDto>> Me(CancellationToken ct)
     {
         var accountName = User.GetObjectId();
         var sam = User.GetSamAccountName();
         var info = _ad.GetUserInfo(sam);
         var isHr = _ad.IsUserInGroup(sam, _hrGroupOptions.TrmRhAdmGroupName);
+        var isTicketTemplateAdmin = await _appUsers.IsAdminAsync(info.Email, ct);
 
         return Ok(new MeDto
         {
             ObjectId = accountName,
             DisplayName = info.DisplayName ?? accountName,
             Email = info.Email,
-            IsHr = isHr
+            IsHr = isHr,
+            IsTicketTemplateAdmin = isTicketTemplateAdmin
         });
     }
 

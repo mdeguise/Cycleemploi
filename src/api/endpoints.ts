@@ -1,6 +1,8 @@
 import type { ApiClient } from './client';
 import type {
+  AppUserDto,
   CatalogsDto,
+  CreateAppUserDto,
   CreateD365SecurityRoleMappingDto,
   CreateHelpTicketDto,
   CreateRequestDto,
@@ -14,7 +16,9 @@ import type {
   HelpUrlDto,
   MeDto,
   RequestDto,
+  TicketTemplateDto,
   UpdateRequestDto,
+  UpdateTicketTemplateDto,
   UpsertD365JobCodeTemplateDto,
 } from './types';
 
@@ -66,6 +70,16 @@ export function createApi(client: ApiClient) {
       upsert: (jobCode: string, dto: UpsertD365JobCodeTemplateDto) =>
         client.put<D365JobCodeTemplateDto>(`/api/d365-jobcode-templates/${encodeURIComponent(jobCode)}`, dto),
       remove: (jobCode: string) => client.delete<void>(`/api/d365-jobcode-templates/${encodeURIComponent(jobCode)}`),
+    },
+    ticketTemplates: {
+      list: () => client.get<TicketTemplateDto[]>('/api/ticket-templates'),
+      update: (key: string, dto: UpdateTicketTemplateDto) =>
+        client.put<TicketTemplateDto>(`/api/ticket-templates/${encodeURIComponent(key)}`, dto),
+    },
+    appUsers: {
+      list: () => client.get<AppUserDto[]>('/api/app-users'),
+      add: (dto: CreateAppUserDto) => client.post<AppUserDto>('/api/app-users', dto),
+      remove: (id: number) => client.delete<void>(`/api/app-users/${id}`),
     },
   };
 }

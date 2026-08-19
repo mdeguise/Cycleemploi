@@ -25,6 +25,9 @@ import { D365RolesAdminPage } from './admin/D365RolesAdminPage';
 import { D365UserRolesCorrectionPage } from './admin/D365UserRolesCorrectionPage';
 import { D365JobCodeTemplatesListPage } from './admin/D365JobCodeTemplatesListPage';
 import { D365JobCodeTemplateEditPage } from './admin/D365JobCodeTemplateEditPage';
+import { TicketTemplatesAdminPage } from './admin/TicketTemplatesAdminPage';
+import { AppUsersAdminPage } from './admin/AppUsersAdminPage';
+import type { MeDto } from './api/types';
 
 const ONBOARDING_STEP_COMPONENTS = [
   Step1Employee,
@@ -39,7 +42,7 @@ const OFFBOARDING_STEP_COMPONENTS = [Step1Employee, Step2Cessation, Step3Departm
 
 const queryClient = new QueryClient();
 
-function AdminLayout({ title, children }: { title: string; children: ReactNode }) {
+function AdminLayout({ title, me, children }: { title: string; me: MeDto; children: ReactNode }) {
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -51,12 +54,29 @@ function AdminLayout({ title, children }: { title: string; children: ReactNode }
           <Link to="/admin/d365-roles">Rôles D365 par code d'emploi</Link>
           <Link to="/admin/d365-user-roles">Correction des rôles D365</Link>
           <Link to="/admin/d365-jobcode-templates">Formulaires D365 par code d'emploi</Link>
+          {me.isTicketTemplateAdmin && (
+            <>
+              <Link to="/admin/ticket-templates">Gabarits des billets</Link>
+              <Link to="/admin/app-users">Administrateurs</Link>
+            </>
+          )}
           <Link to="/">Retour à l'application</Link>
         </div>
       </header>
       <div className="app-body">{children}</div>
     </div>
   );
+}
+
+function TicketTemplateAdminGuard({ me, children }: { me: MeDto; children: ReactNode }) {
+  if (!me.isTicketTemplateAdmin) {
+    return (
+      <div className="step-panel">
+        <div className="big-notice">Vous n'avez pas accès à cette section.</div>
+      </div>
+    );
+  }
+  return <>{children}</>;
 }
 
 function WizardBody() {
@@ -112,7 +132,7 @@ function AuthenticatedApp() {
         <Route
           path="/admin/d365-roles"
           element={
-            <AdminLayout title="Administration — Rôles de sécurité D365">
+            <AdminLayout title="Administration — Rôles de sécurité D365" me={me}>
               <D365RolesAdminPage />
             </AdminLayout>
           }
@@ -120,7 +140,7 @@ function AuthenticatedApp() {
         <Route
           path="/admin/d365-user-roles"
           element={
-            <AdminLayout title="Administration — Correction des rôles D365">
+            <AdminLayout title="Administration — Correction des rôles D365" me={me}>
               <D365UserRolesCorrectionPage />
             </AdminLayout>
           }
@@ -128,7 +148,7 @@ function AuthenticatedApp() {
         <Route
           path="/admin/d365-jobcode-templates"
           element={
-            <AdminLayout title="Administration — Formulaires D365 par code d'emploi">
+            <AdminLayout title="Administration — Formulaires D365 par code d'emploi" me={me}>
               <D365JobCodeTemplatesListPage />
             </AdminLayout>
           }
@@ -136,8 +156,28 @@ function AuthenticatedApp() {
         <Route
           path="/admin/d365-jobcode-templates/:jobCode"
           element={
-            <AdminLayout title="Administration — Formulaires D365 par code d'emploi">
+            <AdminLayout title="Administration — Formulaires D365 par code d'emploi" me={me}>
               <D365JobCodeTemplateEditPage />
+            </AdminLayout>
+          }
+        />
+        <Route
+          path="/admin/ticket-templates"
+          element={
+            <AdminLayout title="Administration — Gabarits des billets" me={me}>
+              <TicketTemplateAdminGuard me={me}>
+                <TicketTemplatesAdminPage />
+              </TicketTemplateAdminGuard>
+            </AdminLayout>
+          }
+        />
+        <Route
+          path="/admin/app-users"
+          element={
+            <AdminLayout title="Administration — Administrateurs" me={me}>
+              <TicketTemplateAdminGuard me={me}>
+                <AppUsersAdminPage />
+              </TicketTemplateAdminGuard>
             </AdminLayout>
           }
         />

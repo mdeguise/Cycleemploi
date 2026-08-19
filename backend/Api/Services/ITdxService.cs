@@ -26,6 +26,7 @@ public interface ITdxService
     /// supplied by the user.</summary>
     /// <returns>The created TDX ticket's numeric ID.</returns>
     Task<int> CreateHelpTicketAsync(string requesterName, string requesterEmail, string description, CancellationToken ct);
+
 }
 
 /// <summary>Everything needed to fill out the "D365 - Access" TDX form (FormID 10799) for one

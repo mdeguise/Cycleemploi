@@ -11,23 +11,28 @@ namespace TremblantLifecycle.Api.Services;
 /// <summary>Creates a Freshdesk ticket for every submitted request, in the "RH - Général" queue
 /// (group_id/email_config_id/type confirmed against the real Freshdesk instance — see
 /// tremblantsmt.freshdesk.com's /api/v2/groups, /api/v2/email_configs, /api/v2/ticket_fields).
-/// This is the first of several planned system integrations on submit (TDX for IT next).</summary>
+/// Subject/description come from admin-editable TicketTemplates (see TicketTemplateDefaults) rather
+/// than hardcoded strings, so IT/HR can change what information a ticket contains without a code
+/// change.</summary>
 public class FreshdeskService : IFreshdeskService
 {
     private readonly HttpClient _http;
     private readonly FreshdeskOptions _options;
     private readonly WorkdayContext _workday;
+    private readonly ITicketTemplateService _templates;
 
-    public FreshdeskService(HttpClient http, IOptions<FreshdeskOptions> options, WorkdayContext workday)
+    public FreshdeskService(HttpClient http, IOptions<FreshdeskOptions> options, WorkdayContext workday, ITicketTemplateService templates)
     {
         _http = http;
         _options = options.Value;
         _workday = workday;
+        _templates = templates;
     }
 
     public async Task<long> CreateTicketAsync(Request request, string requesterEmail, CancellationToken ct)
     {
-        var (subject, description) = BuildContent(request);
+        var subject = await BuildSubjectAsync(request, ct);
+        var description = await BuildMainContentAsync(request, ct);
 
         var payload = new
         {
@@ -47,8 +52,7 @@ public class FreshdeskService : IFreshdeskService
 
     public async Task<long> CreateChildTicketAsync(Request request, long parentTicketId, string requesterEmail, long groupId, bool includeAllJobCodes, CancellationToken ct)
     {
-        var employeeNames = string.Join(", ", request.Employees.Select(e => e.NameSnapshot));
-        var subject = $"{request.RequestType.ToFrenchLabel()} - {employeeNames} (#{request.RequestNumber})";
+        var subject = await BuildSubjectAsync(request, ct);
         var description = await BuildChildContentAsync(request, includeAllJobCodes, ct);
 
         var payload = new
@@ -66,6 +70,18 @@ public class FreshdeskService : IFreshdeskService
         };
 
         return await PostTicketAsync(payload, ct);
+    }
+
+    private async Task<string> BuildSubjectAsync(Request request, CancellationToken ct)
+    {
+        var employeeNames = string.Join(", ", request.Employees.Select(e => e.NameSnapshot));
+        var template = await _templates.GetContentAsync(TicketTemplateKeys.FreshdeskSubject, ct);
+        return TicketTemplateRenderer.Render(template, new Dictionary<string, string?>
+        {
+            ["RequestTypeLabel"] = request.RequestType.ToFrenchLabel(),
+            ["EmployeeNames"] = employeeNames,
+            ["RequestNumber"] = request.RequestNumber
+        });
     }
 
     private async Task<long> PostTicketAsync(object payload, CancellationToken ct)
@@ -89,12 +105,10 @@ public class FreshdeskService : IFreshdeskService
         return doc.RootElement.GetProperty("id").GetInt64();
     }
 
-    /// <summary>Content for the two "child" tickets fanned out to other departments — deliberately a
-    /// much smaller field set than the main ticket (no confidential comments, no equipment/apps
-    /// detail), per the specific fields those departments asked for. Loops over every employee on
-    /// the request (a termination can target several at once), since date/manager/position/paygroup
-    /// are only meaningful per-employee.</summary>
-    private async Task<string> BuildChildContentAsync(Request request, bool includeAllJobCodes, CancellationToken ct)
+    /// <summary>Builds the per-employee HTML block shared by both Freshdesk child templates — see
+    /// TicketTemplateDefaults' doc comment for why this is a pre-rendered block rather than a set of
+    /// flat placeholders (the per-employee Workday lookups don't reduce to a single value).</summary>
+    private async Task<string> BuildEmployeesDetailBlocAsync(Request request, bool includeAllJobCodes, CancellationToken ct)
     {
         var isOffboarding = request.RequestType == RequestType.Offboarding;
         var dateLabel = isOffboarding ? "Date de fin (dernière journée)" : "Date de début prévue";
@@ -103,9 +117,6 @@ public class FreshdeskService : IFreshdeskService
             : request.OnboardingDetail?.DateEntreePrevue;
 
         var sb = new StringBuilder();
-        sb.Append($"<h3>Demande #{request.RequestNumber} — {request.RequestType.ToFrenchLabel()}</h3>");
-        sb.Append($"<p><b>Type de demande:</b> {request.RequestType.ToFrenchLabel()}</p>");
-
         foreach (var emp in request.Employees)
         {
             // Pay_Group is a distinct Workday field from this app's own "Règle de paye" wizard
@@ -139,114 +150,90 @@ public class FreshdeskService : IFreshdeskService
         return sb.ToString();
     }
 
-    private static (string Subject, string Description) BuildContent(Request request)
+    private async Task<string> BuildChildContentAsync(Request request, bool includeAllJobCodes, CancellationToken ct)
     {
-        var employeeNames = string.Join(", ", request.Employees.Select(e => e.NameSnapshot));
-        var subject = $"{request.RequestType.ToFrenchLabel()} - {employeeNames} (#{request.RequestNumber})";
+        var key = includeAllJobCodes ? TicketTemplateKeys.FreshdeskChildWithJobCodes : TicketTemplateKeys.FreshdeskChildWithoutJobCodes;
+        var template = await _templates.GetContentAsync(key, ct);
+        var bloc = await BuildEmployeesDetailBlocAsync(request, includeAllJobCodes, ct);
 
-        var sb = new StringBuilder();
-        sb.Append($"<h3>Demande #{request.RequestNumber} — {request.RequestType.ToFrenchLabel()}</h3>");
-        sb.Append($"<p><b>Demandé par:</b> {request.CreatedByDisplayName}<br>");
-        sb.Append($"<b>Date de création:</b> {request.CreatedAt:yyyy-MM-dd}</p>");
+        return TicketTemplateRenderer.Render(template, new Dictionary<string, string?>
+        {
+            ["RequestNumber"] = request.RequestNumber,
+            ["RequestTypeLabel"] = request.RequestType.ToFrenchLabel(),
+            ["EmployeesDetailBloc"] = bloc
+        });
+    }
 
+    private async Task<string> BuildMainContentAsync(Request request, CancellationToken ct)
+    {
         if (request.RequestType == RequestType.Offboarding)
         {
-            AppendOffboardingContent(sb, request);
+            var template = await _templates.GetContentAsync(TicketTemplateKeys.FreshdeskMainOffboarding, ct);
+            var employeesListe = string.Concat(request.Employees.Select(emp =>
+                $"<li>{emp.NameSnapshot} (#{emp.WorkdayEmployeeId}) — {emp.PositionSnapshot} — {emp.DepartementSnapshot}</li>"));
+
+            var d = request.OffboardingDetail;
+            return TicketTemplateRenderer.Render(template, new Dictionary<string, string?>
+            {
+                ["RequestNumber"] = request.RequestNumber,
+                ["RequestTypeLabel"] = request.RequestType.ToFrenchLabel(),
+                ["RequestedBy"] = request.CreatedByDisplayName,
+                ["CreatedDate"] = request.CreatedAt.ToString("yyyy-MM-dd"),
+                ["EmployeesListe"] = employeesListe,
+                ["DerniereJournee"] = d?.DerniereJournee is { } date ? date.ToString("yyyy-MM-dd") : null,
+                ["IndemniteVacances"] = d?.IndemniteVacances,
+                ["RaisonArret"] = d?.RaisonArret,
+                ["DetailsRaison"] = d?.DetailsRaison,
+                ["Reembaucheriez"] = d?.Reembaucheriez,
+                // Deliberately the ONLY comment field included here — commentairesIT/Stationnement/
+                // Redingote are excluded on purpose, for other systems/tickets, not this one (per
+                // explicit product decision). CommentaireRH lives in a physically separate,
+                // access-restricted table (see OffboardingConfidentialComment's doc comment) —
+                // including it here is a deliberate exception for this specific ticket/group ("RH -
+                // Général"), not a general precedent.
+                ["CommentaireRH"] = request.ConfidentialComment?.CommentaireRH
+            });
         }
         else
         {
-            AppendOnboardingContent(sb, request);
-        }
+            var template = await _templates.GetContentAsync(TicketTemplateKeys.FreshdeskMainOnboarding, ct);
+            var emp = request.Employees.FirstOrDefault();
+            var d = request.OnboardingDetail;
+            var a = request.AccessDetail;
+            var eq = request.EquipmentDetail;
+            var app = request.ApplicationsDetail;
 
-        return (subject, sb.ToString());
+            return TicketTemplateRenderer.Render(template, new Dictionary<string, string?>
+            {
+                ["RequestNumber"] = request.RequestNumber,
+                ["RequestTypeLabel"] = request.RequestType.ToFrenchLabel(),
+                ["RequestedBy"] = request.CreatedByDisplayName,
+                ["CreatedDate"] = request.CreatedAt.ToString("yyyy-MM-dd"),
+                ["EmployeeName"] = emp?.NameSnapshot,
+                ["EmployeeId"] = emp?.WorkdayEmployeeId,
+                ["Poste"] = emp?.PositionSnapshot,
+                ["Departement"] = emp?.DepartementSnapshot,
+                ["Gestionnaire"] = emp?.GestionnaireSnapshot,
+                ["TypeEmploi"] = emp?.TypeEmploiSnapshot,
+                ["DateEntreePrevue"] = d?.DateEntreePrevue is { } date ? date.ToString("yyyy-MM-dd") : null,
+                ["RegleDePaye"] = d?.RegleDePaye,
+                ["RegleDePayeCommentaire"] = d?.RegleDePayeCommentaire,
+                ["SystemesAcces"] = JoinOrNull(a?.Systemes.Select(s => s.Value)),
+                ["ZonesBadge"] = a?.BadgeZones,
+                ["PosHebergement"] = JoinOrNull(a?.PosHebergement.Select(p => p.Value)),
+                ["Stationnement"] = a?.Stationnement,
+                ["JustificationAcces"] = a?.Justification,
+                ["Equipements"] = JoinOrNull(eq?.Equipements.Select(x => x.Value)),
+                ["NotesEquipement"] = eq?.Notes,
+                ["Applications"] = JoinOrNull(app?.Applications.Select(x => x.Value)),
+                ["AutreLogiciel"] = app?.AutreLogiciel
+            });
+        }
     }
 
-    private static void AppendOnboardingContent(StringBuilder sb, Request request)
-    {
-        var emp = request.Employees.FirstOrDefault();
-        sb.Append("<h4>Employé</h4><p>");
-        if (emp is not null)
-        {
-            sb.Append($"{emp.NameSnapshot} (#{emp.WorkdayEmployeeId})<br>");
-            sb.Append($"Poste: {emp.PositionSnapshot}<br>");
-            sb.Append($"Département: {emp.DepartementSnapshot}<br>");
-            sb.Append($"Gestionnaire: {emp.GestionnaireSnapshot}<br>");
-            sb.Append($"Type d'emploi: {emp.TypeEmploiSnapshot}");
-        }
-        sb.Append("</p>");
-
-        var d = request.OnboardingDetail;
-        sb.Append("<h4>Détails</h4><p>");
-        sb.Append($"Date d'entrée prévue: {(d?.DateEntreePrevue is { } date ? date.ToString("yyyy-MM-dd") : "—")}<br>");
-        sb.Append($"Règle de paye: {d?.RegleDePaye ?? "—"}");
-        if (!string.IsNullOrWhiteSpace(d?.RegleDePayeCommentaire))
-        {
-            sb.Append($" — {d.RegleDePayeCommentaire}");
-        }
-        sb.Append("</p>");
-
-        var a = request.AccessDetail;
-        sb.Append("<h4>Accès demandés</h4><p>");
-        sb.Append($"Systèmes: {JoinOrDash(a?.Systemes.Select(s => s.Value))}<br>");
-        if (!string.IsNullOrWhiteSpace(a?.BadgeZones))
-        {
-            sb.Append($"Zones badge: {a.BadgeZones}<br>");
-        }
-        sb.Append($"POS/Hébergement: {JoinOrDash(a?.PosHebergement.Select(p => p.Value))}<br>");
-        sb.Append($"Stationnement: {a?.Stationnement ?? "—"}<br>");
-        sb.Append($"Justification: {a?.Justification ?? "—"}");
-        sb.Append("</p>");
-
-        var eq = request.EquipmentDetail;
-        sb.Append("<h4>Équipement</h4><p>");
-        sb.Append(JoinOrDash(eq?.Equipements.Select(x => x.Value)));
-        if (!string.IsNullOrWhiteSpace(eq?.Notes))
-        {
-            sb.Append($"<br>Notes: {eq.Notes}");
-        }
-        sb.Append("</p>");
-
-        var app = request.ApplicationsDetail;
-        sb.Append("<h4>Applications</h4><p>");
-        sb.Append(JoinOrDash(app?.Applications.Select(x => x.Value)));
-        if (!string.IsNullOrWhiteSpace(app?.AutreLogiciel))
-        {
-            sb.Append($"<br>Autre logiciel: {app.AutreLogiciel}");
-        }
-        sb.Append("</p>");
-    }
-
-    private static void AppendOffboardingContent(StringBuilder sb, Request request)
-    {
-        sb.Append("<h4>Employé(s) visé(s)</h4><ul>");
-        foreach (var emp in request.Employees)
-        {
-            sb.Append($"<li>{emp.NameSnapshot} (#{emp.WorkdayEmployeeId}) — {emp.PositionSnapshot} — {emp.DepartementSnapshot}</li>");
-        }
-        sb.Append("</ul>");
-
-        var d = request.OffboardingDetail;
-        sb.Append("<h4>Détails de la cessation</h4><p>");
-        sb.Append($"Dernière journée: {(d?.DerniereJournee is { } date ? date.ToString("yyyy-MM-dd") : "—")}<br>");
-        sb.Append($"Indemnité de vacances: {d?.IndemniteVacances ?? "—"}<br>");
-        sb.Append($"Raison de l'arrêt: {d?.RaisonArret ?? "—"}<br>");
-        sb.Append($"Détails: {d?.DetailsRaison ?? "—"}<br>");
-        sb.Append($"Réembaucheriez-vous: {d?.Reembaucheriez ?? "—"}");
-        sb.Append("</p>");
-
-        // Deliberately the ONLY comment field included here — commentairesIT/ParkingAcces/Redingote
-        // are excluded on purpose, for other systems/tickets, not this one (per explicit product
-        // decision). CommentaireRH lives in a physically separate, access-restricted table in this
-        // app (see OffboardingConfidentialComment's doc comment) — including it here is a deliberate
-        // exception for this specific ticket type/group ("RH - Général"), not a general precedent.
-        sb.Append("<h4>Commentaires RH (confidentiel)</h4><p>");
-        sb.Append(string.IsNullOrWhiteSpace(request.ConfidentialComment?.CommentaireRH) ? "—" : request.ConfidentialComment.CommentaireRH);
-        sb.Append("</p>");
-    }
-
-    private static string JoinOrDash(IEnumerable<string>? values)
+    private static string? JoinOrNull(IEnumerable<string>? values)
     {
         var list = values?.ToList();
-        return list is null || list.Count == 0 ? "—" : string.Join(", ", list);
+        return list is null || list.Count == 0 ? null : string.Join(", ", list);
     }
 }

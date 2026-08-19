@@ -31,11 +31,13 @@ public class TdxService : ITdxService
     };
     private readonly HttpClient _http;
     private readonly TdxOptions _options;
+    private readonly ITicketTemplateService _templates;
 
-    public TdxService(HttpClient http, IOptions<TdxOptions> options)
+    public TdxService(HttpClient http, IOptions<TdxOptions> options, ITicketTemplateService templates)
     {
         _http = http;
         _options = options.Value;
+        _templates = templates;
     }
 
     public async Task<int> CreateTicketAsync(Request request, RequestEmployee employee, string requesterName, string requesterEmail, CancellationToken ct)
@@ -55,13 +57,29 @@ public class TdxService : ITdxService
         var effectiveDate = isOffboarding
             ? request.OffboardingDetail?.DerniereJournee
             : request.OnboardingDetail?.DateEntreePrevue;
-        var effectiveDateText = effectiveDate is { } date ? date.ToString("yyyy-MM-dd") : "—";
+        var effectiveDateText = effectiveDate is { } date ? date.ToString("yyyy-MM-dd") : null;
+
+        var titleTemplate = await _templates.GetContentAsync(TicketTemplateKeys.TdxQuickIncidentTitle, ct);
+        var descriptionTemplate = await _templates.GetContentAsync(TicketTemplateKeys.TdxQuickIncidentDescription, ct);
+        var title = TicketTemplateRenderer.Render(titleTemplate, new Dictionary<string, string?>
+        {
+            ["RequestTypeLabel"] = request.RequestType.ToFrenchLabel(),
+            ["EmployeeName"] = employee.NameSnapshot
+        });
+        var description = TicketTemplateRenderer.Render(descriptionTemplate, new Dictionary<string, string?>
+        {
+            ["EmployeeName"] = employee.NameSnapshot,
+            ["Gestionnaire"] = employee.GestionnaireSnapshot,
+            ["Poste"] = employee.PositionSnapshot,
+            ["CodeEmploi"] = employee.CodeEmploiSnapshot,
+            ["DateEffective"] = effectiveDateText
+        });
 
         var payload = new
         {
             FormID = _options.FormId,
-            Title = $"{request.RequestType.ToFrenchLabel()} - {employee.NameSnapshot}",
-            Description = $"{employee.NameSnapshot} - {employee.GestionnaireSnapshot} - {employee.PositionSnapshot} - {employee.CodeEmploiSnapshot} - {effectiveDateText}",
+            Title = title,
+            Description = description,
             RequestorName = requesterName,
             RequestorEmail = requesterEmail,
             RequestorUid = requesterUid,

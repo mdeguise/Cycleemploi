@@ -28,6 +28,8 @@ public class AppDbContext : DbContext
     public DbSet<DynawayUser> DynawayUsers => Set<DynawayUser>();
     public DbSet<D365JobCodeTemplate> D365JobCodeTemplates => Set<D365JobCodeTemplate>();
     public DbSet<D365JobCodeTemplateRole> D365JobCodeTemplateRoles => Set<D365JobCodeTemplateRole>();
+    public DbSet<AppUser> AppUsers => Set<AppUser>();
+    public DbSet<TicketTemplate> TicketTemplates => Set<TicketTemplate>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -142,6 +144,22 @@ public class AppDbContext : DbContext
             entity.HasOne(m => m.D365JobCodeTemplate).WithMany(t => t.Roles)
                 .HasForeignKey(m => m.D365JobCodeTemplateId).OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(m => new { m.D365JobCodeTemplateId, m.Role }).IsUnique();
+        });
+
+        modelBuilder.Entity<AppUser>(entity =>
+        {
+            entity.Property(m => m.Email).HasMaxLength(200).IsRequired();
+            entity.Property(m => m.DisplayName).HasMaxLength(200).IsRequired();
+            entity.Property(m => m.CreatedByDisplayName).HasMaxLength(200);
+            entity.HasIndex(m => m.Email).IsUnique();
+        });
+
+        modelBuilder.Entity<TicketTemplate>(entity =>
+        {
+            entity.Property(m => m.Key).HasMaxLength(100).IsRequired();
+            entity.Property(m => m.Content).HasMaxLength(8000).IsRequired();
+            entity.Property(m => m.UpdatedByDisplayName).HasMaxLength(200);
+            entity.HasIndex(m => m.Key).IsUnique();
         });
 
         // Transactionally-safe request numbering — see RequestNumberService.

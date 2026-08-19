@@ -48,6 +48,7 @@ export interface MeDto {
   displayName: string;
   email?: string | null;
   isHr: boolean;
+  isTicketTemplateAdmin: boolean;
 }
 
 export interface HelpUrlDto {
@@ -221,4 +222,41 @@ export interface DiscrepanciesDto {
   noActiveAd: NoActiveAdRowDto[];
   dynawayNoD365Role: DynawayNoRoleRowDto[];
   d365InactiveWorkday: D365InactiveWorkdayRowDto[];
+}
+
+// --- Ticket templates (admin) ---
+
+export interface TicketTemplatePlaceholderDto {
+  name: string;
+  description: string;
+}
+
+export interface TicketTemplateDto {
+  key: string;
+  label: string;
+  description: string;
+  content: string;
+  defaultContent: string;
+  placeholders: TicketTemplatePlaceholderDto[];
+  updatedAt?: string | null;
+  updatedByDisplayName?: string | null;
+}
+
+export interface UpdateTicketTemplateDto {
+  content: string;
+}
+
+// --- App users / Ticket Template admins ---
+
+export interface AppUserDto {
+  appUserId: number;
+  email: string;
+  displayName: string;
+  createdAt: string;
+  createdByDisplayName?: string | null;
+}
+
+export interface CreateAppUserDto {
+  email: string;
+  displayName: string;
 }

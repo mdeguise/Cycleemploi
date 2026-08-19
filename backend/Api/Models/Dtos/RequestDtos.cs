@@ -120,6 +120,7 @@ public class MeDto
     public string DisplayName { get; set; } = null!;
     public string? Email { get; set; }
     public bool IsHr { get; set; }
+    public bool IsTicketTemplateAdmin { get; set; }
 }
 
 public class HelpUrlDto
