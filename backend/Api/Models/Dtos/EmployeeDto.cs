@@ -14,4 +14,9 @@ public class EmployeeDto
     public string? CodeEmploi { get; set; }
     public string? TypeEmploi { get; set; }
     public string? Gestionnaire { get; set; }
+
+    /// <summary>Drives the "Règle de paye" field's requirement on the Nouvelle intégration step —
+    /// employees in "CAN Tremblant-Non Union" don't need one (see Step1Employee.tsx and
+    /// RequestsController.ValidateForSubmit).</summary>
+    public string? PayGroup { get; set; }
 }

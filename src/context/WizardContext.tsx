@@ -1,6 +1,6 @@
 import { createContext, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createEmptyRequest, TYPE_DEMANDE_TERMINAISON, type OnboardingRequest, type TypeDemande } from '../types';
-import { REGLE_DE_PAYE_AUTRE } from '../data/catalogs';
+import { REGLE_DE_PAYE_AUTRE, PAY_GROUP_NON_UNION } from '../data/catalogs';
 import { useApi } from '../api/ApiContext';
 import type { RequestTypeApi, UpdateRequestDto } from '../api/types';
 
@@ -137,8 +137,10 @@ function validateStep(step: number, request: OnboardingRequest): boolean {
   switch (step) {
     case 0: {
       const e = request.employee;
+      const regleDePayeNonRequise = e.employeePayGroup === PAY_GROUP_NON_UNION;
       const regleValid =
-        e.regleDePaye && (e.regleDePaye !== REGLE_DE_PAYE_AUTRE || Boolean(e.regleDePayeCommentaire));
+        regleDePayeNonRequise ||
+        (e.regleDePaye && (e.regleDePaye !== REGLE_DE_PAYE_AUTRE || Boolean(e.regleDePayeCommentaire)));
       return Boolean(request.typeDemande && e.employee && e.dateEntreePrevue && regleValid);
     }
     default:

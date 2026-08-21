@@ -5,9 +5,10 @@ import { ClockIcon, UtensilsIcon, ChevronDownIcon } from './icons';
 interface RegleDePayeSelectProps {
   value: string;
   onChange: (value: string) => void;
+  disabled?: boolean;
 }
 
-export function RegleDePayeSelect({ value, onChange }: RegleDePayeSelectProps) {
+export function RegleDePayeSelect({ value, onChange, disabled }: RegleDePayeSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -24,8 +25,13 @@ export function RegleDePayeSelect({ value, onChange }: RegleDePayeSelectProps) {
   const selectedDisplay = value ? REGLE_DE_PAYE_DISPLAY[value] : undefined;
 
   return (
-    <div className="regle-paye-select" ref={rootRef}>
-      <button type="button" className="regle-paye-select__trigger" onClick={() => setIsOpen((v) => !v)}>
+    <div className={`regle-paye-select${disabled ? ' regle-paye-select--disabled' : ''}`} ref={rootRef}>
+      <button
+        type="button"
+        className="regle-paye-select__trigger"
+        disabled={disabled}
+        onClick={() => !disabled && setIsOpen((v) => !v)}
+      >
         {value ? (
           selectedDisplay ? (
             <span className="regle-paye-select__row">

@@ -33,6 +33,11 @@ public class RequestsController : ControllerBase
     private const string BesoinCodeAlarmeSystemeValue = "Besoin de code d'alarme";
     private const string AccesD365SystemeValue = "Accès D365";
 
+    /// <summary>Employees in this Workday Pay_Group don't need to answer "Règle de paye" on the
+    /// Nouvelle intégration/Réactivation step — mirrored on the frontend in
+    /// src/data/catalogs.ts's PAY_GROUP_NON_UNION.</summary>
+    private const string PayGroupNonUnion = "CAN Tremblant-Non Union";
+
     public RequestsController(
         AppDbContext db,
         WorkdayContext workday,
@@ -209,7 +214,7 @@ public class RequestsController : ControllerBase
 
         // Server-side re-validation mirroring WizardContext.validateStep on the frontend — client
         // validation must never be trusted alone. See the plan's API design notes.
-        var errors = ValidateForSubmit(request);
+        var errors = await ValidateForSubmitAsync(request, ct);
         if (errors.Count > 0)
         {
             return BadRequest(new { errors });
@@ -597,7 +602,7 @@ public class RequestsController : ControllerBase
         }
     }
 
-    private static List<string> ValidateForSubmit(Request request)
+    private async Task<List<string>> ValidateForSubmitAsync(Request request, CancellationToken ct)
     {
         var errors = new List<string>();
 
@@ -612,11 +617,24 @@ public class RequestsController : ControllerBase
             {
                 errors.Add("DateEntreePrevue is required.");
             }
-            if (string.IsNullOrWhiteSpace(request.OnboardingDetail?.RegleDePaye))
+
+            // Not required for CAN Tremblant-Non Union employees (see PayGroupNonUnion) — looked
+            // up live rather than trusting a client-supplied flag, same reasoning as every other
+            // check here: client validation must never be trusted alone.
+            var primaryEmployee = request.Employees.FirstOrDefault(e => e.IsPrimary) ?? request.Employees.FirstOrDefault();
+            var payGroup = primaryEmployee is null
+                ? null
+                : await _workday.WorkdayDemographics
+                    .Where(w => w.EmployeeId == primaryEmployee.WorkdayEmployeeId && w.PrimaryJob == 1)
+                    .Select(w => w.PayGroup)
+                    .FirstOrDefaultAsync(ct);
+            var regleDePayeRequired = payGroup != PayGroupNonUnion;
+
+            if (regleDePayeRequired && string.IsNullOrWhiteSpace(request.OnboardingDetail?.RegleDePaye))
             {
                 errors.Add("RegleDePaye is required.");
             }
-            else if (request.OnboardingDetail.RegleDePaye == "AUTRES PRÉCISÉ DANS COMMENTAIRES" &&
+            else if (request.OnboardingDetail?.RegleDePaye == "AUTRES PRÉCISÉ DANS COMMENTAIRES" &&
                      string.IsNullOrWhiteSpace(request.OnboardingDetail.RegleDePayeCommentaire))
             {
                 errors.Add("RegleDePayeCommentaire is required when RegleDePaye is 'AUTRES...'.");

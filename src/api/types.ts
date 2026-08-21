@@ -12,6 +12,7 @@ export interface EmployeeDto {
   codeEmploi?: string | null;
   typeEmploi?: string | null;
   gestionnaire?: string | null;
+  payGroup?: string | null;
 }
 
 export interface AccessSystemDto {

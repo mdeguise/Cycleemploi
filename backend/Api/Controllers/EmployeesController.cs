@@ -70,7 +70,8 @@ public class EmployeesController : ControllerBase
                 Departement = e.JobFamilyGroup,
                 CodeEmploi = e.JobCode,
                 TypeEmploi = e.TimeType != null && e.WorkerType != null ? $"{e.TimeType} — {e.WorkerType}" : e.TimeType,
-                Gestionnaire = e.Manager
+                Gestionnaire = e.Manager,
+                PayGroup = e.PayGroup
             })
             .ToListAsync(ct);
 
@@ -91,7 +92,8 @@ public class EmployeesController : ControllerBase
                 Departement = e.JobFamilyGroup,
                 CodeEmploi = e.JobCode,
                 TypeEmploi = e.TimeType != null && e.WorkerType != null ? $"{e.TimeType} — {e.WorkerType}" : e.TimeType,
-                Gestionnaire = e.Manager
+                Gestionnaire = e.Manager,
+                PayGroup = e.PayGroup
             })
             .FirstOrDefaultAsync(ct);
 

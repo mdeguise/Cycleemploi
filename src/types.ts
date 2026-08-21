@@ -24,6 +24,11 @@ export interface EmployeeSelectionInfo {
   dateEntreePrevue: string;
   regleDePaye: string;
   regleDePayeCommentaire: string;
+  /** UI-only signal captured from the employee search result at selection time — not persisted
+   * (RequestEmployee has no PayGroup column; the backend re-derives it live from Workday at
+   * submit time for validation — see RequestsController.ValidateForSubmitAsync). Drives whether
+   * "Règle de paye" is required/grayed-out for CAN Tremblant-Non Union employees. */
+  employeePayGroup: string;
 }
 
 export interface AccessInfo {
@@ -93,6 +98,7 @@ export function createEmptyRequest(demandePar: string): OnboardingRequest {
       dateEntreePrevue: '',
       regleDePaye: '',
       regleDePayeCommentaire: '',
+      employeePayGroup: '',
     },
     access: {
       systemes: [],

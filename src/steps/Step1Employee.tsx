@@ -4,7 +4,7 @@ import { useWizard } from '../context/WizardContext';
 import { Field } from '../components/FormField';
 import { StepFooter } from '../components/StepFooter';
 import { UserIcon, SearchIcon, InfoIcon, AlertTriangleIcon } from '../components/icons';
-import { REGLE_DE_PAYE_AUTRE } from '../data/catalogs';
+import { REGLE_DE_PAYE_AUTRE, PAY_GROUP_NON_UNION } from '../data/catalogs';
 import { RegleDePayeSelect } from '../components/RegleDePayeSelect';
 import { DateInput } from '../components/DateInput';
 import { TYPE_DEMANDE_TERMINAISON, type EmployeeSelectionInfo, type EmployeeSnapshot, type TypeDemande } from '../types';
@@ -58,11 +58,13 @@ export function Step1Employee() {
   };
 
   const selectEmployee = (dto: EmployeeDto) => {
-    update({ employee: toSnapshot(dto) });
+    update({ employee: toSnapshot(dto), employeePayGroup: dto.payGroup ?? '' });
     setQuery('');
   };
 
-  const clearSelection = () => update({ employee: null });
+  const clearSelection = () => update({ employee: null, employeePayGroup: '' });
+
+  const regleDePayeNonRequise = e.employeePayGroup === PAY_GROUP_NON_UNION;
 
   const addTerminationEmployee = (dto: EmployeeDto) => {
     setRequest((prev) => {
@@ -325,8 +327,15 @@ export function Step1Employee() {
             <Field label="Date d'entrée prévue" required valid={Boolean(e.dateEntreePrevue)}>
               <DateInput value={e.dateEntreePrevue} onChange={(dateEntreePrevue) => update({ dateEntreePrevue })} />
             </Field>
-            <Field label="Règle de paye" required valid={Boolean(e.regleDePaye)}>
-              <RegleDePayeSelect value={e.regleDePaye} onChange={(regleDePaye) => update({ regleDePaye })} />
+            <Field label="Règle de paye" required={!regleDePayeNonRequise} valid={regleDePayeNonRequise || Boolean(e.regleDePaye)}>
+              <RegleDePayeSelect
+                value={e.regleDePaye}
+                onChange={(regleDePaye) => update({ regleDePaye })}
+                disabled={regleDePayeNonRequise}
+              />
+              {regleDePayeNonRequise && (
+                <div className="field-hint">Non requis pour le groupe de paye CAN Tremblant-Non Union.</div>
+              )}
             </Field>
           </div>
 
