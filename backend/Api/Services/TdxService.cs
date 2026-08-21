@@ -175,7 +175,7 @@ public class TdxService : ITdxService
 
     /// <summary>Fixed subject for every ticket created through the "Besoin d'aide?" form — lets IT
     /// spot at a glance that a ticket came from this app rather than a generic incident.</summary>
-    private const string HelpTicketTitle = "FORMULAIRE CYCLE D'EMPLOI";
+    private const string HelpTicketTitle = "MODIFICATION CYCLE EMPLOI";
 
     public async Task<int> CreateHelpTicketAsync(string requesterName, string requesterEmail, string description, CancellationToken ct)
     {
@@ -196,8 +196,8 @@ public class TdxService : ITdxService
             RequestorEmail = requesterEmail,
             RequestorUid = requesterUid,
             AccountID = _options.AccountId,
-            ResponsibleGroupID = _options.ResponsibleGroupId,
-            ResponsibleGroupName = _options.ResponsibleGroupName,
+            ResponsibleGroupID = _options.HelpTicketResponsibleGroupId,
+            ResponsibleGroupName = _options.HelpTicketResponsibleGroupName,
             PriorityID = _options.HelpTicketPriorityId,
             Attributes = new[]
             {
