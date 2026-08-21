@@ -17,7 +17,8 @@ export const ONBOARDING_STEPS: StepDescriptor[] = [
   { key: 'access', numero: 3, titre: 'Accès et comptes', sousTitre: 'Systèmes et accès requis' },
   { key: 'equipment', numero: 4, titre: 'Équipement', sousTitre: 'Matériel requis' },
   { key: 'applications', numero: 5, titre: 'Applications', sousTitre: 'Logiciels et licences' },
-  { key: 'review', numero: 6, titre: 'Révision et soumission', sousTitre: 'Vérifier et envoyer' },
+  { key: 'comments', numero: 6, titre: 'Commentaires et suivis', sousTitre: 'RH, TI, stationnement, matériel' },
+  { key: 'review', numero: 7, titre: 'Révision et soumission', sousTitre: 'Vérifier et envoyer' },
 ];
 
 export const OFFBOARDING_STEPS: StepDescriptor[] = [
@@ -79,20 +80,28 @@ function toUpdateDto(request: OnboardingRequest): UpdateRequestDto {
     notesEquipement: request.equipment.notes || null,
     applications: request.applications.applications,
     autreLogicielRequis: request.applications.autreLogiciel || null,
+    commentairesRH: isOffboarding
+      ? request.offboarding.commentairesRH || null
+      : request.comments.commentairesRH || null,
+    commentairesIT: isOffboarding ? request.offboarding.commentairesIT || null : request.comments.commentairesIT || null,
+    commentairesStationnement: isOffboarding
+      ? request.offboarding.commentairesStationnement || null
+      : request.comments.commentairesStationnement || null,
+    commentairesPuceAcces: isOffboarding
+      ? request.offboarding.commentairesPuceAcces || null
+      : request.comments.commentairesPuceAcces || null,
+    commentairesRedingote: isOffboarding
+      ? request.offboarding.commentairesRedingote || null
+      : request.comments.commentairesRedingote || null,
     derniereJournee: request.offboarding.derniereJournee || null,
     indemniteVacances: request.offboarding.indemniteVacances || null,
     raisonArret: request.offboarding.raisonArret || null,
     detailsRaison: request.offboarding.detailsRaison || null,
     reembaucheriez: request.offboarding.reembaucheriez || null,
-    commentairesIT: request.offboarding.commentairesIT || null,
-    commentairesStationnement: request.offboarding.commentairesStationnement || null,
-    commentairesPuceAcces: request.offboarding.commentairesPuceAcces || null,
-    commentairesRedingote: request.offboarding.commentairesRedingote || null,
     dateRetourConnue: request.offboarding.dateRetourConnue || null,
     dateRetourTravail: request.offboarding.dateRetourTravail || null,
     preavisRecu: request.offboarding.preavisRecu || null,
     motifNonAdmissibilite: request.offboarding.motifNonAdmissibilite || null,
-    commentairesRH: request.offboarding.commentairesRH || null,
   };
 }
 

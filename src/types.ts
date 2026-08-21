@@ -50,6 +50,17 @@ export interface ApplicationsInfo {
   autreLogiciel: string;
 }
 
+/** "Commentaires et suivis" for Onboarding/Réactivation — mirrors OffboardingInfo's per-department
+ * comment fields (see Step3DepartmentComments.tsx / Step6DepartmentComments.tsx). commentairesRH is
+ * confidentiality-gated the same way as offboarding's — see RequestAuthorizationService. */
+export interface CommentsInfo {
+  commentairesRH: string;
+  commentairesIT: string;
+  commentairesStationnement: string;
+  commentairesPuceAcces: string;
+  commentairesRedingote: string;
+}
+
 export interface OffboardingInfo {
   employees: EmployeeSnapshot[];
   derniereJournee: string;
@@ -82,6 +93,7 @@ export interface OnboardingRequest {
   access: AccessInfo;
   equipment: EquipmentInfo;
   applications: ApplicationsInfo;
+  comments: CommentsInfo;
   offboarding: OffboardingInfo;
 }
 
@@ -115,6 +127,13 @@ export function createEmptyRequest(demandePar: string): OnboardingRequest {
     applications: {
       applications: [],
       autreLogiciel: '',
+    },
+    comments: {
+      commentairesRH: '',
+      commentairesIT: '',
+      commentairesStationnement: '',
+      commentairesPuceAcces: '',
+      commentairesRedingote: '',
     },
     offboarding: {
       employees: [],

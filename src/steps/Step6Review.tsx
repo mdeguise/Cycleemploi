@@ -2,13 +2,22 @@ import { useState } from 'react';
 import { useWizard } from '../context/WizardContext';
 import { StepFooter } from '../components/StepFooter';
 import { SubmissionModal } from '../components/SubmissionModal';
-import { CheckCircleIcon, UserIcon, BriefcaseIcon, LockIcon, LaptopIcon, AppsIcon } from '../components/icons';
+import {
+  CheckCircleIcon,
+  UserIcon,
+  BriefcaseIcon,
+  LockIcon,
+  LaptopIcon,
+  AppsIcon,
+  ShieldIcon,
+  ShirtIcon,
+} from '../components/icons';
 import { REGLE_DE_PAYE_AUTRE, ACCES_BADGE, BESOIN_CODE_ALARME } from '../data/catalogs';
 import { formatDateFr } from '../utils/formatDate';
 
 export function Step6Review() {
   const { request, goToStep, submitRequest } = useWizard();
-  const { employee: e, access: a, equipment: eq, applications: apps } = request;
+  const { employee: e, access: a, equipment: eq, applications: apps, comments: c } = request;
   const selected = e.employee;
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -224,6 +233,63 @@ export function Step6Review() {
           <div>
             <div className="review-item__label">Autre logiciel requis</div>
             <div className="review-item__value">{apps.autreLogiciel || '—'}</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="review-section">
+        <div className="review-section__header">
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ShieldIcon style={{ width: 15, height: 15 }} /> Commentaires et suivis
+          </span>
+          <span className="review-section__edit" onClick={() => goToStep(5)}>
+            Modifier
+          </span>
+        </div>
+        <div className="review-section__body">
+          <div>
+            <div className="review-item__label">
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                Ressources humaines
+                <span className="confidential-badge">
+                  <LockIcon style={{ width: 10, height: 10 }} />
+                  Visible uniquement par les ressources humaines
+                </span>
+              </span>
+            </div>
+            <div className="review-item__value">{c.commentairesRH || '—'}</div>
+          </div>
+          <div>
+            <div className="review-item__label">
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <LaptopIcon style={{ width: 12, height: 12 }} /> Technologies de l'information
+              </span>
+            </div>
+            <div className="review-item__value">{c.commentairesIT || '—'}</div>
+          </div>
+          <div>
+            <div className="review-item__label">
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <LockIcon style={{ width: 12, height: 12 }} /> Stationnement
+              </span>
+            </div>
+            <div className="review-item__value">{c.commentairesStationnement || '—'}</div>
+          </div>
+          <div>
+            <div className="review-item__label">
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <LockIcon style={{ width: 12, height: 12 }} /> Carte ou puce d'accès
+              </span>
+            </div>
+            <div className="review-item__value">{c.commentairesPuceAcces || '—'}</div>
+          </div>
+          <div>
+            <div className="review-item__label">
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <ShirtIcon style={{ width: 12, height: 12 }} /> Uniformes et matériel à fournir
+              </span>
+            </div>
+            <div className="review-item__value">{c.commentairesRedingote || '—'}</div>
           </div>
         </div>
       </div>

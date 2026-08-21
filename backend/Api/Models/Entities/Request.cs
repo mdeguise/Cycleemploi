@@ -39,6 +39,7 @@ public class Request
 
     public ICollection<RequestEmployee> Employees { get; set; } = new List<RequestEmployee>();
     public OnboardingDetail? OnboardingDetail { get; set; }
+    public OnboardingConfidentialComment? OnboardingConfidentialComment { get; set; }
     public AccessDetail? AccessDetail { get; set; }
     public EquipmentDetail? EquipmentDetail { get; set; }
     public ApplicationsDetail? ApplicationsDetail { get; set; }

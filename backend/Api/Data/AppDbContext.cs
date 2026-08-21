@@ -22,6 +22,7 @@ public class AppDbContext : DbContext
     public DbSet<RequestApplication> RequestApplications => Set<RequestApplication>();
     public DbSet<OffboardingDetail> OffboardingDetails => Set<OffboardingDetail>();
     public DbSet<OffboardingConfidentialComment> OffboardingConfidentialComments => Set<OffboardingConfidentialComment>();
+    public DbSet<OnboardingConfidentialComment> OnboardingConfidentialComments => Set<OnboardingConfidentialComment>();
     public DbSet<Attachment> Attachments => Set<Attachment>();
     public DbSet<D365SecurityRoleMapping> D365SecurityRoleMappings => Set<D365SecurityRoleMapping>();
     public DbSet<D365UserSecurityRole> D365UserSecurityRoles => Set<D365UserSecurityRole>();
@@ -54,6 +55,13 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<OnboardingDetail>()
             .HasOne(d => d.Request).WithOne(r => r.OnboardingDetail)
             .HasForeignKey<OnboardingDetail>(d => d.RequestId).OnDelete(DeleteBehavior.Cascade);
+
+        // Deliberately separate table/entity from OnboardingDetail — see the class doc comment on
+        // OnboardingConfidentialComment for why this physical separation matters for access control.
+        modelBuilder.Entity<OnboardingConfidentialComment>().HasKey(d => d.RequestId);
+        modelBuilder.Entity<OnboardingConfidentialComment>()
+            .HasOne(d => d.Request).WithOne(r => r.OnboardingConfidentialComment)
+            .HasForeignKey<OnboardingConfidentialComment>(d => d.RequestId).OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<AccessDetail>().HasKey(d => d.RequestId);
         modelBuilder.Entity<AccessDetail>()

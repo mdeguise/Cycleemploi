@@ -101,11 +101,11 @@ public class RequestsController : ControllerBase
         var dto = MapToDto(request);
 
         // RH comment is loaded separately and only attached to the DTO if the authorization check
-        // passes — never inferred from the presence of OffboardingConfidentialComment alone.
-        if (request.ConfidentialComment is not null &&
-            _authz.CanReadConfidentialComment(request, User.GetObjectId()))
+        // passes — never inferred from the presence of OffboardingConfidentialComment/
+        // OnboardingConfidentialComment alone. A request only ever has one of the two.
+        if (_authz.CanReadConfidentialComment(request, User.GetObjectId()))
         {
-            dto.CommentairesRH = request.ConfidentialComment.CommentaireRH;
+            dto.CommentairesRH = request.ConfidentialComment?.CommentaireRH ?? request.OnboardingConfidentialComment?.CommentaireRH;
         }
 
         return Ok(dto);
@@ -144,6 +144,21 @@ public class RequestsController : ControllerBase
             request.OnboardingDetail.DateEntreePrevue = dto.DateEntreePrevue ?? request.OnboardingDetail.DateEntreePrevue;
             request.OnboardingDetail.RegleDePaye = dto.RegleDePaye ?? request.OnboardingDetail.RegleDePaye;
             request.OnboardingDetail.RegleDePayeCommentaire = dto.RegleDePayeCommentaire;
+            request.OnboardingDetail.CommentairesIT = dto.CommentairesIT;
+            request.OnboardingDetail.CommentairesStationnement = dto.CommentairesStationnement;
+            request.OnboardingDetail.CommentairesPuceAcces = dto.CommentairesPuceAcces;
+            request.OnboardingDetail.CommentairesRedingote = dto.CommentairesRedingote;
+
+            // Written unconditionally here — the author can always write this as normal form entry.
+            // Whether it can be READ BACK is a separate, later check (RequestAuthorizationService),
+            // never enforced on write. Mirrors the offboarding branch below.
+            if (dto.CommentairesRH is not null)
+            {
+                request.OnboardingConfidentialComment ??= new OnboardingConfidentialComment { RequestId = id };
+                request.OnboardingConfidentialComment.CommentaireRH = dto.CommentairesRH;
+                request.OnboardingConfidentialComment.UpdatedAt = DateTime.UtcNow;
+                request.OnboardingConfidentialComment.UpdatedByObjectId = User.GetObjectId();
+            }
         }
 
         request.AccessDetail ??= new AccessDetail { RequestId = id };
@@ -664,6 +679,7 @@ public class RequestsController : ControllerBase
             .Include(r => r.ApplicationsDetail).ThenInclude(a => a!.Applications)
             .Include(r => r.OffboardingDetail)
             .Include(r => r.ConfidentialComment)
+            .Include(r => r.OnboardingConfidentialComment)
             .FirstOrDefaultAsync(r => r.RequestId == id, ct);
 
     private static RequestDto MapToDto(Request r) => new()
@@ -702,10 +718,10 @@ public class RequestsController : ControllerBase
         RaisonArret = r.OffboardingDetail?.RaisonArret,
         DetailsRaison = r.OffboardingDetail?.DetailsRaison,
         Reembaucheriez = r.OffboardingDetail?.Reembaucheriez,
-        CommentairesIT = r.OffboardingDetail?.CommentairesIT,
-        CommentairesStationnement = r.OffboardingDetail?.CommentairesStationnement,
-        CommentairesPuceAcces = r.OffboardingDetail?.CommentairesPuceAcces,
-        CommentairesRedingote = r.OffboardingDetail?.CommentairesRedingote,
+        CommentairesIT = r.OffboardingDetail?.CommentairesIT ?? r.OnboardingDetail?.CommentairesIT,
+        CommentairesStationnement = r.OffboardingDetail?.CommentairesStationnement ?? r.OnboardingDetail?.CommentairesStationnement,
+        CommentairesPuceAcces = r.OffboardingDetail?.CommentairesPuceAcces ?? r.OnboardingDetail?.CommentairesPuceAcces,
+        CommentairesRedingote = r.OffboardingDetail?.CommentairesRedingote ?? r.OnboardingDetail?.CommentairesRedingote,
         DateRetourConnue = r.OffboardingDetail?.DateRetourConnue,
         DateRetourTravail = r.OffboardingDetail?.DateRetourTravail,
         PreavisRecu = r.OffboardingDetail?.PreavisRecu,
