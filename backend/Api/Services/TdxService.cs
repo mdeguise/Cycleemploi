@@ -201,7 +201,8 @@ public class TdxService : ITdxService
             PriorityID = _options.HelpTicketPriorityId,
             Attributes = new[]
             {
-                new { ID = _options.HelpTicketCategoryAttributeId, Value = _options.HelpTicketCategoryChoiceId.ToString() }
+                new { ID = _options.HelpTicketCategoryAttributeId, Value = _options.HelpTicketCategoryChoiceId.ToString() },
+                new { ID = _options.HelpTicketSubCategoryAttributeId, Value = _options.HelpTicketSubCategoryChoiceId.ToString() }
             }
         };
 
