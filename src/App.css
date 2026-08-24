@@ -186,13 +186,13 @@
   flex: 1;
   display: flex;
   gap: 24px;
-  padding: 24px 28px;
+  padding: 18px 28px;
   align-items: flex-start;
 }
 
 /* ---------- Step nav ---------- */
 .step-nav {
-  width: 250px;
+  width: 220px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -309,21 +309,21 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
-  padding: 28px;
+  padding: 18px 22px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 8px;
 }
 
 .step-panel__header {
   display: flex;
   align-items: flex-start;
-  gap: 14px;
+  gap: 12px;
 }
 
 .step-panel__icon {
-  width: 44px;
-  height: 44px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   background: var(--info-bg);
   color: var(--tremblant-red);
@@ -418,7 +418,7 @@
 .field select,
 .field textarea {
   width: 100%;
-  padding: 10px 12px;
+  padding: 8px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--bg-card);
@@ -571,7 +571,7 @@
   width: 100%;
   display: flex;
   align-items: center;
-  padding: 10px 12px;
+  padding: 8px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--bg-card);
@@ -647,7 +647,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
+  padding: 8px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--bg-card);
@@ -938,7 +938,7 @@
 
 /* ---------- Summary sidebar ---------- */
 .summary-sidebar {
-  width: 280px;
+  width: 250px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -1031,13 +1031,13 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin: 0 28px 20px;
-  padding: 14px 18px;
+  margin: 0 28px 12px;
+  padding: 9px 16px;
   border-radius: var(--radius-md);
   background: var(--info-bg);
   border: 1px solid var(--info-border);
   color: var(--tremblant-red-dark);
-  font-size: 13px;
+  font-size: 12.5px;
 }
 
 .tip-banner__left {
@@ -1074,8 +1074,8 @@
 .type-demande-section--unanswered {
   background: var(--tremblant-red-light);
   box-shadow: 0 0 0 1px var(--tremblant-red-border);
-  padding: 14px;
-  margin: -14px -14px 0;
+  padding: 10px;
+  margin: -10px -10px 0;
 }
 
 .type-demande-section__label {
@@ -1100,15 +1100,21 @@
 
 .type-demande-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (max-width: 640px) {
+  .type-demande-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .type-demande-option {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 16px;
+  gap: 8px;
+  padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   cursor: pointer;
@@ -1150,41 +1156,43 @@
 }
 
 .type-demande-option__title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--ink);
 }
 
 .type-demande-option__desc {
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--muted);
-  margin-top: 2px;
+  margin-top: 1px;
+  line-height: 1.3;
 }
 
 .workday-notice {
   display: flex;
-  gap: 12px;
-  padding: 16px;
+  gap: 10px;
+  padding: 8px 14px;
   border-radius: var(--radius-md);
   background: var(--info-bg);
   border: 1px solid var(--info-border);
   color: var(--tremblant-red-dark);
-  font-size: 13px;
+  font-size: 12px;
+  line-height: 1.3;
 }
 
 .workday-notice__icon {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
   margin-top: 1px;
 }
 
 .workday-notice ul {
   margin: 0;
-  padding-left: 18px;
+  padding-left: 16px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 }
 
 .workday-notice__text {
@@ -1222,19 +1230,19 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 16px;
+  padding: 8px 14px;
   border-radius: var(--radius-md);
   background: var(--info-bg);
   border: 1px solid var(--info-border);
   color: var(--tremblant-red-dark);
-  font-size: 13px;
+  font-size: 12.5px;
 }
 
 .big-notice {
   display: flex;
   align-items: flex-start;
-  gap: 14px;
-  padding: 20px;
+  gap: 10px;
+  padding: 12px 16px;
   border-radius: var(--radius-md);
   background: var(--warn-bg);
   border: 2px solid #f0b429;
@@ -1242,15 +1250,15 @@
 }
 
 .big-notice__icon {
-  width: 26px;
-  height: 26px;
+  width: 20px;
+  height: 20px;
   flex-shrink: 0;
 }
 
 .big-notice__text {
-  font-size: 15px;
+  font-size: 12.5px;
   font-weight: 600;
-  line-height: 1.5;
+  line-height: 1.3;
 }
 
 /* ---------- File attachments ---------- */
