@@ -186,7 +186,9 @@ export function Step1Employee() {
           <div className="big-notice__text">
             Veuillez noter que l'équipe informatique ne peut créer les comptes utilisateurs informatiques, incluant le
             compte AD, qu'à partir de 48 heures avant la première journée de travail de l'employé, selon la date de
-            début du poste principal indiquée dans Workday.
+            début du poste principal indiquée dans Workday. Il est donc essentiel que la date de la première journée
+            de travail soit <strong>entrée dans Workday</strong> avant que l'équipe informatique puisse créer le
+            compte.
           </div>
         </div>
       )}
