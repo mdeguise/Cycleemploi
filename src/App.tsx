@@ -28,6 +28,7 @@ import { D365JobCodeTemplatesListPage } from './admin/D365JobCodeTemplatesListPa
 import { D365JobCodeTemplateEditPage } from './admin/D365JobCodeTemplateEditPage';
 import { TicketTemplatesAdminPage } from './admin/TicketTemplatesAdminPage';
 import { AppUsersAdminPage } from './admin/AppUsersAdminPage';
+import { RequestsAdminPage } from './admin/RequestsAdminPage';
 import type { MeDto } from './api/types';
 
 const ONBOARDING_STEP_COMPONENTS = [
@@ -53,6 +54,7 @@ function AdminLayout({ title, me, children }: { title: string; me: MeDto; childr
           <div className="app-header__title">{title}</div>
         </div>
         <div style={{ display: 'flex', gap: 16 }}>
+          {me.adminRole && <Link to="/admin/requests">Demandes</Link>}
           <Link to="/admin/d365-roles">Rôles D365 par code d'emploi</Link>
           <Link to="/admin/d365-user-roles">Correction des rôles D365</Link>
           <Link to="/admin/d365-jobcode-templates">Formulaires D365 par code d'emploi</Link>
@@ -68,6 +70,19 @@ function AdminLayout({ title, me, children }: { title: string; me: MeDto; childr
       <div className="app-body">{children}</div>
     </div>
   );
+}
+
+/// Any Administration access at all — Lecteur or Admin. Acting (retrying a ticket) is gated
+/// separately, server-side, so a Lecteur seeing this page cannot change anything.
+function AdminSectionGuard({ me, children }: { me: MeDto; children: ReactNode }) {
+  if (!me.adminRole) {
+    return (
+      <div className="step-panel">
+        <div className="big-notice">Vous n'avez pas accès à cette section.</div>
+      </div>
+    );
+  }
+  return <>{children}</>;
 }
 
 function TicketTemplateAdminGuard({ me, children }: { me: MeDto; children: ReactNode }) {
@@ -180,6 +195,16 @@ function AuthenticatedApp() {
               <TicketTemplateAdminGuard me={me}>
                 <AppUsersAdminPage />
               </TicketTemplateAdminGuard>
+            </AdminLayout>
+          }
+        />
+        <Route
+          path="/admin/requests"
+          element={
+            <AdminLayout title="Administration — Demandes" me={me}>
+              <AdminSectionGuard me={me}>
+                <RequestsAdminPage />
+              </AdminSectionGuard>
             </AdminLayout>
           }
         />

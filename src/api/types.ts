@@ -49,6 +49,11 @@ export interface MeDto {
   displayName: string;
   email?: string | null;
   isHr: boolean;
+  /** 'Admin' | 'Lecteur' | null when the user has no Administration access at all. */
+  adminRole?: AppUserRole | null;
+  /** Full Administration rights: retry tickets, edit templates, manage app users. */
+  isAppAdmin: boolean;
+  /** @deprecated alias for isAppAdmin, kept while the UI migrates. */
   isTicketTemplateAdmin: boolean;
 }
 
@@ -310,4 +315,67 @@ export interface AdAccountDto {
   sam: string;
   displayName: string;
   email?: string | null;
+}
+
+/** Which downstream system a ticket row represents. */
+export type TicketKind =
+  | 'Freshdesk'
+  | 'FreshdeskChildWithJobCodes'
+  | 'FreshdeskChildWithoutJobCodes'
+  | 'Tdx'
+  | 'D365Badge'
+  | 'D365Access';
+
+export type TicketOutcome = 'Created' | 'Failed';
+
+export interface RequestTicketDto {
+  requestTicketId: number;
+  kind: TicketKind;
+  /** Human-readable French label, supplied by the API so every surface agrees on wording. */
+  kindLabel: string;
+  outcome: TicketOutcome;
+  /** Null for request-level tickets (the Freshdesk parent and its children). */
+  requestEmployeeId?: number | null;
+  employeeName?: string | null;
+  ticketNumber?: string | null;
+  errorType?: string | null;
+  errorMessage?: string | null;
+  attemptCount: number;
+  firstAttemptAt: string;
+  lastAttemptAt: string;
+}
+
+export interface RetryTicketResultDto {
+  succeeded: boolean;
+  ticketNumber?: string | null;
+  error?: string | null;
+}
+
+export interface AdminRequestSummaryDto {
+  requestId: number;
+  requestNumber: string;
+  requestType: RequestTypeApi;
+  status: RequestStatusApi;
+  demandePar: string;
+  createdAt: string;
+  submittedAt?: string | null;
+  employeeNames: string[];
+  ticketsCreated: number;
+  ticketsFailed: number;
+}
+
+export interface AdminRequestListDto {
+  total: number;
+  page: number;
+  pageSize: number;
+  items: AdminRequestSummaryDto[];
+}
+
+export interface AdminRequestDetailDto {
+  request: RequestDto;
+  requesterEmail?: string | null;
+  submittedAt?: string | null;
+  /** False for a Lecteur; the API refuses the retry regardless. */
+  canRetry: boolean;
+  tickets: RequestTicketDto[];
 }
