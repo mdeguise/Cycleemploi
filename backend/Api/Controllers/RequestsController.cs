@@ -521,7 +521,7 @@ public class RequestsController : ControllerBase
             }
 
             var workdayInfo = await _workday.WorkdayDemographics
-                .Where(w => w.EmployeeId == employee.WorkdayEmployeeId && w.PrimaryJob == 1)
+                .Where(w => w.EmployeeId == employee.WorkdayEmployeeId && w.PrimaryJob == true)
                 .Select(w => new { w.JobCode, w.PositionTitle, w.WorkEmail, w.Email, w.ManagerId, w.Manager })
                 .FirstOrDefaultAsync(ct);
             if (workdayInfo is null)
@@ -554,7 +554,7 @@ public class RequestsController : ControllerBase
             if (!string.IsNullOrWhiteSpace(workdayInfo.ManagerId))
             {
                 var manager = await _workday.WorkdayDemographics
-                    .Where(w => w.EmployeeId == workdayInfo.ManagerId && w.PrimaryJob == 1)
+                    .Where(w => w.EmployeeId == workdayInfo.ManagerId && w.PrimaryJob == true)
                     .Select(w => new { w.FirstName, w.PreferredFirstName, w.LastName })
                     .FirstOrDefaultAsync(ct);
                 if (manager is not null)
@@ -640,7 +640,7 @@ public class RequestsController : ControllerBase
             var payGroup = primaryEmployee is null
                 ? null
                 : await _workday.WorkdayDemographics
-                    .Where(w => w.EmployeeId == primaryEmployee.WorkdayEmployeeId && w.PrimaryJob == 1)
+                    .Where(w => w.EmployeeId == primaryEmployee.WorkdayEmployeeId && w.PrimaryJob == true)
                     .Select(w => w.PayGroup)
                     .FirstOrDefaultAsync(ct);
             var regleDePayeRequired = payGroup != PayGroupNonUnion;
