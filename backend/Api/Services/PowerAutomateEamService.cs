@@ -59,21 +59,21 @@ public class PowerAutomateEamService : IDynamicsEamService
         {
             RequestNumber = request.RequestNumber,
             TypeDemande = request.RequestType.ToFrenchLabel(),
-            NomEmploye = employee.NameSnapshot,
-            PositionTitle = employee.PositionSnapshot,
-            JobCode = employee.CodeEmploiSnapshot,
-            Departement = employee.DepartementSnapshot,
-            Statut = employee.TypeEmploiSnapshot,
-            DebutantLe = debutantLe,
-            DerniereJournee = derniereJournee,
-            Manager = employee.GestionnaireSnapshot,
-            DemandePar = request.CreatedByDisplayName,
+            NomEmploye = employee.NameSnapshot ?? "",
+            PositionTitle = employee.PositionSnapshot ?? "",
+            JobCode = employee.CodeEmploiSnapshot ?? "",
+            Departement = employee.DepartementSnapshot ?? "",
+            Statut = employee.TypeEmploiSnapshot ?? "",
+            DebutantLe = debutantLe ?? "",
+            DerniereJournee = derniereJournee ?? "",
+            Manager = employee.GestionnaireSnapshot ?? "",
+            DemandePar = request.CreatedByDisplayName ?? "",
             BesoinBadgeAcces = systemes.Contains("Badge d'accès aux édifices"),
-            ZonesOuEdifices = access?.BadgeZones,
+            ZonesOuEdifices = access?.BadgeZones ?? "",
             BesoinCodeAlarme = systemes.Contains("Besoin de code d'alarme"),
-            DetailsCodeAlarme = access?.CodeAlarmeDetails,
-            Stationnement = stationnement,
-            PuceAcces = puceAcces,
+            DetailsCodeAlarme = access?.CodeAlarmeDetails ?? "",
+            Stationnement = stationnement ?? "",
+            PuceAcces = puceAcces ?? "",
             FreshdeskTicketId = freshdeskTicketId
         };
 
@@ -103,6 +103,21 @@ public class PowerAutomateEamService : IDynamicsEamService
         return $"(soumis via webhook, ID D365 non retourné — statut {(int)response.StatusCode})";
     }
 
+    /// <summary>Every string here is non-nullable and defaults to "" ON PURPOSE.
+    ///
+    /// The Power Automate flow's "When an HTTP request is received" trigger declares these as
+    /// plain `"type": "string"`, so a JSON null is rejected outright with
+    /// TriggerInputSchemaMismatch ("Invalid type. Expected String but got Null.") and the whole
+    /// request 400s. That made EVERY termination fail: debutantLe is unconditionally null for an
+    /// Offboarding (a termination has no start date), and the badge integration runs for every
+    /// employee on every termination with no gating — so no termination ever produced a D365 badge
+    /// request. It failed silently for months, visible only as an email to IT, until ticket
+    /// outcomes started being recorded and the failures became countable.
+    ///
+    /// Sending "" instead of null keeps the flow's schema satisfied without needing it edited. The
+    /// cleaner long-term shape is for the trigger schema to accept null (`"type": ["string","null"]`)
+    /// — null says "not applicable" honestly where "" fudges it — but that is a change on the flow
+    /// side, and this app must not depend on it having been made.</summary>
     private class BadgeRequestPayload
     {
         [JsonPropertyName("requestNumber")]
@@ -112,49 +127,49 @@ public class PowerAutomateEamService : IDynamicsEamService
         public string TypeDemande { get; set; } = "";
 
         [JsonPropertyName("nomEmploye")]
-        public string? NomEmploye { get; set; }
+        public string NomEmploye { get; set; } = "";
 
         [JsonPropertyName("positionTitle")]
-        public string? PositionTitle { get; set; }
+        public string PositionTitle { get; set; } = "";
 
         [JsonPropertyName("jobcode")]
-        public string? JobCode { get; set; }
+        public string JobCode { get; set; } = "";
 
         [JsonPropertyName("departement")]
-        public string? Departement { get; set; }
+        public string Departement { get; set; } = "";
 
         [JsonPropertyName("statut")]
-        public string? Statut { get; set; }
+        public string Statut { get; set; } = "";
 
         [JsonPropertyName("debutantLe")]
-        public string? DebutantLe { get; set; }
+        public string DebutantLe { get; set; } = "";
 
         [JsonPropertyName("derniereJournee")]
-        public string? DerniereJournee { get; set; }
+        public string DerniereJournee { get; set; } = "";
 
         [JsonPropertyName("manager")]
-        public string? Manager { get; set; }
+        public string Manager { get; set; } = "";
 
         [JsonPropertyName("demandePar")]
-        public string? DemandePar { get; set; }
+        public string DemandePar { get; set; } = "";
 
         [JsonPropertyName("besoinBadgeAcces")]
         public bool BesoinBadgeAcces { get; set; }
 
         [JsonPropertyName("zonesOuEdifices")]
-        public string? ZonesOuEdifices { get; set; }
+        public string ZonesOuEdifices { get; set; } = "";
 
         [JsonPropertyName("besoinCodeAlarme")]
         public bool BesoinCodeAlarme { get; set; }
 
         [JsonPropertyName("detailsCodeAlarme")]
-        public string? DetailsCodeAlarme { get; set; }
+        public string DetailsCodeAlarme { get; set; } = "";
 
         [JsonPropertyName("stationnement")]
-        public string? Stationnement { get; set; }
+        public string Stationnement { get; set; } = "";
 
         [JsonPropertyName("puceAcces")]
-        public string? PuceAcces { get; set; }
+        public string PuceAcces { get; set; } = "";
 
         [JsonPropertyName("freshdeskTicketId")]
         public long? FreshdeskTicketId { get; set; }
