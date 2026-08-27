@@ -1,0 +1,577 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using TremblantLifecycle.Api.Data;
+using TremblantLifecycle.Api.Models.Entities;
+
+namespace TremblantLifecycle.Api.Services;
+
+/// <summary>The outcome of retrying one ticket.</summary>
+public record TicketRetryResult(bool Succeeded, string? TicketNumber, string? Error);
+
+public interface ITicketOrchestrationService
+{
+    /// <summary>Fires every downstream integration for a freshly submitted request. Best-effort by
+    /// design: the submission is already committed by the time this runs and must never be failed
+    /// by a downstream system being unavailable.</summary>
+    Task RunAllAsync(Request request, AdUserInfo requester, CancellationToken ct);
+
+    /// <summary>Re-runs the ONE integration a RequestTicket row represents. Used by the
+    /// Administration screen's Réessayer button.</summary>
+    Task<TicketRetryResult> RetryAsync(Request request, RequestTicket ticket, CancellationToken ct);
+}
+
+/// <summary>All the downstream ticket-system integrations, extracted out of RequestsController so
+/// the SAME code runs on submit and on retry — a second copy for retry would drift, and drift here
+/// means tickets whose contents differ depending on how they were created.
+///
+/// The requester is passed IN rather than read from the HTTP caller. At submit time the caller is
+/// the requester; on a retry the caller is an administrator, and re-deriving it there would raise
+/// the ticket under the wrong person — in Freshdesk the requester drives the whole reply thread.
+/// See Request.RequesterEmail.</summary>
+public class TicketOrchestrationService : ITicketOrchestrationService
+{
+    private readonly AppDbContext _db;
+    private readonly WorkdayContext _workday;
+    private readonly IAdDirectoryService _ad;
+    private readonly IFreshdeskService _freshdesk;
+    private readonly FreshdeskOptions _freshdeskOptions;
+    private readonly IDynamicsEamService _dynamics;
+    private readonly ITdxService _tdx;
+    private readonly IEmailNotificationService _email;
+    private readonly IRequestTicketService _tickets;
+    private readonly ILogger<TicketOrchestrationService> _logger;
+
+    /// <summary>Systèmes junction rows store the catalog's display text directly — these must match
+    /// src/data/catalogs.ts's ACCES_BADGE, BESOIN_CODE_ALARME and ACCES_D365 exactly.</summary>
+    private const string AccesBadgeSystemeValue = "Badge d'accès aux édifices";
+    private const string BesoinCodeAlarmeSystemeValue = "Besoin de code d'alarme";
+    private const string AccesD365SystemeValue = "Accès D365";
+
+    public TicketOrchestrationService(
+        AppDbContext db,
+        WorkdayContext workday,
+        IAdDirectoryService ad,
+        IFreshdeskService freshdesk,
+        IOptions<FreshdeskOptions> freshdeskOptions,
+        IDynamicsEamService dynamics,
+        ITdxService tdx,
+        IEmailNotificationService email,
+        IRequestTicketService tickets,
+        ILogger<TicketOrchestrationService> logger)
+    {
+        _db = db;
+        _workday = workday;
+        _ad = ad;
+        _freshdesk = freshdesk;
+        _freshdeskOptions = freshdeskOptions.Value;
+        _dynamics = dynamics;
+        _tdx = tdx;
+        _email = email;
+        _tickets = tickets;
+        _logger = logger;
+    }
+
+    public async Task RunAllAsync(Request request, AdUserInfo requester, CancellationToken ct)
+    {
+        // Freshdesk runs first so its ticket id (when it succeeded) can be included in the D365
+        // webhook payload for cross-referencing.
+        var freshdeskTicketId = await TryCreateFreshdeskTicketAsync(request, requester, ct);
+        await TryCreateD365BadgeTicketAsync(request, freshdeskTicketId, ct);
+        await TryCreateTdxTicketAsync(request, requester, ct);
+        await TryCreateD365AccessTicketAsync(request, requester, ct);
+    }
+
+
+    public async Task<TicketRetryResult> RetryAsync(Request request, RequestTicket ticket, CancellationToken ct)
+    {
+        // The requester is the person who SUBMITTED the request, never the administrator clicking
+        // Réessayer. Re-deriving it from the caller here is the whole reason RequesterEmail is
+        // persisted — see Request.RequesterEmail.
+        var requester = new AdUserInfo(request.CreatedByDisplayName, request.RequesterEmail);
+        if (string.IsNullOrWhiteSpace(requester.Email))
+        {
+            return new TicketRetryResult(false, null,
+                "Cette demande n'a pas de courriel de demandeur enregistré (elle a été soumise avant que ce champ existe). " +
+                "Le billet doit être créé manuellement.");
+        }
+
+        try
+        {
+            switch (ticket.Kind)
+            {
+                case TicketKind.Freshdesk:
+                    // Also creates whichever child tickets never got made — they are only attempted
+                    // after the parent succeeds, so a failed parent means no child rows exist at all
+                    // and there would be nothing for an administrator to click.
+                    await TryCreateFreshdeskTicketAsync(request, requester, ct);
+                    break;
+
+                case TicketKind.FreshdeskChildWithJobCodes:
+                case TicketKind.FreshdeskChildWithoutJobCodes:
+                {
+                    var parent = await _db.RequestTickets.AsNoTracking()
+                        .FirstOrDefaultAsync(t => t.RequestId == request.RequestId && t.Kind == TicketKind.Freshdesk, ct);
+                    if (parent is null || parent.Outcome != TicketOutcome.Created || !long.TryParse(parent.TicketNumber, out var parentTicketId))
+                    {
+                        return new TicketRetryResult(false, null,
+                            "Le billet Freshdesk principal n'existe pas encore — relancez-le d'abord; ses billets enfants suivront.");
+                    }
+
+                    var withJobCodes = ticket.Kind == TicketKind.FreshdeskChildWithJobCodes;
+                    var groupId = withJobCodes ? _freshdeskOptions.ChildGroupIdWithJobCodes : _freshdeskOptions.ChildGroupIdWithoutJobCodes;
+                    await TryCreateFreshdeskChildTicketAsync(request, parentTicketId, requester.Email!, groupId, withJobCodes, ticket.Kind, ct);
+                    break;
+                }
+
+                case TicketKind.Tdx:
+                    await TryCreateTdxTicketAsync(request, requester, ct, ticket.RequestEmployeeId);
+                    break;
+
+                case TicketKind.D365Badge:
+                {
+                    // Pass the Freshdesk id along when we have one, same as the submit path does, so
+                    // the D365 record still cross-references the ticket.
+                    var freshdesk = await _db.RequestTickets.AsNoTracking()
+                        .FirstOrDefaultAsync(t => t.RequestId == request.RequestId && t.Kind == TicketKind.Freshdesk, ct);
+                    long? freshdeskTicketId = freshdesk is { Outcome: TicketOutcome.Created } && long.TryParse(freshdesk.TicketNumber, out var fdId)
+                        ? fdId
+                        : null;
+                    await TryCreateD365BadgeTicketAsync(request, freshdeskTicketId, ct, ticket.RequestEmployeeId);
+                    break;
+                }
+
+                case TicketKind.D365Access:
+                    await TryCreateD365AccessTicketAsync(request, requester, ct, ticket.RequestEmployeeId);
+                    break;
+
+                default:
+                    return new TicketRetryResult(false, null, $"Type de billet non pris en charge : {ticket.Kind}.");
+            }
+        }
+        catch (Exception ex)
+        {
+            // The Try* methods swallow their own failures by design; this only catches something
+            // thrown around them.
+            _logger.LogError(ex, "Retry of {Kind} for request {RequestNumber} threw", ticket.Kind, request.RequestNumber);
+            return new TicketRetryResult(false, null, ex.Message);
+        }
+
+        // Report whatever the integration actually recorded rather than assuming it worked — the
+        // Try* methods catch their own exceptions and write a Failed row instead of throwing.
+        var updated = await _db.RequestTickets.AsNoTracking()
+            .FirstOrDefaultAsync(t => t.RequestId == request.RequestId && t.Kind == ticket.Kind && t.RequestEmployeeId == ticket.RequestEmployeeId, ct);
+
+        if (updated is null)
+        {
+            // The integration decided this kind does not apply to this request (e.g. no D365 access
+            // was requested), so nothing was attempted and no row was written.
+            return new TicketRetryResult(false, null,
+                "Aucune tentative n'a été effectuée : cette intégration ne s'applique pas à cette demande.");
+        }
+
+        return updated.Outcome == TicketOutcome.Created
+            ? new TicketRetryResult(true, updated.TicketNumber, null)
+            : new TicketRetryResult(false, null, updated.ErrorMessage ?? "Échec inconnu.");
+    }
+
+    private Task<bool> ChildAlreadyCreatedAsync(int requestId, TicketKind kind, CancellationToken ct) =>
+        _db.RequestTickets.AsNoTracking()
+            .AnyAsync(t => t.RequestId == requestId && t.Kind == kind && t.Outcome == TicketOutcome.Created, ct);
+
+    private async Task<long?> TryCreateFreshdeskTicketAsync(Request request, AdUserInfo requester, CancellationToken ct)
+    {
+        string? requesterEmail = null;
+        try
+        {
+            requesterEmail = requester.Email;
+            if (string.IsNullOrWhiteSpace(requesterEmail))
+            {
+                throw new InvalidOperationException("Could not resolve requester email from AD.");
+            }
+
+            var ticketId = await _freshdesk.CreateTicketAsync(request, requesterEmail, ct);
+            await _tickets.RecordSuccessAsync(request.RequestId, TicketKind.Freshdesk, null, ticketId.ToString(), ct);
+
+            // Best-effort, independent of each other and of the main ticket above (which already
+            // succeeded and is committed) — fanning the same submission out to two other
+            // departments as Freshdesk "child" tickets of the main one.
+            // Skip a child that already exists. On the submit path nothing exists yet so both run;
+            // on a parent RETRY this prevents creating a second copy of a child that had already
+            // succeeded, while still creating the ones that never got made.
+            if (!await ChildAlreadyCreatedAsync(request.RequestId, TicketKind.FreshdeskChildWithJobCodes, ct))
+            {
+                await TryCreateFreshdeskChildTicketAsync(request, ticketId, requesterEmail, _freshdeskOptions.ChildGroupIdWithJobCodes, includeAllJobCodes: true, TicketKind.FreshdeskChildWithJobCodes, ct);
+            }
+            if (!await ChildAlreadyCreatedAsync(request.RequestId, TicketKind.FreshdeskChildWithoutJobCodes, ct))
+            {
+                await TryCreateFreshdeskChildTicketAsync(request, ticketId, requesterEmail, _freshdeskOptions.ChildGroupIdWithoutJobCodes, includeAllJobCodes: false, TicketKind.FreshdeskChildWithoutJobCodes, ct);
+            }
+
+            return ticketId;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create Freshdesk ticket for request {RequestNumber}", request.RequestNumber);
+            await _tickets.RecordFailureAsync(request.RequestId, TicketKind.Freshdesk, null, ex, ct);
+
+            var subject = $"[Cycle Emploi] Échec de création de ticket Freshdesk — demande #{request.RequestNumber}";
+            var body =
+                $"La demande #{request.RequestNumber} ({request.RequestType.ToFrenchLabel()}) a été soumise avec succès, " +
+                "mais la création du ticket Freshdesk correspondant a échoué. Un ticket devra être créé manuellement.\n\n" +
+                "== Détails de la demande ==\n" +
+                $"Demandé par: {request.CreatedByDisplayName}\n" +
+                $"Date de soumission: {request.SubmittedAt:yyyy-MM-dd HH:mm} UTC\n\n" +
+                "== Détails de l'erreur ==\n" +
+                $"Type: {ex.GetType().Name}\n" +
+                $"Message: {ex.Message}\n" +
+                (ex.InnerException is not null ? $"Cause interne: {ex.InnerException.Message}\n" : "") +
+                $"Survenue: {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC\n\n" +
+                "== Étapes à vérifier ==\n" +
+                "1. Consulter les journaux applicatifs sur vm-trm-live (Event Viewer, ou les logs ASP.NET Core du site TremblantOnboardingApi) pour la trace complète, en recherchant le numéro de demande ci-dessus.\n" +
+                "2. Si l'erreur mentionne un code HTTP Freshdesk (401/403): la clé API dans appsettings.Production.json sur le serveur a peut-être expiré ou été révoquée — vérifier/régénérer dans Freshdesk (Profil > Paramètres > Clé API).\n" +
+                "3. Si l'erreur mentionne \"Could not resolve requester email from AD\": le compte AD du demandeur n'a pas d'adresse courriel valide renseignée — vérifier l'attribut mail dans Active Directory.\n" +
+                "4. Si l'erreur indique un problème de connexion/timeout: vérifier que vm-trm-live peut atteindre https://tremblantsmt.freshdesk.com (port 443) — pare-feu ou proxy sortant.\n" +
+                "5. Si l'erreur mentionne group_id, email_config_id ou un champ invalide: la configuration Freshdesk (groupe \"RH - Général\", boîte courriel) a peut-être changé côté Freshdesk — comparer avec appsettings.json.\n" +
+                "6. Une fois la cause corrigée, créer le ticket manuellement dans Freshdesk (groupe RH - Général) avec les détails de la demande ci-dessus — les données complètes de la demande restent disponibles dans l'application Cycle Emploi.";
+
+            try
+            {
+                await _email.SendAsync(subject, body, ct);
+            }
+            catch (Exception emailEx)
+            {
+                // Nothing more useful to do here — the submission already succeeded and is
+                // committed; let this surface in the server logs for someone to notice.
+                _logger.LogError(emailEx, "Also failed to send the Freshdesk-failure notification email for request {RequestNumber}", request.RequestNumber);
+            }
+
+            return null;
+        }
+    }
+
+    /// <summary>Creates one Freshdesk "child" ticket (Parent-child ticketing feature) of the
+    /// already-created main ticket, fanning the submission out to another department's group.
+    /// Independent failure handling from the main ticket and from the other child ticket — either
+    /// can fail without affecting the other, since the main ticket (and the submission itself) is
+    /// already committed by the time either of these run.</summary>
+    private async Task TryCreateFreshdeskChildTicketAsync(Request request, long parentTicketId, string requesterEmail, long groupId, bool includeAllJobCodes, TicketKind kind, CancellationToken ct)
+    {
+        try
+        {
+            var childTicketId = await _freshdesk.CreateChildTicketAsync(request, parentTicketId, requesterEmail, groupId, includeAllJobCodes, ct);
+            await _tickets.RecordSuccessAsync(request.RequestId, kind, null, childTicketId.ToString(), ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create Freshdesk child ticket (group {GroupId}) for request {RequestNumber}", groupId, request.RequestNumber);
+            await _tickets.RecordFailureAsync(request.RequestId, kind, null, ex, ct);
+
+            var subject = $"[Cycle Emploi] Échec de création de ticket Freshdesk enfant (groupe {groupId}) — demande #{request.RequestNumber}";
+            var body =
+                $"La demande #{request.RequestNumber} ({request.RequestType.ToFrenchLabel()}) a été soumise avec succès, et le ticket Freshdesk principal (#{parentTicketId}) a été créé, " +
+                $"mais la création du ticket enfant destiné au groupe {groupId} a échoué. Ce ticket devra être créé manuellement.\n\n" +
+                "== Détails de la demande ==\n" +
+                $"Demandé par: {request.CreatedByDisplayName}\n" +
+                $"Ticket principal Freshdesk: #{parentTicketId}\n" +
+                $"Date de soumission: {request.SubmittedAt:yyyy-MM-dd HH:mm} UTC\n\n" +
+                "== Détails de l'erreur ==\n" +
+                $"Type: {ex.GetType().Name}\n" +
+                $"Message: {ex.Message}\n" +
+                (ex.InnerException is not null ? $"Cause interne: {ex.InnerException.Message}\n" : "") +
+                $"Survenue: {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC\n\n" +
+                "== Étapes à vérifier ==\n" +
+                "1. Consulter les journaux applicatifs sur vm-trm-live pour la trace complète, en recherchant le numéro de demande ci-dessus.\n" +
+                "2. Si l'erreur mentionne un code HTTP Freshdesk (401/403): la clé API a peut-être expiré ou été révoquée.\n" +
+                "3. Si l'erreur mentionne \"parent_id\" ou un champ invalide: vérifier que la fonctionnalité \"Parent-child ticketing\" est toujours activée dans Freshdesk (Admin > Fonctionnalités avancées) et que le ticket principal existe toujours.\n" +
+                $"4. Une fois la cause corrigée, créer le ticket manuellement dans Freshdesk (groupe {groupId}), en le liant comme ticket enfant du ticket principal #{parentTicketId} — les données complètes de la demande restent disponibles dans l'application Cycle Emploi.";
+
+            try
+            {
+                await _email.SendAsync(subject, body, ct);
+            }
+            catch (Exception emailEx)
+            {
+                _logger.LogError(emailEx, "Also failed to send the Freshdesk-child-ticket-failure notification email for request {RequestNumber}, group {GroupId}", request.RequestNumber, groupId);
+            }
+        }
+    }
+
+    /// <summary>Creates a D365 F&amp;O Enterprise Asset Management work order for badge/alarm
+    /// activation/deactivation, mirroring the old Freshservice-triggered Power Automate flow this
+    /// replaces. For Onboarding/Réactivation, only fires when "Badge d'accès aux édifices" and/or
+    /// "Besoin de code d'alarme" was selected, for the single employee on the request. For
+    /// Offboarding there's no equivalent selection step, so it always fires — once per employee on
+    /// the request, since a termination can target several people at once. Same fail-open,
+    /// email-on-failure pattern as the Freshdesk integration above, applied per employee so one
+    /// failure in a batch termination doesn't stop the others from being sent.</summary>
+    private async Task TryCreateD365BadgeTicketAsync(Request request, long? freshdeskTicketId, CancellationToken ct, int? onlyRequestEmployeeId = null)
+    {
+        List<RequestEmployee> employeesToProcess;
+        if (request.RequestType == RequestType.Offboarding)
+        {
+            employeesToProcess = request.Employees.ToList();
+        }
+        else
+        {
+            var systemes = (request.AccessDetail?.Systemes.Select(s => s.Value) ?? []).ToList();
+            if (!systemes.Contains(AccesBadgeSystemeValue) && !systemes.Contains(BesoinCodeAlarmeSystemeValue))
+            {
+                return;
+            }
+
+            var employee = request.Employees.FirstOrDefault(e => e.IsPrimary) ?? request.Employees.FirstOrDefault();
+            employeesToProcess = employee is null ? [] : [employee];
+        }
+
+        // See TryCreateTdxTicketAsync — a retry must not fan back out to every employee.
+        if (onlyRequestEmployeeId is { } onlyBadgeEmployeeId)
+        {
+            employeesToProcess = employeesToProcess.Where(e => e.RequestEmployeeId == onlyBadgeEmployeeId).ToList();
+        }
+
+        foreach (var employee in employeesToProcess)
+        {
+            try
+            {
+                var d365JobCode = await _dynamics.CreateBadgeRequestAsync(request, employee, freshdeskTicketId, ct);
+                _logger.LogInformation("Created D365 EAM badge request, jobcode {D365JobCode}, for request {RequestNumber}, employee {EmployeeName}", d365JobCode, request.RequestNumber, employee.NameSnapshot);
+                await _tickets.RecordSuccessAsync(request.RequestId, TicketKind.D365Badge, employee.RequestEmployeeId, d365JobCode, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to create D365 EAM badge request for request {RequestNumber}, employee {EmployeeName}", request.RequestNumber, employee.NameSnapshot);
+                await _tickets.RecordFailureAsync(request.RequestId, TicketKind.D365Badge, employee.RequestEmployeeId, ex, ct);
+
+                var subject = $"[Cycle Emploi] Échec de création de billet D365 (badge/alarme) — demande #{request.RequestNumber} — {employee.NameSnapshot}";
+                var body =
+                    $"La demande #{request.RequestNumber} ({request.RequestType.ToFrenchLabel()}) a été soumise avec succès, " +
+                    $"mais la création du billet D365 (Enterprise Asset Management) correspondant à {employee.NameSnapshot} a échoué. Le billet devra être créé manuellement.\n\n" +
+                    "== Détails de la demande ==\n" +
+                    $"Employé: {employee.NameSnapshot}\n" +
+                    $"Demandé par: {request.CreatedByDisplayName}\n" +
+                    $"Date de soumission: {request.SubmittedAt:yyyy-MM-dd HH:mm} UTC\n\n" +
+                    "== Détails de l'erreur ==\n" +
+                    $"Type: {ex.GetType().Name}\n" +
+                    $"Message: {ex.Message}\n" +
+                    (ex.InnerException is not null ? $"Cause interne: {ex.InnerException.Message}\n" : "") +
+                    $"Survenue: {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC\n\n" +
+                    "== Étapes à vérifier ==\n" +
+                    "1. Consulter les journaux applicatifs sur vm-trm-live pour la trace complète, en recherchant le numéro de demande ci-dessus.\n" +
+                    "2. Si l'erreur mentionne \"webhook URL not configured\": l'intégration Power Automate n'a pas encore été configurée — voir la section PowerAutomate de appsettings.Production.json.\n" +
+                    "3. Si l'erreur mentionne un code HTTP 4xx/5xx du webhook: vérifier dans Power Automate (Mes flux) que le flux qui crée les billets D365 (badge/alarme) est toujours activé et n'a pas d'erreur de connexion (ex. connexion Dynamics expirée).\n" +
+                    "4. Si l'erreur indique un problème de connexion/timeout: vérifier que vm-trm-live peut atteindre prod-*.logic.azure.com (les points de terminaison Power Automate, port 443).\n" +
+                    "5. Consulter l'historique d'exécution du flux dans Power Automate pour voir si la demande a été reçue et où elle a échoué côté D365.\n" +
+                    "6. Une fois la cause corrigée, créer le billet manuellement dans D365 (Enterprise Asset Management, emplacement fonctionnel BF-SEC-GEN) avec les détails ci-dessus — les données complètes de la demande restent disponibles dans l'application Cycle Emploi.";
+
+                try
+                {
+                    await _email.SendAsync(subject, body, ct);
+                }
+                catch (Exception emailEx)
+                {
+                    _logger.LogError(emailEx, "Also failed to send the D365-failure notification email for request {RequestNumber}, employee {EmployeeName}", request.RequestNumber, employee.NameSnapshot);
+                }
+            }
+        }
+    }
+
+    /// <summary>Creates a TDX ticket (TeamDynamix, "OneIT" app) for every submitted request,
+    /// regardless of type — unlike the D365 badge/alarm integration, there's no gating condition
+    /// here. Loops per employee on the request, same as the Freshdesk child tickets and D365
+    /// integration, since a termination can target several people at once.</summary>
+    private async Task TryCreateTdxTicketAsync(Request request, AdUserInfo requester, CancellationToken ct, int? onlyRequestEmployeeId = null)
+    {
+        List<RequestEmployee> employeesToProcess = request.RequestType == RequestType.Offboarding
+            ? request.Employees.ToList()
+            : (request.Employees.FirstOrDefault(e => e.IsPrimary) ?? request.Employees.FirstOrDefault()) is { } emp
+                ? [emp]
+                : [];
+
+        // A retry targets ONE row, i.e. one employee — without this the retry would re-fire the
+        // integration for every employee on the request and duplicate the ones that had succeeded.
+        if (onlyRequestEmployeeId is { } onlyTdxEmployeeId)
+        {
+            employeesToProcess = employeesToProcess.Where(e => e.RequestEmployeeId == onlyTdxEmployeeId).ToList();
+        }
+
+        var requesterInfo = requester;
+        var requesterName = requesterInfo.DisplayName ?? request.CreatedByDisplayName;
+        var requesterEmail = requesterInfo.Email;
+
+        foreach (var employee in employeesToProcess)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(requesterEmail))
+                {
+                    throw new InvalidOperationException("Could not resolve requester email from AD.");
+                }
+
+                var tdxTicketId = await _tdx.CreateTicketAsync(request, employee, requesterName, requesterEmail, ct);
+                _logger.LogInformation("Created TDX ticket {TdxTicketId} for request {RequestNumber}, employee {EmployeeName}", tdxTicketId, request.RequestNumber, employee.NameSnapshot);
+                await _tickets.RecordSuccessAsync(request.RequestId, TicketKind.Tdx, employee.RequestEmployeeId, tdxTicketId.ToString(), ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to create TDX ticket for request {RequestNumber}, employee {EmployeeName}", request.RequestNumber, employee.NameSnapshot);
+                await _tickets.RecordFailureAsync(request.RequestId, TicketKind.Tdx, employee.RequestEmployeeId, ex, ct);
+
+                var subject = $"[Cycle Emploi] Échec de création de billet TDX — demande #{request.RequestNumber} — {employee.NameSnapshot}";
+                var body =
+                    $"La demande #{request.RequestNumber} ({request.RequestType.ToFrenchLabel()}) a été soumise avec succès, " +
+                    $"mais la création du billet TDX correspondant à {employee.NameSnapshot} a échoué. Le billet devra être créé manuellement.\n\n" +
+                    "== Détails de la demande ==\n" +
+                    $"Employé: {employee.NameSnapshot}\n" +
+                    $"Demandé par: {request.CreatedByDisplayName}\n" +
+                    $"Date de soumission: {request.SubmittedAt:yyyy-MM-dd HH:mm} UTC\n\n" +
+                    "== Détails de l'erreur ==\n" +
+                    $"Type: {ex.GetType().Name}\n" +
+                    $"Message: {ex.Message}\n" +
+                    (ex.InnerException is not null ? $"Cause interne: {ex.InnerException.Message}\n" : "") +
+                    $"Survenue: {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC\n\n" +
+                    "== Étapes à vérifier ==\n" +
+                    "1. Consulter les journaux applicatifs sur vm-trm-live pour la trace complète, en recherchant le numéro de demande ci-dessus.\n" +
+                    "2. Si l'erreur mentionne \"TDX username/password not configured\": l'intégration TDX n'a pas encore été configurée — voir la section Tdx de appsettings.Production.json.\n" +
+                    "3. Si l'erreur mentionne un code HTTP 401 sur /api/auth: le mot de passe du compte de service TDX a peut-être expiré ou été changé.\n" +
+                    "4. Si l'erreur mentionne \"returned no match\" sur la recherche du demandeur: le compte AD du demandeur n'a pas d'adresse courriel valide, ou cette adresse n'existe pas dans TDX — vérifier l'attribut mail dans Active Directory.\n" +
+                    "5. Si l'erreur indique un problème de connexion/timeout: vérifier que vm-trm-live peut atteindre https://get.alterra.support (port 443).\n" +
+                    "6. Une fois la cause corrigée, créer le billet manuellement dans TDX (application OneIT, formulaire Quick Incident, groupe IT Operations) avec les détails ci-dessus — les données complètes de la demande restent disponibles dans l'application Cycle Emploi.";
+
+                try
+                {
+                    await _email.SendAsync(subject, body, ct);
+                }
+                catch (Exception emailEx)
+                {
+                    _logger.LogError(emailEx, "Also failed to send the TDX-failure notification email for request {RequestNumber}, employee {EmployeeName}", request.RequestNumber, employee.NameSnapshot);
+                }
+            }
+        }
+    }
+
+    /// <summary>Creates a TDX ticket on the "D365 - Access" form (FormID 10799) when "Accès D365"
+    /// was selected — Onboarding/Réactivation only, for the primary employee, same gating pattern as
+    /// the badge/alarm D365 integration. Looks up the employee's job code in D365JobCodeTemplate for
+    /// the roles/legal entity/approval limit/etc. answers; if no template has been filled out yet for
+    /// that job code, fails open (email notifies IT to fill it in and create the ticket by hand)
+    /// rather than blocking the submission or guessing at values.</summary>
+    private async Task TryCreateD365AccessTicketAsync(Request request, AdUserInfo requester, CancellationToken ct, int? onlyRequestEmployeeId = null)
+    {
+        if (request.RequestType == RequestType.Offboarding) return;
+
+        var systemes = (request.AccessDetail?.Systemes.Select(s => s.Value) ?? []).ToList();
+        if (!systemes.Contains(AccesD365SystemeValue)) return;
+
+        var employee = request.Employees.FirstOrDefault(e => e.IsPrimary) ?? request.Employees.FirstOrDefault();
+        if (employee is null) return;
+        if (onlyRequestEmployeeId is { } onlyAccessEmployeeId && employee.RequestEmployeeId != onlyAccessEmployeeId) return;
+
+        try
+        {
+            var requesterInfo = requester;
+            var requesterName = requesterInfo.DisplayName ?? request.CreatedByDisplayName;
+            var requesterEmail = requesterInfo.Email;
+            if (string.IsNullOrWhiteSpace(requesterEmail))
+            {
+                throw new InvalidOperationException("Could not resolve requester email from AD.");
+            }
+
+            var workdayInfo = await _workday.WorkdayDemographics
+                .Where(w => w.EmployeeId == employee.WorkdayEmployeeId && w.PrimaryJob == true)
+                .Select(w => new { w.JobCode, w.PositionTitle, w.WorkEmail, w.Email, w.ManagerId, w.Manager })
+                .FirstOrDefaultAsync(ct);
+            if (workdayInfo is null)
+            {
+                throw new InvalidOperationException($"No active Workday record found for employee {employee.WorkdayEmployeeId}.");
+            }
+
+            var jobCode = workdayInfo.JobCode ?? employee.CodeEmploiSnapshot;
+            if (string.IsNullOrWhiteSpace(jobCode))
+            {
+                throw new InvalidOperationException("Employee has no job code — cannot look up their D365 access template.");
+            }
+
+            var template = await _db.D365JobCodeTemplates
+                .Include(t => t.Roles)
+                .FirstOrDefaultAsync(t => t.JobCode == jobCode, ct);
+            if (template is null)
+            {
+                throw new InvalidOperationException(
+                    $"No D365 access template has been filled out yet for job code {jobCode} — see Formulaires D365 par code d'emploi.");
+            }
+
+            var employeeEmail = workdayInfo.WorkEmail ?? workdayInfo.Email;
+            if (string.IsNullOrWhiteSpace(employeeEmail))
+            {
+                throw new InvalidOperationException("Employee has no email address on file in Workday.");
+            }
+
+            var managerName = workdayInfo.Manager;
+            if (!string.IsNullOrWhiteSpace(workdayInfo.ManagerId))
+            {
+                var manager = await _workday.WorkdayDemographics
+                    .Where(w => w.EmployeeId == workdayInfo.ManagerId && w.PrimaryJob == true)
+                    .Select(w => new { w.FirstName, w.PreferredFirstName, w.LastName })
+                    .FirstOrDefaultAsync(ct);
+                if (manager is not null)
+                {
+                    managerName = $"{manager.PreferredFirstName ?? manager.FirstName} {manager.LastName}";
+                }
+            }
+
+            var input = new D365AccessTicketInput(
+                RequesterName: requesterName,
+                RequesterEmail: requesterEmail,
+                EmployeeName: employee.NameSnapshot,
+                EmployeeEmail: employeeEmail,
+                JobTitle: template.JobTitleEnglish,
+                LegalEntity: template.LegalEntity,
+                DepartmentNumber: template.DepartmentNumber,
+                LevyEmployee: template.LevyEmployee,
+                ManagerName: managerName,
+                StartDate: request.OnboardingDetail?.DateEntreePrevue,
+                Roles: template.Roles.Select(r => r.Role).ToList(),
+                ApprovalLimit: template.ApprovalLimit,
+                ApAccessDetails: template.ApAccessDetails,
+                AdditionalLegalEntities: template.AdditionalLegalEntities);
+
+            var ticketId = await _tdx.CreateD365AccessTicketAsync(input, ct);
+            _logger.LogInformation("Created D365 Access TDX ticket {TicketId} for request {RequestNumber}, employee {EmployeeName}", ticketId, request.RequestNumber, employee.NameSnapshot);
+            await _tickets.RecordSuccessAsync(request.RequestId, TicketKind.D365Access, employee.RequestEmployeeId, ticketId.ToString(), ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create D365 Access TDX ticket for request {RequestNumber}, employee {EmployeeName}", request.RequestNumber, employee.NameSnapshot);
+            await _tickets.RecordFailureAsync(request.RequestId, TicketKind.D365Access, employee.RequestEmployeeId, ex, ct);
+
+            var subject = $"[Cycle Emploi] Échec de création de billet TDX D365 Access — demande #{request.RequestNumber} — {employee.NameSnapshot}";
+            var body =
+                $"La demande #{request.RequestNumber} ({request.RequestType.ToFrenchLabel()}) a été soumise avec succès, " +
+                $"mais la création automatique du billet TDX « D365 - Access » pour {employee.NameSnapshot} a échoué. Le billet devra être créé manuellement.\n\n" +
+                "== Détails de la demande ==\n" +
+                $"Employé: {employee.NameSnapshot}\n" +
+                $"Code d'emploi: {employee.CodeEmploiSnapshot}\n" +
+                $"Demandé par: {request.CreatedByDisplayName}\n" +
+                $"Date de soumission: {request.SubmittedAt:yyyy-MM-dd HH:mm} UTC\n\n" +
+                "== Détails de l'erreur ==\n" +
+                $"Type: {ex.GetType().Name}\n" +
+                $"Message: {ex.Message}\n" +
+                (ex.InnerException is not null ? $"Cause interne: {ex.InnerException.Message}\n" : "") +
+                $"Survenue: {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC\n\n" +
+                "== Étapes à vérifier ==\n" +
+                "1. Si l'erreur mentionne « No D365 access template has been filled out »: remplir le formulaire D365 pour ce code d'emploi dans Formulaires D365 par code d'emploi, puis créer le billet TDX manuellement pour cette demande (il ne sera pas recréé automatiquement après coup).\n" +
+                "2. Si l'erreur mentionne « No active Workday record » ou « no email address »: vérifier les données Workday de l'employé.\n" +
+                "3. Consulter les journaux applicatifs sur vm-trm-live pour la trace complète, en recherchant le numéro de demande ci-dessus.\n" +
+                "4. Une fois la cause corrigée, créer le billet manuellement dans TDX (application OneIT, formulaire D365 - Access) avec les détails ci-dessus.";
+
+            try
+            {
+                await _email.SendAsync(subject, body, ct);
+            }
+            catch (Exception emailEx)
+            {
+                _logger.LogError(emailEx, "Also failed to send the D365-Access-ticket-failure notification email for request {RequestNumber}, employee {EmployeeName}", request.RequestNumber, employee.NameSnapshot);
+            }
+        }
+    }
+}
