@@ -17,7 +17,11 @@ cd Cycleemploi
 
 ## SQL Server access (for local dev)
 
-Local dev connects to the *real* `vm-trm-sql1` server (there's no local/mock database) — `appsettings.json`'s connection strings use `Trusted_Connection=True`, so it's your own Windows/AD login that needs the grant below, not a password to configure anywhere.
+Local dev connects to the *real* `vm-trm-sql1` server (there's no local/mock database) — the connection strings use `Trusted_Connection=True`, so it's your own Windows/AD login that needs the grant below, not a password to configure anywhere.
+
+**Dev and prod are separate databases — since 2026-08-27.** `appsettings.Development.json` points `AppDb` at **`EmployeeLifecycleDev`**; production uses `EmployeeLifecycle` from `appsettings.json`. Before that they were the same database, which meant `dotnet ef database update` run from *any* machine was a production schema change, and there was nowhere to test a migration before it hit real requests. Run migrations against dev first — always. `WorkdayDb` still points at the real `Redingote` in both, because it is read-only and externally managed (hourly Workday sync); there is nothing there for us to break.
+
+`EmployeeLifecycleDev` was created with the same `French_CI_AS` collation as prod on purpose. A collation mismatch between dev and prod produces string-comparison and sorting differences that pass every local test and only surface in production.
 
 Ask whoever has `sysadmin` on `vm-trm-sql1` to run this (swap in your real domain username):
 
@@ -74,11 +78,20 @@ There's no CI/CD pipeline yet — deploys are manual, onto `vm-trm-live` (needs 
    ```
    Stop the `TremblantOnboardingApi` IIS app pool, copy the publish output to `\\vm-trm-live\C$\inetpub\wwwroot\TremblantOnboardingApi`, restart the app pool.
 
-3. **Database schema changes**: if you added an EF Core migration —
+3. **Database schema changes**: if you added an EF Core migration, apply it to **dev first** and only then to prod.
+
+   Dev (safe, this is the default environment locally):
    ```bash
-   dotnet ef database update --context AppDbContext
+   ASPNETCORE_ENVIRONMENT=Development dotnet ef database update --context AppDbContext
    ```
-   against `vm-trm-sql1` (needs a build, so can't run while the API's IIS app pool has the output locked — stop it first).
+
+   Prod — deliberate, and only after it has been proven on dev:
+   ```bash
+   ASPNETCORE_ENVIRONMENT=Production dotnet ef database update --context AppDbContext
+   ```
+   Needs a build, so it can't run while the API's IIS app pool has the output locked — stop the pool first. Take a database backup before any migration that drops or alters an existing column; several requests' worth of data lives in there and `Down()` is not a substitute for a backup.
+
+   Scaffolded migrations are a starting point, not a finished artifact. Read the generated `Up()` before running it: EF adds new non-nullable columns with a `defaultValue` and then creates indexes over them, which fails outright on a table that already has rows (and silently produces meaningless data when it doesn't fail). Back-fill explicitly, and prefer a `THROW` over letting a migration quietly produce rows that no longer match anyone.
 
 Sites are separate IIS sites (not nested), each with Windows Auth (NTLM only — Kerberos/Negotiate was dropped because there's no SPN registered for these non-standard ports) and CORS between them. If you touch the auth or CORS setup, read `Program.cs`'s comments first — there's a lot of hard-won context there about why it's structured the way it is.
 
