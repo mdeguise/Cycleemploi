@@ -120,6 +120,16 @@ public class MeDto
     public string DisplayName { get; set; } = null!;
     public string? Email { get; set; }
     public bool IsHr { get; set; }
+
+    /// <summary>"Admin", "Lecteur", or null when the caller has no Administration access at all.</summary>
+    public string? AdminRole { get; set; }
+
+    /// <summary>Full Administration rights: retry ticket creation, edit ticket templates, manage app
+    /// users. A Lecteur gets the Administration section read-only, so this is false for them.</summary>
+    public bool IsAppAdmin { get; set; }
+
+    /// <summary>Deprecated alias for <see cref="IsAppAdmin"/>, kept so the existing frontend guards
+    /// keep working while the UI migrates to IsAppAdmin/AdminRole. Remove once nothing reads it.</summary>
     public bool IsTicketTemplateAdmin { get; set; }
 }
 

@@ -1,6 +1,8 @@
 import type { ApiClient } from './client';
 import type {
+  AdAccountDto,
   AppUserDto,
+  AppUserRole,
   CatalogsDto,
   CreateAppUserDto,
   CreateD365SecurityRoleMappingDto,
@@ -80,6 +82,10 @@ export function createApi(client: ApiClient) {
       list: () => client.get<AppUserDto[]>('/api/app-users'),
       add: (dto: CreateAppUserDto) => client.post<AppUserDto>('/api/app-users', dto),
       remove: (id: number) => client.delete<void>(`/api/app-users/${id}`),
+      updateRole: (id: number, role: AppUserRole) =>
+        client.put<AppUserDto>(`/api/app-users/${id}/role`, { role }),
+      adSearch: (q: string) =>
+        client.get<AdAccountDto[]>(`/api/app-users/ad-search?q=${encodeURIComponent(q)}`),
     },
   };
 }

@@ -284,15 +284,30 @@ export interface BlockTemplateContent {
 
 // --- App users / Ticket Template admins ---
 
+export type AppUserRole = 'Admin' | 'Lecteur';
+
 export interface AppUserDto {
   appUserId: number;
-  email: string;
+  /** Bare sAMAccountName — the authorization key (domain-agnostic, survives the ENTERPRISE migration). */
+  sam: string;
   displayName: string;
+  /** Informational only; null for admin (*_adm) accounts, which have no AD mail attribute. */
+  email?: string | null;
+  role: AppUserRole;
   createdAt: string;
   createdByDisplayName?: string | null;
 }
 
 export interface CreateAppUserDto {
-  email: string;
+  sam: string;
   displayName: string;
+  email?: string | null;
+  role: AppUserRole;
+}
+
+/** One hit from the AD people search behind the "add a user" picker. */
+export interface AdAccountDto {
+  sam: string;
+  displayName: string;
+  email?: string | null;
 }

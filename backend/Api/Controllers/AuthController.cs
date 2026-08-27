@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using TremblantLifecycle.Api.Models.Dtos;
+using TremblantLifecycle.Api.Models.Entities;
 using TremblantLifecycle.Api.Services;
 
 namespace TremblantLifecycle.Api.Controllers;
@@ -33,7 +34,10 @@ public class AuthController : ControllerBase
         var sam = User.GetSamAccountName();
         var info = _ad.GetUserInfo(sam);
         var isHr = _ad.IsUserInGroup(sam, _hrGroupOptions.TrmRhAdmGroupName);
-        var isTicketTemplateAdmin = await _appUsers.IsAdminAsync(info.Email, ct);
+
+        // Resolved from the Windows identity, NOT from info.Email — admin (*_adm) accounts have no
+        // `mail` attribute in AD, so an email-keyed lookup silently denied them every time.
+        var role = await _appUsers.GetRoleAsync(accountName, ct);
 
         return Ok(new MeDto
         {
@@ -41,7 +45,9 @@ public class AuthController : ControllerBase
             DisplayName = info.DisplayName ?? accountName,
             Email = info.Email,
             IsHr = isHr,
-            IsTicketTemplateAdmin = isTicketTemplateAdmin
+            AdminRole = role?.ToString(),
+            IsAppAdmin = role == AppUserRole.Admin,
+            IsTicketTemplateAdmin = role == AppUserRole.Admin
         });
     }
 
