@@ -22,7 +22,7 @@ public class EmployeesController : ControllerBase
     /// employees (Employment_Status != "Terminated" — NOT == "Active", since "Inactive" covers
     /// on-leave/layoff, which the business treats as active for this app — see the
     /// WorkdayDemographic entity's doc comment) and collapsed to one row per employee via
-    /// PrimaryJob == 1. TODO: confirm the "!= Terminated" business rule with HR/the business owner
+    /// PrimaryJob == true. TODO: confirm the "!= Terminated" business rule with HR/the business owner
     /// before launch — it's what the data and the app's own "seuls les employés actifs" notice
     /// text both point to, but wasn't explicitly re-confirmed after the schema discovery.</summary>
     [HttpGet("search")]
@@ -36,7 +36,7 @@ public class EmployeesController : ControllerBase
         var terms = q.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
         var query = _workday.WorkdayDemographics
-            .Where(e => e.PrimaryJob == 1 && e.EmploymentStatus != "Terminated");
+            .Where(e => e.PrimaryJob == true && e.EmploymentStatus != "Terminated");
 
         if (terms.Length <= 1)
         {
@@ -82,7 +82,7 @@ public class EmployeesController : ControllerBase
     public async Task<ActionResult<EmployeeDto>> GetById(string workdayId, CancellationToken ct)
     {
         var employee = await _workday.WorkdayDemographics
-            .Where(e => e.EmployeeId == workdayId && e.PrimaryJob == 1)
+            .Where(e => e.EmployeeId == workdayId && e.PrimaryJob == true)
             .Select(e => new EmployeeDto
             {
                 EmployeeId = e.EmployeeId,

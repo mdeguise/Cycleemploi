@@ -29,7 +29,7 @@ public class D365JobCodeTemplatesController : ControllerBase
     private async Task<Dictionary<string, string?>> GetPositionTitlesByJobCode(CancellationToken ct)
     {
         return await _workday.WorkdayDemographics
-            .Where(w => w.PrimaryJob == 1 && w.JobCode != null)
+            .Where(w => w.PrimaryJob == true && w.JobCode != null)
             .GroupBy(w => w.JobCode!)
             .Select(g => new { JobCode = g.Key, PositionTitle = g.First().PositionTitle })
             .ToDictionaryAsync(x => x.JobCode, x => x.PositionTitle, ct);

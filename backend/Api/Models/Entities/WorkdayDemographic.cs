@@ -48,8 +48,11 @@ public class WorkdayDemographic
     public string? WorkEmail { get; set; }
     public string? Email { get; set; }
 
-    /// <summary>1 when this row is the employee's primary job assignment. Employee search/selection
-    /// must filter to PrimaryJob == 1 (or otherwise collapse to one row per Employee_ID) — this table
-    /// has multiple rows per employee when someone holds concurrent positions.</summary>
-    public int? PrimaryJob { get; set; }
+    /// <summary>True when this row is the employee's primary job assignment. Employee search/selection
+    /// must filter to PrimaryJob == true (or otherwise collapse to one row per Employee_ID) — this table
+    /// has multiple rows per employee when someone holds concurrent positions.
+    /// Confirmed against real data as a bit column (like ActiveStatus), NOT an int: modelling it as
+    /// int? still filtered correctly, because EF translates the comparison to SQL server-side, but
+    /// threw InvalidCastException (Boolean -> Int32) the moment the full entity was materialized.</summary>
+    public bool? PrimaryJob { get; set; }
 }

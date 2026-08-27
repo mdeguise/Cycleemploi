@@ -16,7 +16,7 @@ public class EmployeeFieldsService : IEmployeeFieldsService
     public async Task<Dictionary<string, string?>> ResolveAsync(RequestEmployee employee, CancellationToken ct)
     {
         var wd = await _workday.WorkdayDemographics
-            .Where(w => w.EmployeeId == employee.WorkdayEmployeeId && w.PrimaryJob == 1)
+            .Where(w => w.EmployeeId == employee.WorkdayEmployeeId && w.PrimaryJob == true)
             .FirstOrDefaultAsync(ct);
 
         // Every distinct job code the employee has ever held (not just the current/primary one) —

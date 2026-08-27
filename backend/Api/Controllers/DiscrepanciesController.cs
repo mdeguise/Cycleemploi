@@ -92,7 +92,7 @@ public class DiscrepanciesController : ControllerBase
 
         // Workday employment status for the linked D365 users (by EmployeeId).
         var wdByEmp = (await _workday.WorkdayDemographics
-                .Where(w => w.PrimaryJob == 1 && d365EmpIds.Contains(w.EmployeeId))
+                .Where(w => w.PrimaryJob == true && d365EmpIds.Contains(w.EmployeeId))
                 .Select(w => new { w.EmployeeId, w.EmploymentStatus })
                 .ToListAsync(ct))
             .GroupBy(w => w.EmployeeId)
@@ -111,7 +111,7 @@ public class DiscrepanciesController : ControllerBase
         var wdByEmail = unlinkedEmails.Count == 0
             ? new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
             : (await _workday.WorkdayDemographics
-                    .Where(w => w.PrimaryJob == 1 && w.WorkEmail != null && unlinkedEmails.Contains(w.WorkEmail))
+                    .Where(w => w.PrimaryJob == true && w.WorkEmail != null && unlinkedEmails.Contains(w.WorkEmail))
                     .Select(w => new { w.WorkEmail, w.EmploymentStatus })
                     .ToListAsync(ct))
                 .GroupBy(w => w.WorkEmail!, StringComparer.OrdinalIgnoreCase)

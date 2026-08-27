@@ -2,7 +2,7 @@ namespace TremblantLifecycle.Api.Models.Dtos;
 
 /// <summary>Shape returned by employee search/lookup — mirrors src/types.ts's
 /// EmployeeDirectoryEntry on the frontend. Sourced from WorkdayDemographic, filtered to
-/// PrimaryJob == 1 and EmploymentStatus != "Terminated" (see WorkdayDemographic entity doc comment
+/// PrimaryJob == true and EmploymentStatus != "Terminated" (see WorkdayDemographic entity doc comment
 /// for why not simply == "Active").</summary>
 public class EmployeeDto
 {

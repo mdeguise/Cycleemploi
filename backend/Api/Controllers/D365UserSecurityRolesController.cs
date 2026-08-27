@@ -56,7 +56,7 @@ public class D365UserSecurityRolesController : ControllerBase
         if (row is null) return NotFound();
 
         var employee = await _workday.WorkdayDemographics
-            .Where(w => w.EmployeeId == dto.EmployeeId && w.PrimaryJob == 1)
+            .Where(w => w.EmployeeId == dto.EmployeeId && w.PrimaryJob == true)
             .Select(w => new { w.EmployeeId, w.JobCode, w.PositionTitle })
             .FirstOrDefaultAsync(ct);
         if (employee is null)

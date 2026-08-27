@@ -11,7 +11,7 @@ public class D365UserSecurityRoleDto
 }
 
 /// <summary>Linking a row to the correct employee only requires the EmployeeId — JobCode and
-/// PositionTitle are re-resolved from WorkdayDemographic server-side (PrimaryJob == 1) rather than
+/// PositionTitle are re-resolved from WorkdayDemographic server-side (PrimaryJob == true) rather than
 /// accepted from the client, so they always reflect Workday's actual current data.</summary>
 public class LinkD365UserSecurityRoleDto
 {
