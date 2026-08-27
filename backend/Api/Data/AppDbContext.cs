@@ -31,12 +31,14 @@ public class AppDbContext : DbContext
     public DbSet<D365JobCodeTemplateRole> D365JobCodeTemplateRoles => Set<D365JobCodeTemplateRole>();
     public DbSet<AppUser> AppUsers => Set<AppUser>();
     public DbSet<TicketTemplate> TicketTemplates => Set<TicketTemplate>();
+    public DbSet<RequestTicket> RequestTickets => Set<RequestTicket>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Request>(entity =>
         {
             entity.HasIndex(r => r.RequestNumber).IsUnique();
+            entity.Property(r => r.RequesterEmail).HasMaxLength(200);
             entity.Property(r => r.RequestType).HasConversion<string>().HasMaxLength(20);
             entity.Property(r => r.Status).HasConversion<string>().HasMaxLength(20);
         });
@@ -152,6 +154,41 @@ public class AppDbContext : DbContext
             entity.HasOne(m => m.D365JobCodeTemplate).WithMany(t => t.Roles)
                 .HasForeignKey(m => m.D365JobCodeTemplateId).OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(m => new { m.D365JobCodeTemplateId, m.Role }).IsUnique();
+        });
+
+        modelBuilder.Entity<RequestTicket>(entity =>
+        {
+            entity.Property(t => t.Kind).HasConversion<string>().HasMaxLength(40);
+            entity.Property(t => t.Outcome).HasConversion<string>().HasMaxLength(20);
+            entity.Property(t => t.TicketNumber).HasMaxLength(100);
+            entity.Property(t => t.ErrorType).HasMaxLength(200);
+            entity.Property(t => t.ErrorMessage).HasMaxLength(2000);
+
+            entity.HasOne(t => t.Request)
+                .WithMany()
+                .HasForeignKey(t => t.RequestId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // NoAction, not Cascade: SQL Server refuses multiple cascade paths to the same table, and
+            // Request already cascades here. Rows are cleaned up via the Request cascade anyway.
+            entity.HasOne(t => t.RequestEmployee)
+                .WithMany()
+                .HasForeignKey(t => t.RequestEmployeeId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            // One row per (request, kind, employee). This is what makes recording an outcome an
+            // upsert and therefore makes retry idempotent — a retry can never create a second
+            // ticket for the same slot.
+            //
+            // HasFilter(null) is essential, not cosmetic. EF Core defaults a unique index over a
+            // NULLABLE column to "WHERE [RequestEmployeeId] IS NOT NULL", which would exclude every
+            // request-level row (the Freshdesk parent and its two children all have a null
+            // RequestEmployeeId) from the uniqueness guarantee — precisely the rows it is meant to
+            // protect. Clearing the filter restores plain SQL Server semantics, where NULLs compare
+            // equal in a unique index, so those kinds are genuinely limited to one row per request.
+            entity.HasIndex(t => new { t.RequestId, t.Kind, t.RequestEmployeeId })
+                .IsUnique()
+                .HasFilter(null);
         });
 
         modelBuilder.Entity<AppUser>(entity =>
