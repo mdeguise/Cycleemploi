@@ -379,3 +379,38 @@ export interface AdminRequestDetailDto {
   canRetry: boolean;
   tickets: RequestTicketDto[];
 }
+
+/** 'Open' | 'Closed' | 'Unknown'. Unknown means the source system could not be reached — kept
+ *  distinct from Closed on purpose, since reporting an unreachable ticket as closed is the kind of
+ *  wrong answer someone acts on. */
+export type LiveTicketState = 'Open' | 'Closed' | 'Unknown';
+
+export interface TicketRefDto {
+  requestTicketId: number;
+  ticketNumber: string;
+  state: LiveTicketState;
+  /** The source system's own wording ("En attente", "In Process"), when it gave one. */
+  stateLabel?: string | null;
+  employeeName?: string | null;
+}
+
+export interface TicketViewRowDto {
+  requestId: number;
+  requestNumber: string;
+  requestType: RequestTypeApi;
+  status: RequestStatusApi;
+  submittedAt?: string | null;
+  employeeNames: string[];
+  freshdesk: TicketRefDto[];
+  tdx: TicketRefDto[];
+  failedCount: number;
+}
+
+export interface TicketViewDto {
+  total: number;
+  page: number;
+  pageSize: number;
+  items: TicketViewRowDto[];
+  /** True when at least one live-status lookup failed, so the UI can say so rather than show blanks. */
+  hasUnknownStatuses: boolean;
+}

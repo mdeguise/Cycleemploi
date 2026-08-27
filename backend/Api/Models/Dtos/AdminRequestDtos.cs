@@ -95,3 +95,53 @@ public class AdminRequestDetailDto
 
     public List<RequestTicketDto> Tickets { get; set; } = [];
 }
+
+/// <summary>One ticket in the flat list view: its number plus its CURRENT state in the source
+/// system. State is "Open" / "Closed" / "Unknown" — Unknown means the lookup failed or timed out,
+/// deliberately distinct from Closed, because reporting an unreachable ticket as closed is the kind
+/// of wrong answer someone acts on.</summary>
+public class TicketRefDto
+{
+    public int RequestTicketId { get; set; }
+    public string TicketNumber { get; set; } = null!;
+
+    /// <summary>"Open" | "Closed" | "Unknown".</summary>
+    public string State { get; set; } = null!;
+
+    /// <summary>The source system's own wording ("En attente", "In Process"), when it gave one.</summary>
+    public string? StateLabel { get; set; }
+
+    /// <summary>Null for the request-level Freshdesk tickets.</summary>
+    public string? EmployeeName { get; set; }
+}
+
+/// <summary>One row of the flat list: request number, employees, and every Freshdesk and TDX ticket
+/// it produced with each ticket's live status.</summary>
+public class TicketViewRowDto
+{
+    public int RequestId { get; set; }
+    public string RequestNumber { get; set; } = null!;
+    public string RequestType { get; set; } = null!;
+    public string Status { get; set; } = null!;
+    public DateTime? SubmittedAt { get; set; }
+    public List<string> EmployeeNames { get; set; } = [];
+
+    public List<TicketRefDto> Freshdesk { get; set; } = [];
+    public List<TicketRefDto> Tdx { get; set; } = [];
+
+    /// <summary>Tickets whose creation FAILED, so the row can show that a number is missing rather
+    /// than simply showing fewer tickets than expected.</summary>
+    public int FailedCount { get; set; }
+}
+
+public class TicketViewDto
+{
+    public int Total { get; set; }
+    public int Page { get; set; }
+    public int PageSize { get; set; }
+    public List<TicketViewRowDto> Items { get; set; } = [];
+
+    /// <summary>True when at least one live-status lookup came back Unknown, so the UI can say the
+    /// source system was unreachable instead of silently showing blanks.</summary>
+    public bool HasUnknownStatuses { get; set; }
+}

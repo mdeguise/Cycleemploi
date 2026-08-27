@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Caching.Memory;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
 using TremblantLifecycle.Api.Models.Entities;
@@ -33,13 +34,15 @@ public class TdxService : ITdxService
     private readonly TdxOptions _options;
     private readonly ITicketTemplateService _templates;
     private readonly IEmployeeFieldsService _employeeFields;
+    private readonly IMemoryCache _cache;
 
-    public TdxService(HttpClient http, IOptions<TdxOptions> options, ITicketTemplateService templates, IEmployeeFieldsService employeeFields)
+    public TdxService(HttpClient http, IOptions<TdxOptions> options, ITicketTemplateService templates, IEmployeeFieldsService employeeFields, IMemoryCache cache)
     {
         _http = http;
         _options = options.Value;
         _templates = templates;
         _employeeFields = employeeFields;
+        _cache = cache;
     }
 
     public async Task<int> CreateTicketAsync(Request request, RequestEmployee employee, string requesterName, string requesterEmail, CancellationToken ct)
@@ -246,7 +249,59 @@ public class TdxService : ITdxService
         return doc.RootElement.GetProperty("ID").GetInt32();
     }
 
+    private const string TokenCacheKey = "tdx:auth-token";
+
+    /// <summary>Cached for 20 minutes. Without this, listing N tickets means N auth round-trips —
+    /// TDX issues a fresh JWT per call and the list view would spend most of its time authenticating.
+    /// Well inside TDX's own token lifetime, and a stale token simply fails the one call that used
+    /// it rather than corrupting anything.</summary>
     private async Task<string> GetTokenAsync(CancellationToken ct)
+    {
+        if (_cache.TryGetValue<string>(TokenCacheKey, out var cached) && !string.IsNullOrEmpty(cached))
+        {
+            return cached;
+        }
+
+        var fresh = await FetchTokenAsync(ct);
+        _cache.Set(TokenCacheKey, fresh, TimeSpan.FromMinutes(20));
+        return fresh;
+    }
+
+    /// <summary>TDX StatusClass, per its API: 1 New, 2 InProcess, 5 OnHold are all still live work;
+    /// 3 Completed and 4 Cancelled are done. StatusName is the instance's own wording, shown as-is so
+    /// the screen reflects what TDX says rather than only our two-way summary.</summary>
+    public async Task<LiveTicketStatus> GetTicketStatusAsync(int ticketId, CancellationToken ct)
+    {
+        try
+        {
+            var token = await GetTokenAsync(ct);
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Get, $"{_options.BaseUrl}/api/{_options.AppId}/tickets/{ticketId}");
+            requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            using var response = await _http.SendAsync(requestMessage, ct);
+            if (!response.IsSuccessStatusCode) return LiveTicketStatus.Unknown;
+
+            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+            var root = doc.RootElement;
+            var label = root.TryGetProperty("StatusName", out var nameEl) ? nameEl.GetString() : null;
+
+            if (!root.TryGetProperty("StatusClass", out var classEl)) return LiveTicketStatus.Unknown;
+
+            return classEl.GetInt32() switch
+            {
+                1 or 2 or 5 => new LiveTicketStatus(LiveTicketState.Open, label ?? "Ouvert"),
+                3 or 4 => new LiveTicketStatus(LiveTicketState.Closed, label ?? "Fermé"),
+                _ => LiveTicketStatus.Unknown
+            };
+        }
+        catch
+        {
+            // Never throws by contract — see ITdxService.
+            return LiveTicketStatus.Unknown;
+        }
+    }
+
+    private async Task<string> FetchTokenAsync(CancellationToken ct)
     {
         using var response = await _http.PostAsJsonAsync($"{_options.BaseUrl}/api/auth", new
         {

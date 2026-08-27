@@ -4,7 +4,9 @@ import type {
   AdminRequestDetailDto,
   AdminRequestSummaryDto,
   RequestTicketDto,
+  TicketViewRowDto,
 } from '../api/types';
+import { TicketsTableView } from './TicketsTableView';
 
 const STATUS_LABELS: Record<string, string> = {
   Brouillon: 'Brouillon',
@@ -119,6 +121,12 @@ export function RequestsAdminPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  // 'tableau' is the default: the operational question is "what are the ticket numbers and which
+  // are still open", which the flat table answers at a glance. 'detail' is for reading one request.
+  const [view, setView] = useState<'tableau' | 'detail'>('tableau');
+  const [ticketRows, setTicketRows] = useState<TicketViewRowDto[]>([]);
+  const [hasUnknownStatuses, setHasUnknownStatuses] = useState(false);
+
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [detail, setDetail] = useState<AdminRequestDetailDto | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
@@ -128,15 +136,26 @@ export function RequestsAdminPage() {
   const loadList = useCallback(() => {
     setIsLoading(true);
     setLoadError(null);
-    api.adminRequests
-      .list({ q, status, requestType, onlyFailures, page, pageSize })
-      .then((res) => {
-        setItems(res.items);
-        setTotal(res.total);
-      })
+    const params = { q, status, requestType, onlyFailures, page, pageSize };
+
+    // The table view costs outbound calls to Freshdesk/TDX for live status, so it is only fetched
+    // when that view is actually on screen.
+    const work =
+      view === 'tableau'
+        ? api.adminRequests.ticketView(params).then((res) => {
+            setTicketRows(res.items);
+            setHasUnknownStatuses(res.hasUnknownStatuses);
+            setTotal(res.total);
+          })
+        : api.adminRequests.list(params).then((res) => {
+            setItems(res.items);
+            setTotal(res.total);
+          });
+
+    work
       .catch((err) => setLoadError(err instanceof Error ? err.message : 'Erreur inconnue'))
       .finally(() => setIsLoading(false));
-  }, [api, q, status, requestType, onlyFailures, page]);
+  }, [api, q, status, requestType, onlyFailures, page, view]);
 
   // Debounced so typing in the search box doesn't fire a request per keystroke.
   useEffect(() => {
@@ -249,6 +268,23 @@ export function RequestsAdminPage() {
           />
           Seulement les demandes avec un billet en échec
         </label>
+        <div style={{ display: 'flex', gap: 4, paddingBottom: 8 }}>
+          <button
+            type="button"
+            className={view === 'tableau' ? 'btn btn-primary' : 'btn btn-secondary'}
+            onClick={() => setView('tableau')}
+          >
+            Vue tableau
+          </button>
+          <button
+            type="button"
+            className={view === 'detail' ? 'btn btn-primary' : 'btn btn-secondary'}
+            onClick={() => setView('detail')}
+          >
+            Vue détaillée
+          </button>
+        </div>
+
         <div style={{ paddingBottom: 8, color: 'var(--muted, #666)', fontSize: 13 }}>
           {total} demande{total > 1 ? 's' : ''}
           {failuresInView > 0 && ` — ${failuresInView} billet(s) en échec sur cette page`}
@@ -257,7 +293,23 @@ export function RequestsAdminPage() {
 
       {loadError && <div className="big-notice">{loadError}</div>}
 
+      {view === 'tableau' && (
+        isLoading ? (
+          <div style={{ padding: 12 }}>Chargement… (statuts récupérés depuis Freshdesk et TDX)</div>
+        ) : (
+          <TicketsTableView
+            rows={ticketRows}
+            hasUnknownStatuses={hasUnknownStatuses}
+            onSelect={(id) => {
+              setSelectedId(id);
+              setView('detail');
+            }}
+          />
+        )
+      )}
+
       {/* Two panes, each scrolling on its own, so the screen never grows past one viewport. */}
+      {view === 'detail' && (
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 420px) 1fr', gap: 16, alignItems: 'start' }}>
         <div style={{ maxHeight: '62vh', overflowY: 'auto', border: '1px solid var(--border, #ddd)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -414,6 +466,7 @@ export function RequestsAdminPage() {
           )}
         </div>
       </div>
+      )}
 
       {pageCount > 1 && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12 }}>

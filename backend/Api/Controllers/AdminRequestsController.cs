@@ -24,6 +24,7 @@ public class AdminRequestsController : ControllerBase
     private readonly IRequestTicketService _tickets;
     private readonly ITicketOrchestrationService _orchestration;
     private readonly RequestAuthorizationService _authz;
+    private readonly ITicketStatusService _statuses;
     private readonly ILogger<AdminRequestsController> _logger;
 
     public AdminRequestsController(
@@ -32,6 +33,7 @@ public class AdminRequestsController : ControllerBase
         IRequestTicketService tickets,
         ITicketOrchestrationService orchestration,
         RequestAuthorizationService authz,
+        ITicketStatusService statuses,
         ILogger<AdminRequestsController> logger)
     {
         _db = db;
@@ -39,6 +41,7 @@ public class AdminRequestsController : ControllerBase
         _tickets = tickets;
         _orchestration = orchestration;
         _authz = authz;
+        _statuses = statuses;
         _logger = logger;
     }
 
@@ -160,6 +163,121 @@ public class AdminRequestsController : ControllerBase
                 TicketsCreated = ticketStats.TryGetValue(r.RequestId, out var created) ? created.Created : 0,
                 TicketsFailed = ticketStats.TryGetValue(r.RequestId, out var failed) ? failed.Failed : 0
             }).ToList()
+        });
+    }
+
+    /// <summary>Flat list: one row per request, showing every Freshdesk and TDX ticket number with
+    /// its CURRENT state in the source system.
+    ///
+    /// The Open/Closed state is NOT ours — RequestTicket only records whether creation succeeded.
+    /// Whether the ticket has since been worked and closed lives in Freshdesk and TDX, so this
+    /// queries them, capped and cached (see TicketStatusService). Filters mirror the main list.</summary>
+    [HttpGet("ticket-view")]
+    public async Task<ActionResult<TicketViewDto>> TicketView(
+        [FromQuery] string? q,
+        [FromQuery] string? status,
+        [FromQuery] string? requestType,
+        [FromQuery] bool? onlyFailures,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 25,
+        CancellationToken ct = default)
+    {
+        if (!await CanViewAsync(ct)) return Forbid();
+
+        page = Math.Max(1, page);
+        // Capped lower than the main list: every row here costs outbound API calls.
+        pageSize = Math.Clamp(pageSize, 1, 50);
+
+        var query = _db.Requests.AsNoTracking().Include(r => r.Employees).AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var like = "%" + q.Trim() + "%";
+            query = query.Where(r =>
+                EF.Functions.Like(r.RequestNumber, like) ||
+                EF.Functions.Like(r.CreatedByDisplayName, like) ||
+                r.Employees.Any(e => EF.Functions.Like(e.NameSnapshot, like)));
+        }
+        if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<RequestStatus>(status, true, out var parsedStatus))
+        {
+            query = query.Where(r => r.Status == parsedStatus);
+        }
+        if (!string.IsNullOrWhiteSpace(requestType) && Enum.TryParse<RequestType>(requestType, true, out var parsedType))
+        {
+            query = query.Where(r => r.RequestType == parsedType);
+        }
+        if (onlyFailures == true)
+        {
+            query = query.Where(r => _db.RequestTickets.Any(t => t.RequestId == r.RequestId && t.Outcome == TicketOutcome.Failed));
+        }
+
+        var total = await query.CountAsync(ct);
+
+        var pageRows = await query
+            .OrderByDescending(r => r.RequestId)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(r => new
+            {
+                r.RequestId,
+                r.RequestNumber,
+                r.RequestType,
+                r.Status,
+                r.SubmittedAt,
+                Employees = r.Employees.Select(e => new { e.RequestEmployeeId, e.NameSnapshot }).ToList()
+            })
+            .ToListAsync(ct);
+
+        var ids = pageRows.Select(x => x.RequestId).ToList();
+        var allTickets = await _db.RequestTickets.AsNoTracking()
+            .Where(t => ids.Contains(t.RequestId))
+            .ToListAsync(ct);
+
+        // One batched, concurrency-capped, cached pass over the source systems for the whole page.
+        var statuses = await _statuses.GetStatusesAsync(allTickets, ct);
+
+        var byRequest = allTickets.ToLookup(t => t.RequestId);
+        var items = new List<TicketViewRowDto>();
+
+        foreach (var r in pageRows)
+        {
+            var names = r.Employees.ToDictionary(e => e.RequestEmployeeId, e => e.NameSnapshot);
+            var tickets = byRequest[r.RequestId].ToList();
+
+            TicketRefDto Ref(RequestTicket t) => new()
+            {
+                RequestTicketId = t.RequestTicketId,
+                TicketNumber = t.TicketNumber ?? "",
+                State = (statuses.TryGetValue(t.RequestTicketId, out var s) ? s.State : LiveTicketState.Unknown).ToString(),
+                StateLabel = statuses.TryGetValue(t.RequestTicketId, out var s2) ? s2.Label : null,
+                EmployeeName = t.RequestEmployeeId is { } eid && names.TryGetValue(eid, out var n) ? n : null
+            };
+
+            var created = tickets.Where(t => t.Outcome == TicketOutcome.Created && !string.IsNullOrWhiteSpace(t.TicketNumber)).ToList();
+
+            items.Add(new TicketViewRowDto
+            {
+                RequestId = r.RequestId,
+                RequestNumber = r.RequestNumber,
+                RequestType = r.RequestType.ToString(),
+                Status = r.Status.ToString(),
+                SubmittedAt = r.SubmittedAt,
+                EmployeeNames = r.Employees.Select(e => e.NameSnapshot).ToList(),
+                Freshdesk = created.Where(t => t.Kind is TicketKind.Freshdesk or TicketKind.FreshdeskChildWithJobCodes or TicketKind.FreshdeskChildWithoutJobCodes)
+                    .OrderBy(t => t.Kind).Select(Ref).ToList(),
+                Tdx = created.Where(t => t.Kind is TicketKind.Tdx or TicketKind.D365Access)
+                    .OrderBy(t => t.Kind).ThenBy(t => t.RequestEmployeeId).Select(Ref).ToList(),
+                FailedCount = tickets.Count(t => t.Outcome == TicketOutcome.Failed)
+            });
+        }
+
+        return Ok(new TicketViewDto
+        {
+            Total = total,
+            Page = page,
+            PageSize = pageSize,
+            Items = items,
+            HasUnknownStatuses = items.Any(i => i.Freshdesk.Concat(i.Tdx).Any(t => t.State == nameof(LiveTicketState.Unknown)))
         });
     }
 

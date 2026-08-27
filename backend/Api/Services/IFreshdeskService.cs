@@ -17,6 +17,11 @@ public interface IFreshdeskService
     /// that need a subset of the request's details without seeing the full RH ticket. Throws on any
     /// failure — same best-effort contract as CreateTicketAsync.</summary>
     Task<long> CreateChildTicketAsync(Request request, long parentTicketId, string requesterEmail, long groupId, bool includeAllJobCodes, CancellationToken ct);
+
+    /// <summary>Current state of an existing ticket. Unlike the Create methods this NEVER throws —
+    /// it is called while rendering a list, where one unreachable ticket must not fail the whole
+    /// page. A failure returns Unknown, which the UI shows as such rather than guessing.</summary>
+    Task<LiveTicketStatus> GetTicketStatusAsync(long ticketId, CancellationToken ct);
 }
 
 public class FreshdeskTicketException(string message) : Exception(message);

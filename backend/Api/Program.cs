@@ -60,6 +60,7 @@ builder.Services.AddScoped<ITicketTemplateService, TicketTemplateService>();
 builder.Services.AddScoped<IEmployeeFieldsService, EmployeeFieldsService>();
 builder.Services.AddScoped<IRequestTicketService, RequestTicketService>();
 builder.Services.AddScoped<ITicketOrchestrationService, TicketOrchestrationService>();
+builder.Services.AddScoped<ITicketStatusService, TicketStatusService>();
 
 // --- Ticket-system integrations (submit-time, best-effort — see RequestsController.Submit) ---
 builder.Services.Configure<FreshdeskOptions>(builder.Configuration.GetSection("Freshdesk"));
@@ -87,6 +88,7 @@ builder.Services.AddCors(options =>
             .AllowCredentials());
 });
 
+builder.Services.AddMemoryCache();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

@@ -199,6 +199,39 @@ public class FreshdeskService : IFreshdeskService
         return doc.RootElement.GetProperty("id").GetInt64();
     }
 
+    /// <summary>Freshdesk status codes, confirmed against the live instance's /api/v2/ticket_fields:
+    /// 2 Open, 3 Pending, 4 Resolved, 5 Closed. Resolved counts as closed for this screen — the work
+    /// is done and nobody is waiting on it.</summary>
+    public async Task<LiveTicketStatus> GetTicketStatusAsync(long ticketId, CancellationToken ct)
+    {
+        try
+        {
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Get, $"https://{_options.Subdomain}/api/v2/tickets/{ticketId}");
+            requestMessage.Headers.Authorization = new AuthenticationHeaderValue(
+                "Basic", Convert.ToBase64String(Encoding.ASCII.GetBytes($"{_options.ApiKey}:X")));
+
+            using var response = await _http.SendAsync(requestMessage, ct);
+            if (!response.IsSuccessStatusCode) return LiveTicketStatus.Unknown;
+
+            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+            if (!doc.RootElement.TryGetProperty("status", out var statusEl)) return LiveTicketStatus.Unknown;
+
+            return statusEl.GetInt32() switch
+            {
+                2 => new LiveTicketStatus(LiveTicketState.Open, "Ouvert"),
+                3 => new LiveTicketStatus(LiveTicketState.Open, "En attente"),
+                4 => new LiveTicketStatus(LiveTicketState.Closed, "Résolu"),
+                5 => new LiveTicketStatus(LiveTicketState.Closed, "Fermé"),
+                _ => LiveTicketStatus.Unknown
+            };
+        }
+        catch
+        {
+            // Never throws by contract — see IFreshdeskService.
+            return LiveTicketStatus.Unknown;
+        }
+    }
+
     private static string? JoinOrNull(IEnumerable<string>? values)
     {
         var list = values?.ToList();

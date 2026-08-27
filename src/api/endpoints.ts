@@ -3,6 +3,7 @@ import type {
   AdAccountDto,
   AdminRequestDetailDto,
   AdminRequestListDto,
+  TicketViewDto,
   AppUserDto,
   AppUserRole,
   CatalogsDto,
@@ -110,6 +111,23 @@ export function createApi(client: ApiClient) {
         return client.get<AdminRequestListDto>(`/api/admin/requests?${qs.toString()}`);
       },
       detail: (id: number) => client.get<AdminRequestDetailDto>(`/api/admin/requests/${id}`),
+      ticketView: (params: {
+        q?: string;
+        status?: string;
+        requestType?: string;
+        onlyFailures?: boolean;
+        page?: number;
+        pageSize?: number;
+      }) => {
+        const qs = new URLSearchParams();
+        if (params.q) qs.set('q', params.q);
+        if (params.status) qs.set('status', params.status);
+        if (params.requestType) qs.set('requestType', params.requestType);
+        if (params.onlyFailures) qs.set('onlyFailures', 'true');
+        if (params.page) qs.set('page', String(params.page));
+        if (params.pageSize) qs.set('pageSize', String(params.pageSize));
+        return client.get<TicketViewDto>(`/api/admin/requests/ticket-view?${qs.toString()}`);
+      },
       retryTicket: (requestId: number, ticketId: number) =>
         client.post<RetryTicketResultDto>(`/api/admin/requests/${requestId}/tickets/${ticketId}/retry`, {}),
     },
