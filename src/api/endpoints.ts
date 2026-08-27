@@ -1,10 +1,13 @@
 import type { ApiClient } from './client';
 import type {
   AdAccountDto,
+  AdminRequestDetailDto,
+  AdminRequestListDto,
   AppUserDto,
   AppUserRole,
   CatalogsDto,
   CreateAppUserDto,
+  RetryTicketResultDto,
   CreateD365SecurityRoleMappingDto,
   CreateHelpTicketDto,
   CreateRequestDto,
@@ -86,6 +89,29 @@ export function createApi(client: ApiClient) {
         client.put<AppUserDto>(`/api/app-users/${id}/role`, { role }),
       adSearch: (q: string) =>
         client.get<AdAccountDto[]>(`/api/app-users/ad-search?q=${encodeURIComponent(q)}`),
+    },
+
+    adminRequests: {
+      list: (params: {
+        q?: string;
+        status?: string;
+        requestType?: string;
+        onlyFailures?: boolean;
+        page?: number;
+        pageSize?: number;
+      }) => {
+        const qs = new URLSearchParams();
+        if (params.q) qs.set('q', params.q);
+        if (params.status) qs.set('status', params.status);
+        if (params.requestType) qs.set('requestType', params.requestType);
+        if (params.onlyFailures) qs.set('onlyFailures', 'true');
+        if (params.page) qs.set('page', String(params.page));
+        if (params.pageSize) qs.set('pageSize', String(params.pageSize));
+        return client.get<AdminRequestListDto>(`/api/admin/requests?${qs.toString()}`);
+      },
+      detail: (id: number) => client.get<AdminRequestDetailDto>(`/api/admin/requests/${id}`),
+      retryTicket: (requestId: number, ticketId: number) =>
+        client.post<RetryTicketResultDto>(`/api/admin/requests/${requestId}/tickets/${ticketId}/retry`, {}),
     },
   };
 }

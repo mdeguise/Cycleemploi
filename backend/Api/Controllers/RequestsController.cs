@@ -310,52 +310,7 @@ public class RequestsController : ControllerBase
             .Include(r => r.OnboardingConfidentialComment)
             .FirstOrDefaultAsync(r => r.RequestId == id, ct);
 
-    private static RequestDto MapToDto(Request r) => new()
-    {
-        RequestId = r.RequestId,
-        RequestNumber = r.RequestNumber,
-        RequestType = r.RequestType.ToString(),
-        Status = r.Status.ToString(),
-        DemandePar = r.CreatedByDisplayName,
-        CreatedAt = r.CreatedAt,
-        Employees = r.Employees.Select(e => new RequestEmployeeDto
-        {
-            WorkdayEmployeeId = e.WorkdayEmployeeId,
-            NameSnapshot = e.NameSnapshot,
-            PositionSnapshot = e.PositionSnapshot,
-            DepartementSnapshot = e.DepartementSnapshot,
-            CodeEmploiSnapshot = e.CodeEmploiSnapshot,
-            TypeEmploiSnapshot = e.TypeEmploiSnapshot,
-            GestionnaireSnapshot = e.GestionnaireSnapshot
-        }).ToList(),
-        DateEntreePrevue = r.OnboardingDetail?.DateEntreePrevue,
-        RegleDePaye = r.OnboardingDetail?.RegleDePaye,
-        RegleDePayeCommentaire = r.OnboardingDetail?.RegleDePayeCommentaire,
-        SystemesAcces = r.AccessDetail?.Systemes.Select(s => s.Value).ToList() ?? [],
-        BadgeZones = r.AccessDetail?.BadgeZones,
-        CodeAlarmeDetails = r.AccessDetail?.CodeAlarmeDetails,
-        SystemePosHebergement = r.AccessDetail?.PosHebergement.Select(p => p.Value).ToList() ?? [],
-        StationnementRequis = r.AccessDetail?.Stationnement,
-        JustificationAcces = r.AccessDetail?.Justification,
-        Equipements = r.EquipmentDetail?.Equipements.Select(e => e.Value).ToList() ?? [],
-        NotesEquipement = r.EquipmentDetail?.Notes,
-        Applications = r.ApplicationsDetail?.Applications.Select(a => a.Value).ToList() ?? [],
-        AutreLogicielRequis = r.ApplicationsDetail?.AutreLogiciel,
-        DerniereJournee = r.OffboardingDetail?.DerniereJournee,
-        IndemniteVacances = r.OffboardingDetail?.IndemniteVacances,
-        RaisonArret = r.OffboardingDetail?.RaisonArret,
-        DetailsRaison = r.OffboardingDetail?.DetailsRaison,
-        Reembaucheriez = r.OffboardingDetail?.Reembaucheriez,
-        CommentairesIT = r.OffboardingDetail?.CommentairesIT ?? r.OnboardingDetail?.CommentairesIT,
-        CommentairesStationnement = r.OffboardingDetail?.CommentairesStationnement ?? r.OnboardingDetail?.CommentairesStationnement,
-        CommentairesPuceAcces = r.OffboardingDetail?.CommentairesPuceAcces ?? r.OnboardingDetail?.CommentairesPuceAcces,
-        CommentairesRedingote = r.OffboardingDetail?.CommentairesRedingote ?? r.OnboardingDetail?.CommentairesRedingote,
-        DateRetourConnue = r.OffboardingDetail?.DateRetourConnue,
-        DateRetourTravail = r.OffboardingDetail?.DateRetourTravail,
-        PreavisRecu = r.OffboardingDetail?.PreavisRecu,
-        MotifNonAdmissibilite = r.OffboardingDetail?.MotifNonAdmissibilite
-        // CommentairesRH deliberately not mapped here — see GetInternal.
-    };
+    private static RequestDto MapToDto(Request r) => RequestMapper.ToDto(r);
 
     private static void ReplaceJunction<T>(
         Microsoft.EntityFrameworkCore.DbSet<T> dbSet,
