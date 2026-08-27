@@ -37,6 +37,15 @@ public class Request
     public DateTime? SubmittedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
+    /// <summary>The requester's email, captured from AD at SUBMIT time and stored, because it is the
+    /// "requester" on every downstream ticket — in Freshdesk it drives the whole reply thread.
+    ///
+    /// It has to be persisted rather than re-derived: the integrations originally read it from
+    /// whoever was calling, which is correct at submit time but wrong on a retry, where the caller
+    /// is an administrator rather than the person who made the request. Without this, retrying a
+    /// failed ticket would silently raise it under the admin's name.</summary>
+    public string? RequesterEmail { get; set; }
+
     public ICollection<RequestEmployee> Employees { get; set; } = new List<RequestEmployee>();
     public OnboardingDetail? OnboardingDetail { get; set; }
     public OnboardingConfidentialComment? OnboardingConfidentialComment { get; set; }

@@ -24,6 +24,7 @@ public class RequestsController : ControllerBase
     private readonly IDynamicsEamService _dynamics;
     private readonly ITdxService _tdx;
     private readonly IEmailNotificationService _email;
+    private readonly IRequestTicketService _tickets;
     private readonly ILogger<RequestsController> _logger;
 
     /// <summary>Systèmes junction rows store the catalog's display text directly (see
@@ -49,6 +50,7 @@ public class RequestsController : ControllerBase
         IDynamicsEamService dynamics,
         ITdxService tdx,
         IEmailNotificationService email,
+        IRequestTicketService tickets,
         ILogger<RequestsController> logger)
     {
         _db = db;
@@ -61,6 +63,7 @@ public class RequestsController : ControllerBase
         _dynamics = dynamics;
         _tdx = tdx;
         _email = email;
+        _tickets = tickets;
         _logger = logger;
     }
 
@@ -238,6 +241,12 @@ public class RequestsController : ControllerBase
         request.Status = RequestStatus.Soumise;
         request.SubmittedAt = DateTime.UtcNow;
         request.UpdatedAt = request.SubmittedAt.Value;
+
+        // Captured now, while the caller IS the requester. Every downstream ticket is raised under
+        // this address (in Freshdesk it drives the reply thread), and a retry is performed by an
+        // administrator — so re-deriving it from the caller later would misattribute the ticket.
+        request.RequesterEmail = _ad.GetUserInfo(User.GetSamAccountName()).Email;
+
         await _db.SaveChangesAsync(ct);
 
         // Best-effort: the submission has already succeeded and is committed by this point.
@@ -265,18 +274,20 @@ public class RequestsController : ControllerBase
             }
 
             var ticketId = await _freshdesk.CreateTicketAsync(request, requesterEmail, ct);
+            await _tickets.RecordSuccessAsync(request.RequestId, TicketKind.Freshdesk, null, ticketId.ToString(), ct);
 
             // Best-effort, independent of each other and of the main ticket above (which already
             // succeeded and is committed) — fanning the same submission out to two other
             // departments as Freshdesk "child" tickets of the main one.
-            await TryCreateFreshdeskChildTicketAsync(request, ticketId, requesterEmail, _freshdeskOptions.ChildGroupIdWithJobCodes, includeAllJobCodes: true, ct);
-            await TryCreateFreshdeskChildTicketAsync(request, ticketId, requesterEmail, _freshdeskOptions.ChildGroupIdWithoutJobCodes, includeAllJobCodes: false, ct);
+            await TryCreateFreshdeskChildTicketAsync(request, ticketId, requesterEmail, _freshdeskOptions.ChildGroupIdWithJobCodes, includeAllJobCodes: true, TicketKind.FreshdeskChildWithJobCodes, ct);
+            await TryCreateFreshdeskChildTicketAsync(request, ticketId, requesterEmail, _freshdeskOptions.ChildGroupIdWithoutJobCodes, includeAllJobCodes: false, TicketKind.FreshdeskChildWithoutJobCodes, ct);
 
             return ticketId;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to create Freshdesk ticket for request {RequestNumber}", request.RequestNumber);
+            await _tickets.RecordFailureAsync(request.RequestId, TicketKind.Freshdesk, null, ex, ct);
 
             var subject = $"[Cycle Emploi] Échec de création de ticket Freshdesk — demande #{request.RequestNumber}";
             var body =
@@ -318,15 +329,17 @@ public class RequestsController : ControllerBase
     /// Independent failure handling from the main ticket and from the other child ticket — either
     /// can fail without affecting the other, since the main ticket (and the submission itself) is
     /// already committed by the time either of these run.</summary>
-    private async Task TryCreateFreshdeskChildTicketAsync(Request request, long parentTicketId, string requesterEmail, long groupId, bool includeAllJobCodes, CancellationToken ct)
+    private async Task TryCreateFreshdeskChildTicketAsync(Request request, long parentTicketId, string requesterEmail, long groupId, bool includeAllJobCodes, TicketKind kind, CancellationToken ct)
     {
         try
         {
-            await _freshdesk.CreateChildTicketAsync(request, parentTicketId, requesterEmail, groupId, includeAllJobCodes, ct);
+            var childTicketId = await _freshdesk.CreateChildTicketAsync(request, parentTicketId, requesterEmail, groupId, includeAllJobCodes, ct);
+            await _tickets.RecordSuccessAsync(request.RequestId, kind, null, childTicketId.ToString(), ct);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to create Freshdesk child ticket (group {GroupId}) for request {RequestNumber}", groupId, request.RequestNumber);
+            await _tickets.RecordFailureAsync(request.RequestId, kind, null, ex, ct);
 
             var subject = $"[Cycle Emploi] Échec de création de ticket Freshdesk enfant (groupe {groupId}) — demande #{request.RequestNumber}";
             var body =
@@ -391,10 +404,12 @@ public class RequestsController : ControllerBase
             {
                 var d365JobCode = await _dynamics.CreateBadgeRequestAsync(request, employee, freshdeskTicketId, ct);
                 _logger.LogInformation("Created D365 EAM badge request, jobcode {D365JobCode}, for request {RequestNumber}, employee {EmployeeName}", d365JobCode, request.RequestNumber, employee.NameSnapshot);
+                await _tickets.RecordSuccessAsync(request.RequestId, TicketKind.D365Badge, employee.RequestEmployeeId, d365JobCode, ct);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to create D365 EAM badge request for request {RequestNumber}, employee {EmployeeName}", request.RequestNumber, employee.NameSnapshot);
+                await _tickets.RecordFailureAsync(request.RequestId, TicketKind.D365Badge, employee.RequestEmployeeId, ex, ct);
 
                 var subject = $"[Cycle Emploi] Échec de création de billet D365 (badge/alarme) — demande #{request.RequestNumber} — {employee.NameSnapshot}";
                 var body =
@@ -456,10 +471,12 @@ public class RequestsController : ControllerBase
 
                 var tdxTicketId = await _tdx.CreateTicketAsync(request, employee, requesterName, requesterEmail, ct);
                 _logger.LogInformation("Created TDX ticket {TdxTicketId} for request {RequestNumber}, employee {EmployeeName}", tdxTicketId, request.RequestNumber, employee.NameSnapshot);
+                await _tickets.RecordSuccessAsync(request.RequestId, TicketKind.Tdx, employee.RequestEmployeeId, tdxTicketId.ToString(), ct);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to create TDX ticket for request {RequestNumber}, employee {EmployeeName}", request.RequestNumber, employee.NameSnapshot);
+                await _tickets.RecordFailureAsync(request.RequestId, TicketKind.Tdx, employee.RequestEmployeeId, ex, ct);
 
                 var subject = $"[Cycle Emploi] Échec de création de billet TDX — demande #{request.RequestNumber} — {employee.NameSnapshot}";
                 var body =
@@ -581,10 +598,12 @@ public class RequestsController : ControllerBase
 
             var ticketId = await _tdx.CreateD365AccessTicketAsync(input, ct);
             _logger.LogInformation("Created D365 Access TDX ticket {TicketId} for request {RequestNumber}, employee {EmployeeName}", ticketId, request.RequestNumber, employee.NameSnapshot);
+            await _tickets.RecordSuccessAsync(request.RequestId, TicketKind.D365Access, employee.RequestEmployeeId, ticketId.ToString(), ct);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to create D365 Access TDX ticket for request {RequestNumber}, employee {EmployeeName}", request.RequestNumber, employee.NameSnapshot);
+            await _tickets.RecordFailureAsync(request.RequestId, TicketKind.D365Access, employee.RequestEmployeeId, ex, ct);
 
             var subject = $"[Cycle Emploi] Échec de création de billet TDX D365 Access — demande #{request.RequestNumber} — {employee.NameSnapshot}";
             var body =
