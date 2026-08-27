@@ -156,10 +156,15 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<AppUser>(entity =>
         {
-            entity.Property(m => m.Email).HasMaxLength(200).IsRequired();
+            // Sam is the authorization key and therefore the unique one; Email is informational and
+            // nullable, because admin (*_adm) accounts have no `mail` attribute in AD. See AppUser's
+            // doc comment for why matching moved off Email.
+            entity.Property(m => m.Sam).HasMaxLength(100).IsRequired();
+            entity.Property(m => m.Email).HasMaxLength(200);
             entity.Property(m => m.DisplayName).HasMaxLength(200).IsRequired();
             entity.Property(m => m.CreatedByDisplayName).HasMaxLength(200);
-            entity.HasIndex(m => m.Email).IsUnique();
+            entity.Property(m => m.Role).HasConversion<string>().HasMaxLength(20);
+            entity.HasIndex(m => m.Sam).IsUnique();
         });
 
         modelBuilder.Entity<TicketTemplate>(entity =>

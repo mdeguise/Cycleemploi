@@ -26,11 +26,10 @@ public class TicketTemplatesController : ControllerBase
         _ad = ad;
     }
 
-    private async Task<bool> IsCallerAdminAsync(CancellationToken ct)
-    {
-        var email = _ad.GetUserInfo(User.GetSamAccountName()).Email;
-        return await _appUsers.IsAdminAsync(email, ct);
-    }
+    // Keyed on the Windows identity, not the AD email — admin (*_adm) accounts have no `mail`
+    // attribute, which used to deny them silently.
+    private Task<bool> IsCallerAdminAsync(CancellationToken ct) =>
+        _appUsers.IsAdminAsync(User.GetObjectId(), ct);
 
     private static TicketTemplateDto ToDto(TicketTemplateDefinition def, TicketTemplate? row)
     {

@@ -50,6 +50,8 @@ builder.Services.AddAuthorization(options =>
 });
 
 builder.Services.Configure<HrGroupOptions>(builder.Configuration.GetSection("HrGroup"));
+builder.Services.Configure<AccessOptions>(builder.Configuration.GetSection("Access"));
+builder.Services.Configure<AdOptions>(builder.Configuration.GetSection("Ad"));
 builder.Services.AddScoped<IAdDirectoryService, AdDirectoryService>();
 builder.Services.AddScoped<RequestAuthorizationService>();
 builder.Services.AddScoped<RequestNumberService>();

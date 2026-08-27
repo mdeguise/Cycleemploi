@@ -34,4 +34,11 @@ public interface IAdDirectoryService
     /// is the reliable join from a D365 user (once linked to Workday) to their AD account, immune to
     /// display-name typos/renames. Batched into chunked LDAP OR-filters.</summary>
     IReadOnlyList<AdAccount> GetAccountsByEmployeeId(IEnumerable<string> employeeIds);
+
+    /// <summary>Prefix-searches enabled accounts by sAMAccountName / display name / first / last /
+    /// mail, for the "add a user" people picker. Searches the domain named by Ad:SearchDomain when
+    /// set, otherwise whatever domain the app server itself is joined to — that distinction matters
+    /// while vm-trm-live is still iDirectory-joined but access is granted to ENTERPRISE accounts.
+    /// The query is LDAP-escaped before use.</summary>
+    IReadOnlyList<AdAccount> SearchAccounts(string query, int limit);
 }

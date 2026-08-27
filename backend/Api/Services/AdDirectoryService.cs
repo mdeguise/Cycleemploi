@@ -2,11 +2,67 @@ using System.DirectoryServices;
 using System.DirectoryServices.AccountManagement;
 using System.Runtime.Versioning;
 
+using Microsoft.Extensions.Options;
+
 namespace TremblantLifecycle.Api.Services;
+
+/// <summary>Directory settings. <see cref="SearchDomain"/> is empty by default, meaning "use the
+/// domain this server is joined to". Set it (e.g. "enterprise.ad") to search a different domain
+/// across the forest trust — needed because vm-trm-live is still joined to iDirectory.itw while
+/// access is being granted to ENTERPRISE.AD accounts.</summary>
+public class AdOptions
+{
+    public string SearchDomain { get; set; } = "";
+}
 
 [SupportedOSPlatform("windows")]
 public class AdDirectoryService : IAdDirectoryService
 {
+    private readonly AdOptions _options;
+
+    public AdDirectoryService(IOptions<AdOptions> options)
+    {
+        _options = options.Value;
+    }
+
+    private DirectoryEntry CreateSearchRoot() =>
+        string.IsNullOrWhiteSpace(_options.SearchDomain)
+            ? new DirectoryEntry()
+            : new DirectoryEntry($"LDAP://{_options.SearchDomain.Trim()}");
+
+    public IReadOnlyList<AdAccount> SearchAccounts(string query, int limit)
+    {
+        if (string.IsNullOrWhiteSpace(query)) return [];
+
+        var q = EscapeLdap(query.Trim());
+        var results = new List<AdAccount>();
+
+        using var root = CreateSearchRoot();
+        using var searcher = new DirectorySearcher(root)
+        {
+            // Enabled accounts only (the bit-AND rule excludes ACCOUNTDISABLE) — granting app access
+            // to a disabled account is never intentional.
+            Filter = "(&(objectCategory=person)(objectClass=user)" +
+                     "(!(userAccountControl:1.2.840.113556.1.4.803:=2))" +
+                     $"(|(sAMAccountName={q}*)(cn={q}*)(givenName={q}*)(sn={q}*)(mail={q}*)))",
+            PageSize = 50,
+            SizeLimit = limit
+        };
+        searcher.PropertiesToLoad.AddRange(new[] { "sAMAccountName", "cn", "employeeID", "mail" });
+        searcher.Sort = new SortOption("cn", SortDirection.Ascending);
+
+        using var found = searcher.FindAll();
+        foreach (SearchResult r in found)
+        {
+            var sam = GetProp(r, "sAMAccountName");
+            if (string.IsNullOrEmpty(sam)) continue;
+
+            results.Add(new AdAccount(sam, GetProp(r, "cn"), true, GetProp(r, "employeeID"), GetProp(r, "mail")));
+            if (results.Count >= limit) break;
+        }
+        return results;
+    }
+
     public bool IsUserInGroup(string samAccountName, string groupName)
     {
         using var ctx = new PrincipalContext(ContextType.Domain);
