@@ -1,3 +1,6 @@
+import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { useApi } from '../api/ApiContext';
 import { useWizard } from '../context/WizardContext';
 import { CalendarIcon, UserIcon, ChevronDownIcon } from './icons';
 import { formatDateFr } from '../utils/formatDate';
@@ -13,6 +16,11 @@ const STATUS_LABEL: Record<string, string> = {
 
 export function Header() {
   const { request } = useWizard();
+  const api = useApi();
+
+  // Same query key AuthenticatedApp already loaded, so this reads from the React Query cache
+  // rather than issuing a second /api/auth/me on every render of the header.
+  const { data: me } = useQuery({ queryKey: ['me'], queryFn: () => api.auth.me() });
   const isTermination = request.typeDemande === TYPE_DEMANDE_TERMINAISON;
 
   const dateLabel = isTermination ? 'Dernière journée' : "Date d'entrée";
@@ -41,6 +49,19 @@ export function Header() {
             <div className="meta-block__value">{request.demandePar}</div>
           </div>
         </div>
+        {/* Only rendered for someone who actually has Administration access — for everyone else
+            the section does not exist, and the API refuses it regardless of what the UI shows. */}
+        {me?.adminRole && (
+          <Link
+            to="/admin/requests"
+            className="btn btn-secondary"
+            style={{ whiteSpace: 'nowrap', textDecoration: 'none' }}
+            title="Consulter les demandes et les billets créés"
+          >
+            Administration
+          </Link>
+        )}
+
         <div className="status-pill-wrap">
           <div className="status-pill-wrap__label">Statut</div>
           <div className="status-pill">
