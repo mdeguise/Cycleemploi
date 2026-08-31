@@ -25,42 +25,61 @@ public class AdDirectoryService : IAdDirectoryService
         _options = options.Value;
     }
 
-    private DirectoryEntry CreateSearchRoot() =>
-        string.IsNullOrWhiteSpace(_options.SearchDomain)
-            ? new DirectoryEntry()
-            : new DirectoryEntry($"LDAP://{_options.SearchDomain.Trim()}");
+    // vm-trm-live is still joined to iDirectory during the migration, so a default bind only finds
+    // iDirectory accounts. Also search ENTERPRISE.AD (where migrated users now live) and merge.
+    private const string MigrationDomain = "enterprise.ad";
+
+    /// <summary>The roots to search, in order: the machine's own domain first, then the migration
+    /// domain (AdOptions.SearchDomain override, else enterprise.ad).</summary>
+    private IEnumerable<DirectoryEntry> SearchRoots()
+    {
+        yield return new DirectoryEntry();
+        var extra = string.IsNullOrWhiteSpace(_options.SearchDomain) ? MigrationDomain : _options.SearchDomain.Trim();
+        yield return new DirectoryEntry($"LDAP://{extra}");
+    }
 
     public IReadOnlyList<AdAccount> SearchAccounts(string query, int limit)
     {
         if (string.IsNullOrWhiteSpace(query)) return [];
 
         var q = EscapeLdap(query.Trim());
-        var results = new List<AdAccount>();
+        var bySam = new Dictionary<string, AdAccount>(StringComparer.OrdinalIgnoreCase);
 
-        using var root = CreateSearchRoot();
-        using var searcher = new DirectorySearcher(root)
+        foreach (var root in SearchRoots())
         {
-            // Enabled accounts only (the bit-AND rule excludes ACCOUNTDISABLE) — granting app access
-            // to a disabled account is never intentional.
-            Filter = "(&(objectCategory=person)(objectClass=user)" +
-                     "(!(userAccountControl:1.2.840.113556.1.4.803:=2))" +
-                     $"(|(sAMAccountName={q}*)(cn={q}*)(givenName={q}*)(sn={q}*)(mail={q}*)))",
-            PageSize = 50,
-            SizeLimit = limit
-        };
-        searcher.PropertiesToLoad.AddRange(new[] { "sAMAccountName", "cn", "employeeID", "mail" });
-        searcher.Sort = new SortOption("cn", SortDirection.Ascending);
-
-        using var found = searcher.FindAll();
-        foreach (SearchResult r in found)
-        {
-            var sam = GetProp(r, "sAMAccountName");
-            if (string.IsNullOrEmpty(sam)) continue;
-
-            results.Add(new AdAccount(sam, GetProp(r, "cn"), true, GetProp(r, "employeeID"), GetProp(r, "mail")));
-            if (results.Count >= limit) break;
+            if (bySam.Count >= limit) break;
+            try
+            {
+                using (root)
+                using (var searcher = new DirectorySearcher(root)
+                {
+                    // Enabled accounts only (the bit-AND rule excludes ACCOUNTDISABLE) — granting app access
+                    // to a disabled account is never intentional.
+                    Filter = "(&(objectCategory=person)(objectClass=user)" +
+                             "(!(userAccountControl:1.2.840.113556.1.4.803:=2))" +
+                             $"(|(sAMAccountName={q}*)(cn={q}*)(givenName={q}*)(sn={q}*)(mail={q}*)))",
+                    PageSize = 50,
+                    SizeLimit = limit
+                })
+                {
+                    searcher.PropertiesToLoad.AddRange(new[] { "sAMAccountName", "cn", "employeeID", "mail" });
+                    searcher.Sort = new SortOption("cn", SortDirection.Ascending);
+                    using var found = searcher.FindAll();
+                    foreach (SearchResult r in found)
+                    {
+                        var sam = GetProp(r, "sAMAccountName");
+                        if (string.IsNullOrEmpty(sam) || bySam.ContainsKey(sam)) continue;
+                        bySam[sam] = new AdAccount(sam, GetProp(r, "cn"), true, GetProp(r, "employeeID"), GetProp(r, "mail"));
+                        if (bySam.Count >= limit) break;
+                    }
+                }
+            }
+            catch
+            {
+                // Domain unreachable (off-domain dev box, or trust hiccup) — try the next root.
+            }
         }
-        return results;
+        return bySam.Values.OrderBy(a => a.Cn, StringComparer.CurrentCultureIgnoreCase).ToList();
     }
 
     public bool IsUserInGroup(string samAccountName, string groupName)
