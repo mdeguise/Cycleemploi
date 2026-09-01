@@ -31,7 +31,7 @@ export function Header() {
     <header className="app-header">
       <div className="app-header__brand">
         <img src={tremblantLogo} alt="Tremblant" className="app-header__logo" />
-        <div className="app-header__title">Gestion du cycle d'emploi – Intégration, réactivation et cessation</div>
+        <div className="app-header__title">Embauche, réactivation et avis d'arrêt de travail</div>
       </div>
 
       <div className="app-header__meta">

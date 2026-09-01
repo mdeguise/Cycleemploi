@@ -343,6 +343,7 @@
   font-size: 13px;
   color: var(--muted);
   margin-top: 2px;
+  margin-bottom: 12px;
 }
 
 .field-section-title {
