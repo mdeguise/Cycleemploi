@@ -191,13 +191,19 @@ public class D365AccessApprovalsController : ControllerBase
     /// <summary>Same Job Code AND Position Title, excluding this employee, and the D365 security
     /// roles each already holds (D365UserSecurityRole, joined by Workday EmployeeId — see
     /// DiscrepanciesController for the same join pattern). Peers with roles sort first: they're the
-    /// useful reference signal.</summary>
+    /// useful reference signal.
+    ///
+    /// Filtered to EmploymentStatus != "Terminated" — same rule as EmployeesController's search
+    /// (not == "Active", since "Inactive" covers on-leave/layoff, which is still a real employee
+    /// whose D365 roles are legitimate reference data). Without this, a peer who left Tremblant
+    /// years ago still shows up as if their old roles were a current, meaningful comparison.</summary>
     private async Task<List<D365PeerRoleDto>> BuildPeersAsync(string employeeWorkdayId, string? jobCode, string? positionTitle, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(jobCode) || string.IsNullOrWhiteSpace(positionTitle)) return [];
 
         var peers = await _workday.WorkdayDemographics
-            .Where(w => w.PrimaryJob == true && w.JobCode == jobCode && w.PositionTitle == positionTitle && w.EmployeeId != employeeWorkdayId)
+            .Where(w => w.PrimaryJob == true && w.EmploymentStatus != "Terminated"
+                && w.JobCode == jobCode && w.PositionTitle == positionTitle && w.EmployeeId != employeeWorkdayId)
             .Select(w => new { w.EmployeeId, w.FirstName, w.PreferredFirstName, w.LastName })
             .ToListAsync(ct);
         if (peers.Count == 0) return [];
