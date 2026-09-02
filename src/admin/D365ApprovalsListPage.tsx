@@ -28,14 +28,25 @@ export function D365ApprovalsListPage({ me }: { me: MeDto }) {
   const pending = rows.filter((r) => r.status === 'Pending');
   const completed = rows.filter((r) => r.status !== 'Pending');
 
+  // ticketState is the two-way "does a human still need to look at this" summary (Open/Closed),
+  // normalized across Freshdesk and TDX's very different status models — see LiveTicketStatus.cs.
+  // ticketStateLabel is the source system's own wording ("New", "In Process", "Cancelled") shown
+  // alongside it for detail, but Open/Closed is what colors the dot — previously every live status
+  // rendered identically (plain muted text), so this couldn't actually answer "is it open or closed".
   const renderTicketState = (r: D365AccessApprovalSummaryDto) => {
     if (r.ticketNumber) {
+      const isClosed = r.ticketState === 'Closed';
+      const isOpen = r.ticketState === 'Open';
+      const color = isClosed ? '#2e7d32' : isOpen ? '#b06a12' : 'var(--muted)';
+      const summary = isClosed ? 'Fermé' : isOpen ? 'Ouvert' : 'Statut inconnu';
       return (
         <>
           <a href={`${TDX_TICKET_URL}${r.ticketNumber}`} target="_blank" rel="noreferrer">
             #{r.ticketNumber}
           </a>
-          {r.ticketStateLabel && <span style={{ marginLeft: 8, color: 'var(--muted)' }}>({r.ticketStateLabel})</span>}
+          <span style={{ marginLeft: 8, color, fontWeight: 600 }}>
+            ● {summary}{r.ticketStateLabel && r.ticketStateLabel !== summary ? ` (${r.ticketStateLabel})` : ''}
+          </span>
         </>
       );
     }
