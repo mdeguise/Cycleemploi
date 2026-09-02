@@ -17,13 +17,16 @@ function bareSam(identity: string): string {
  * Position Title at all) — see Approbateurs D365 for managing those. Multiple approvers per title
  * is intentional, same as everywhere else in this app: any one matched approver acting is enough.
  *
- * Two tiers, matching the backend: a Cycle Emploi Admin (isTicketTemplateAdmin) can assign/remove
- * ANYONE via the AD picker. A plain D365Approver who isn't also an Admin can only claim or drop
- * titles under their OWN name — no picker, just "M'assigner à ce titre" — the server resolves and
- * trusts only their own AD identity regardless of what the request claims. */
+ * Two INDEPENDENT actions below the table, matching the backend's two tiers exactly:
+ *  - "M'assigner à ce titre" — visible to ANY D365Approver, admin or not. One click, no picker:
+ *    it always claims the title under the CALLER's own identity. An admin who is also an approver
+ *    (the common case — see D365ApproversAdminPage) needs this too; without it they had no way to
+ *    add themselves short of searching AD for their own name in the picker below.
+ *  - "Assigner un autre compte" — Admin only, full AD picker, for assigning anyone else. */
 export function D365PositionTitleAssignmentsPage({ me }: { me: MeDto }) {
   const api = useApi();
   const isAdmin = me.isTicketTemplateAdmin;
+  const isApprover = me.isD365Approver;
   const mySam = bareSam(me.objectId);
 
   const [titles, setTitles] = useState<string[]>([]);
@@ -32,8 +35,10 @@ export function D365PositionTitleAssignmentsPage({ me }: { me: MeDto }) {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [selectedTitle, setSelectedTitle] = useState('');
-  const [addError, setAddError] = useState<string | null>(null);
-  const [isAdding, setIsAdding] = useState(false);
+  const [selfError, setSelfError] = useState<string | null>(null);
+  const [isSelfAssigning, setIsSelfAssigning] = useState(false);
+  const [otherError, setOtherError] = useState<string | null>(null);
+  const [isAssigningOther, setIsAssigningOther] = useState(false);
   const picker = usePicker((q) => api.d365Approvers.adSearch(q));
 
   const load = () => {
@@ -54,33 +59,55 @@ export function D365PositionTitleAssignmentsPage({ me }: { me: MeDto }) {
   const globalCount = approvers.filter((a) => !a.positionTitle).length;
   const alreadyMine = approvers.some((a) => a.positionTitle === selectedTitle && a.sam === mySam);
 
-  const handleAssign = async (ev: React.FormEvent) => {
-    ev.preventDefault();
-    setAddError(null);
-
+  const handleSelfAssign = async () => {
+    setSelfError(null);
     if (!selectedTitle) {
-      setAddError('Choisissez un titre de poste.');
+      setSelfError('Choisissez un titre de poste.');
       return;
     }
-    if (isAdmin && !picker.picked) {
-      setAddError('Choisissez un compte dans la liste de résultats.');
-      return;
-    }
-
-    setIsAdding(true);
+    setIsSelfAssigning(true);
     try {
       await api.d365Approvers.add({
-        sam: isAdmin ? picker.picked!.sam : me.objectId,
-        displayName: isAdmin ? picker.picked!.displayName : me.displayName,
-        email: (isAdmin ? picker.picked!.email : me.email) ?? null,
+        sam: me.objectId,
+        displayName: me.displayName,
+        email: me.email ?? null,
+        positionTitle: selectedTitle,
+      });
+      load();
+    } catch (err) {
+      setSelfError(err instanceof Error ? err.message : 'Erreur inconnue');
+    } finally {
+      setIsSelfAssigning(false);
+    }
+  };
+
+  const handleAssignOther = async (ev: React.FormEvent) => {
+    ev.preventDefault();
+    setOtherError(null);
+
+    if (!selectedTitle) {
+      setOtherError('Choisissez un titre de poste.');
+      return;
+    }
+    if (!picker.picked) {
+      setOtherError('Choisissez un compte dans la liste de résultats.');
+      return;
+    }
+
+    setIsAssigningOther(true);
+    try {
+      await api.d365Approvers.add({
+        sam: picker.picked.sam,
+        displayName: picker.picked.displayName,
+        email: picker.picked.email ?? null,
         positionTitle: selectedTitle,
       });
       picker.reset();
       load();
     } catch (err) {
-      setAddError(err instanceof Error ? err.message : 'Erreur inconnue');
+      setOtherError(err instanceof Error ? err.message : 'Erreur inconnue');
     } finally {
-      setIsAdding(false);
+      setIsAssigningOther(false);
     }
   };
 
@@ -103,7 +130,6 @@ export function D365PositionTitleAssignmentsPage({ me }: { me: MeDto }) {
             Un titre de poste sans approbateur assigné ci-dessous utilise les approbateurs{' '}
             <strong>globaux</strong> ({globalCount === 0 ? 'aucun configuré pour l\'instant' : `${globalCount} présentement`}
             {' '}— voir Approbateurs D365).
-            {!isAdmin && ' Vous pouvez vous assigner vous-même à un titre, ou retirer votre propre assignation.'}
           </div>
         </div>
       </div>
@@ -163,37 +189,51 @@ export function D365PositionTitleAssignmentsPage({ me }: { me: MeDto }) {
             </tbody>
           </table>
 
-          <div className="field-section-title">
-            {isAdmin ? 'Assigner un approbateur' : 'M\'assigner à un titre de poste'}
+          <div className="field-section-title">Assigner un titre de poste</div>
+          <div className="field" style={{ maxWidth: 520 }}>
+            <label className="field__label">Titre de poste</label>
+            <div className="field__input-wrap">
+              <select value={selectedTitle} onChange={(ev) => setSelectedTitle(ev.target.value)}>
+                {titles.map((title) => (
+                  <option key={title} value={title}>{title}</option>
+                ))}
+              </select>
+            </div>
           </div>
-          <form onSubmit={handleAssign} style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 520 }}>
-            <div className="field">
-              <label className="field__label">Titre de poste</label>
-              <div className="field__input-wrap">
-                <select value={selectedTitle} onChange={(ev) => setSelectedTitle(ev.target.value)}>
-                  {titles.map((title) => (
-                    <option key={title} value={title}>{title}</option>
-                  ))}
-                </select>
+
+          {isApprover && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 520, marginTop: 12 }}>
+              <div style={{ fontWeight: 600, fontSize: 13 }}>Vous êtes un approbateur D365</div>
+              {alreadyMine ? (
+                <div className="required-note">Vous êtes déjà assigné à ce titre.</div>
+              ) : (
+                <div>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={handleSelfAssign}
+                    disabled={isSelfAssigning || !selectedTitle}
+                  >
+                    {isSelfAssigning ? 'Assignation…' : 'M\'assigner à ce titre'}
+                  </button>
+                </div>
+              )}
+              {selfError && <div className="required-note" style={{ color: 'var(--tremblant-red-dark)' }}>{selfError}</div>}
+            </div>
+          )}
+
+          {isAdmin && (
+            <form onSubmit={handleAssignOther} style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 520, marginTop: 20 }}>
+              <div style={{ fontWeight: 600, fontSize: 13 }}>Ou assigner un autre compte (admin)</div>
+              <PickerField picker={picker} />
+              {otherError && <div className="required-note" style={{ color: 'var(--tremblant-red-dark)' }}>{otherError}</div>}
+              <div>
+                <button type="submit" className="btn btn-primary" disabled={isAssigningOther || !selectedTitle || !picker.picked}>
+                  Assigner
+                </button>
               </div>
-            </div>
-
-            {isAdmin && <PickerField picker={picker} />}
-            {!isAdmin && alreadyMine && (
-              <div className="required-note">Vous êtes déjà assigné à ce titre.</div>
-            )}
-
-            {addError && <div className="required-note" style={{ color: 'var(--tremblant-red-dark)' }}>{addError}</div>}
-            <div>
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={isAdding || !selectedTitle || (isAdmin && !picker.picked) || (!isAdmin && alreadyMine)}
-              >
-                {isAdmin ? 'Assigner' : 'M\'assigner'}
-              </button>
-            </div>
-          </form>
+            </form>
+          )}
         </>
       )}
     </div>
