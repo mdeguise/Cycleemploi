@@ -513,9 +513,13 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         var approvers = await _d365Approvers.MatchingAsync(positionTitle, ct);
         var recipients = approvers.Where(a => !string.IsNullOrWhiteSpace(a.Email)).Select(a => a.Email!).ToList();
 
+        // Points at the standalone D365Approvals app (its own route is "/approvals/{id}", not
+        // Cycle Emploi's embedded "/admin/d365-approvals/{id}") — approvers use that app directly
+        // and don't need Cycle Emploi Administration access at all, so the email should never send
+        // them somewhere that implies they do.
         var link = string.IsNullOrWhiteSpace(_appOptions.BaseUrl)
-            ? $"/admin/d365-approvals/{request.RequestId}"
-            : $"{_appOptions.BaseUrl.TrimEnd('/')}/admin/d365-approvals/{request.RequestId}";
+            ? $"/approvals/{request.RequestId}"
+            : $"{_appOptions.BaseUrl.TrimEnd('/')}/approvals/{request.RequestId}";
 
         if (recipients.Count == 0)
         {
@@ -576,9 +580,13 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         var approvers = await _d365Approvers.MatchingAsync(positionTitle, ct);
         var recipients = approvers.Where(a => !string.IsNullOrWhiteSpace(a.Email)).Select(a => a.Email!).ToList();
 
+        // Points at the standalone D365Approvals app (its own route is "/approvals/{id}", not
+        // Cycle Emploi's embedded "/admin/d365-approvals/{id}") — approvers use that app directly
+        // and don't need Cycle Emploi Administration access at all, so the email should never send
+        // them somewhere that implies they do.
         var link = string.IsNullOrWhiteSpace(_appOptions.BaseUrl)
-            ? $"/admin/d365-approvals/{request.RequestId}"
-            : $"{_appOptions.BaseUrl.TrimEnd('/')}/admin/d365-approvals/{request.RequestId}";
+            ? $"/approvals/{request.RequestId}"
+            : $"{_appOptions.BaseUrl.TrimEnd('/')}/approvals/{request.RequestId}";
 
         if (recipients.Count == 0)
         {
