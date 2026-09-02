@@ -30,6 +30,7 @@ import type {
   CreateD365ViewerDto,
   D365AccessApprovalSummaryDto,
   D365AccessApprovalDetailDto,
+  CancelD365AccessApprovalDto,
   CompleteD365AccessApprovalDto,
   CompleteD365AccessApprovalResultDto,
 } from './types';
@@ -95,6 +96,8 @@ export function createApi(client: ApiClient) {
         client.get<D365AccessApprovalDetailDto>(`/api/d365-access-approvals/${requestId}`),
       complete: (requestId: number, dto: CompleteD365AccessApprovalDto) =>
         client.post<CompleteD365AccessApprovalResultDto>(`/api/d365-access-approvals/${requestId}/complete`, dto),
+      cancel: (requestId: number, dto: CancelD365AccessApprovalDto) =>
+        client.post<void>(`/api/d365-access-approvals/${requestId}/cancel`, dto),
     },
     ticketTemplates: {
       list: () => client.get<TicketTemplateDto[]>('/api/ticket-templates'),

@@ -73,6 +73,14 @@ public class D365AccessApprovalsController : ControllerBase
         await _viewers.HasAnyAccessAsync(User.GetObjectId(), ct) ||
         await _appUsers.IsAdminAsync(User.GetObjectId(), ct);
 
+    /// <summary>Same matched-approver rule as Complete, plus an AppUsers Admin even when they
+    /// aren't matched — cancelling is the only way out for a request nobody is matched to act on
+    /// (no scoped approver, no global approver), so it needs a safety net Complete deliberately
+    /// doesn't have.</summary>
+    private async Task<bool> CanCancelAsync(string? positionTitle, CancellationToken ct) =>
+        await _approvers.CanActOnAsync(User.GetObjectId(), positionTitle, ct) ||
+        await _appUsers.IsAdminAsync(User.GetObjectId(), ct);
+
     [HttpGet]
     public async Task<ActionResult<List<D365AccessApprovalSummaryDto>>> List(CancellationToken ct)
     {
@@ -143,6 +151,9 @@ public class D365AccessApprovalsController : ControllerBase
                 CreatedAt = a.CreatedAt,
                 CompletedAt = a.CompletedAt,
                 CompletedByDisplayName = a.CompletedByDisplayName,
+                CancelledAt = a.CancelledAt,
+                CancelledByDisplayName = a.CancelledByDisplayName,
+                CancelReason = a.CancelReason,
                 TicketNumber = ticket?.Outcome == TicketOutcome.Created ? ticket.TicketNumber : null,
                 TicketState = ticket?.Outcome == TicketOutcome.Failed ? "Failed" : live?.State.ToString(),
                 TicketStateLabel = ticket?.Outcome == TicketOutcome.Failed ? "Échec de création" : live?.Label
@@ -172,6 +183,7 @@ public class D365AccessApprovalsController : ControllerBase
 
         if (!await CanViewAsync(ct)) return Forbid();
         var canComplete = await _approvers.CanActOnAsync(User.GetObjectId(), workdayInfo?.PositionTitle, ct);
+        var canCancel = await CanCancelAsync(workdayInfo?.PositionTitle, ct);
 
         var managerName = await ResolveManagerNameAsync(workdayInfo?.ManagerId, workdayInfo?.Manager, ct);
         var peers = await BuildPeersAsync(employee.WorkdayEmployeeId, workdayInfo?.JobCode, workdayInfo?.PositionTitle, ct);
@@ -181,7 +193,11 @@ public class D365AccessApprovalsController : ControllerBase
             RequestId = approval.RequestId,
             RequestNumber = approval.Request.RequestNumber,
             Status = approval.Status.ToString(),
+            CancelledByDisplayName = approval.CancelledByDisplayName,
+            CancelledAt = approval.CancelledAt,
+            CancelReason = approval.CancelReason,
             CanComplete = canComplete && approval.Status == D365ApprovalStatus.Pending,
+            CanCancel = canCancel && approval.Status == D365ApprovalStatus.Pending,
             RequesterName = approval.Request.CreatedByDisplayName,
             EmployeeName = employee.NameSnapshot,
             EmployeeEmail = workdayInfo?.WorkEmail ?? workdayInfo?.Email,
@@ -345,6 +361,44 @@ public class D365AccessApprovalsController : ControllerBase
             TicketNumber = result.TicketNumber,
             Error = result.Error
         });
+    }
+
+    /// <summary>Marks a Pending approval Cancelled — no TDX ticket is ever created for it. Gated by
+    /// CanCancelAsync (matched approver OR AppUsers Admin), broader than Complete's matched-approver-
+    /// only rule, since a request with no matched approver at all would otherwise be stuck forever
+    /// with no one able to act on it either way.</summary>
+    [HttpPost("{requestId:int}/cancel")]
+    public async Task<IActionResult> Cancel(int requestId, CancelD365AccessApprovalDto dto, CancellationToken ct)
+    {
+        var approval = await _db.D365AccessApprovals
+            .Include(a => a.Request).ThenInclude(r => r.Employees)
+            .FirstOrDefaultAsync(a => a.RequestId == requestId, ct);
+        if (approval is null) return NotFound();
+
+        if (approval.Status != D365ApprovalStatus.Pending)
+        {
+            return Conflict("Cette demande n'est plus en attente.");
+        }
+
+        var employee = approval.Request.Employees.FirstOrDefault(e => e.RequestEmployeeId == approval.RequestEmployeeId);
+        var positionTitle = employee is null ? null : await _workday.WorkdayDemographics
+            .Where(w => w.EmployeeId == employee.WorkdayEmployeeId && w.PrimaryJob == true)
+            .Select(w => w.PositionTitle)
+            .FirstOrDefaultAsync(ct);
+
+        if (!await CanCancelAsync(positionTitle, ct)) return Forbid();
+
+        approval.Status = D365ApprovalStatus.Cancelled;
+        approval.CancelledByObjectId = User.GetObjectId();
+        approval.CancelledByDisplayName = _ad.GetUserInfo(User.GetSamAccountName()).DisplayName ?? User.GetObjectId();
+        approval.CancelledAt = DateTime.UtcNow;
+        approval.CancelReason = string.IsNullOrWhiteSpace(dto.Reason) ? null : dto.Reason.Trim();
+
+        await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation("D365 approver {Approver} cancelled approval for request {RequestNumber}", User.GetObjectId(), approval.Request.RequestNumber);
+
+        return NoContent();
     }
 
     /// <summary>Powers the standalone D365AccessRequest app's employee picker: once someone picks a

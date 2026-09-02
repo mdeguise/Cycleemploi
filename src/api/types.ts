@@ -214,6 +214,9 @@ export interface D365AccessApprovalSummaryDto {
   createdAt: string;
   completedAt?: string | null;
   completedByDisplayName?: string | null;
+  cancelledAt?: string | null;
+  cancelledByDisplayName?: string | null;
+  cancelReason?: string | null;
   ticketNumber?: string | null;
   ticketState?: string | null;
   ticketStateLabel?: string | null;
@@ -223,7 +226,11 @@ export interface D365AccessApprovalDetailDto {
   requestId: number;
   requestNumber: string;
   status: string;
+  cancelledByDisplayName?: string | null;
+  cancelledAt?: string | null;
+  cancelReason?: string | null;
   canComplete: boolean;
+  canCancel: boolean;
   requesterName: string;
   employeeName: string;
   employeeEmail?: string | null;
@@ -266,6 +273,10 @@ export interface CompleteD365AccessApprovalResultDto {
   succeeded: boolean;
   ticketNumber?: string | null;
   error?: string | null;
+}
+
+export interface CancelD365AccessApprovalDto {
+  reason?: string | null;
 }
 
 // --- Reconciliation / "Écarts" (DiscrepanciesController) ---

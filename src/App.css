@@ -950,6 +950,24 @@
   cursor: not-allowed;
 }
 
+/* Outlined, not solid — sits next to .btn-primary (Envoyer) without competing for attention, but
+   the red border/text still reads as "this ends the request" rather than a neutral action. */
+.btn-danger {
+  background: var(--bg-card);
+  border-color: var(--tremblant-red-border, var(--tremblant-red));
+  color: var(--tremblant-red-dark);
+}
+
+.btn-danger:hover {
+  background: var(--tremblant-red-light, #fdecee);
+}
+
+.btn-danger:disabled {
+  color: #d9a3ab;
+  border-color: #eed7da;
+  cursor: not-allowed;
+}
+
 /* ---------- Summary sidebar ---------- */
 .summary-sidebar {
   width: 250px;

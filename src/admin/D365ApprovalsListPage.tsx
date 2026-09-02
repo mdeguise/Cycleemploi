@@ -26,7 +26,8 @@ export function D365ApprovalsListPage({ me }: { me: MeDto }) {
   }, [api]);
 
   const pending = rows.filter((r) => r.status === 'Pending');
-  const completed = rows.filter((r) => r.status !== 'Pending');
+  const completed = rows.filter((r) => r.status === 'Completed');
+  const cancelled = rows.filter((r) => r.status === 'Cancelled');
 
   // ticketState is the two-way "does a human still need to look at this" summary (Open/Closed),
   // normalized across Freshdesk and TDX's very different status models — see LiveTicketStatus.cs.
@@ -145,6 +146,39 @@ export function D365ApprovalsListPage({ me }: { me: MeDto }) {
                     <td style={{ padding: '8px 12px' }}>{r.completedByDisplayName ?? '—'}</td>
                     <td style={{ padding: '8px 12px' }}>{r.completedAt ? new Date(r.completedAt).toLocaleDateString('fr-CA') : '—'}</td>
                     <td style={{ padding: '8px 12px' }}>{renderTicketState(r)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="field-section-title">Annulées ({cancelled.length})</div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--border, #ddd)' }}>
+                  <th style={{ padding: '8px 12px' }}>Demande</th>
+                  <th style={{ padding: '8px 12px' }}>Employé</th>
+                  <th style={{ padding: '8px 12px' }}>Demandé par</th>
+                  <th style={{ padding: '8px 12px' }}>Annulée par</th>
+                  <th style={{ padding: '8px 12px' }}>Annulée le</th>
+                  <th style={{ padding: '8px 12px' }}>Motif</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cancelled.length === 0 && (
+                  <tr>
+                    <td colSpan={6} style={{ padding: '8px 12px', color: 'var(--muted)' }}>Aucune approbation annulée.</td>
+                  </tr>
+                )}
+                {cancelled.map((r) => (
+                  <tr key={r.requestId} style={{ borderBottom: '1px solid var(--border, #eee)' }}>
+                    <td style={{ padding: '8px 12px' }}>{r.requestNumber}</td>
+                    <td style={{ padding: '8px 12px' }}>{r.employeeName}</td>
+                    <td style={{ padding: '8px 12px' }}>{r.requesterName}</td>
+                    <td style={{ padding: '8px 12px' }}>{r.cancelledByDisplayName ?? '—'}</td>
+                    <td style={{ padding: '8px 12px' }}>{r.cancelledAt ? new Date(r.cancelledAt).toLocaleDateString('fr-CA') : '—'}</td>
+                    <td style={{ padding: '8px 12px', color: r.cancelReason ? 'inherit' : 'var(--muted)' }}>{r.cancelReason ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>

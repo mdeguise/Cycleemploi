@@ -11,7 +11,12 @@ public enum D365ApprovalStatus
     /// in this app — see RequestTicket(Kind=D365Access) for that outcome. A Completed approval whose
     /// ticket failed is retried through the normal Administration/Réessayer path, not by reopening
     /// this form to the approver.</summary>
-    Completed = 1
+    Completed = 1,
+
+    /// <summary>A matched approver (or an AppUsers Admin, as a safety net for a request nobody is
+    /// matched to act on) decided this request should not proceed — no TDX ticket is ever created.
+    /// Terminal, same as Completed: a Cancelled approval never becomes Pending or Completed again.</summary>
+    Cancelled = 2
 }
 
 /// <summary>One row per (Onboarding/Réactivation) request that requested "Accès D365" — the
@@ -85,6 +90,14 @@ public class D365AccessApproval
     public string? CompletedByObjectId { get; set; }
     public string? CompletedByDisplayName { get; set; }
     public DateTime? CompletedAt { get; set; }
+
+    public string? CancelledByObjectId { get; set; }
+    public string? CancelledByDisplayName { get; set; }
+    public DateTime? CancelledAt { get; set; }
+
+    /// <summary>Optional free-text — why this request was cancelled, for whoever looks at it later
+    /// (the original requester has no other way to find out).</summary>
+    public string? CancelReason { get; set; }
 }
 
 /// <summary>A single checked role on a completed D365AccessApproval — same free-text vocabulary as

@@ -26,6 +26,9 @@ export function D365ApprovalFormPage({ me }: { me: MeDto }) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitResult, setSubmitResult] = useState<{ succeeded: boolean; ticketNumber?: string | null } | null>(null);
 
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!requestId) return;
     setIsLoading(true);
@@ -89,6 +92,24 @@ export function D365ApprovalFormPage({ me }: { me: MeDto }) {
     }
   };
 
+  const handleCancel = async () => {
+    if (!requestId) return;
+    const reason = window.prompt('Annuler cette demande — motif (optionnel) :');
+    if (reason === null) return; // clicked Cancel on the prompt itself, not a real confirmation
+
+    setCancelError(null);
+    setIsCancelling(true);
+    try {
+      await api.d365AccessApprovals.cancel(Number(requestId), { reason: reason.trim() || null });
+      const refreshed = await api.d365AccessApprovals.detail(Number(requestId));
+      setData(refreshed);
+    } catch (err) {
+      setCancelError(err instanceof Error ? err.message : 'Erreur inconnue');
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
   if (isLoading) return <div className="step-panel">Chargement…</div>;
   if (loadError) return <div className="step-panel"><div className="big-notice">{loadError}</div></div>;
   if (!data) return null;
@@ -133,6 +154,13 @@ export function D365ApprovalFormPage({ me }: { me: MeDto }) {
       )}
       {data.status === 'Completed' && !submitResult && (
         <div className="big-notice">Cette approbation a déjà été complétée — les valeurs ci-dessous sont en lecture seule.</div>
+      )}
+      {data.status === 'Cancelled' && (
+        <div className="big-notice">
+          Cette demande a été annulée{data.cancelledByDisplayName ? ` par ${data.cancelledByDisplayName}` : ''}
+          {data.cancelledAt ? ` le ${new Date(data.cancelledAt).toLocaleDateString('fr-CA')}` : ''}.
+          {data.cancelReason ? ` Motif : « ${data.cancelReason} ».` : ' Aucun motif fourni.'}
+        </div>
       )}
 
       <div className="field-section-title">Informations connues</div>
@@ -234,11 +262,17 @@ export function D365ApprovalFormPage({ me }: { me: MeDto }) {
         )}
 
         {submitError && <div className="required-note" style={{ color: 'var(--tremblant-red-dark)' }}>{submitError}</div>}
+        {cancelError && <div className="required-note" style={{ color: 'var(--tremblant-red-dark)' }}>{cancelError}</div>}
 
         <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
           <button type="button" className="btn btn-secondary" onClick={() => navigate('/admin/d365-approvals')}>
             Retour
           </button>
+          {data.canCancel && data.status === 'Pending' && !submitResult && (
+            <button type="button" className="btn btn-danger" onClick={handleCancel} disabled={isCancelling}>
+              {isCancelling ? 'Annulation…' : 'Annuler la demande'}
+            </button>
+          )}
           {!readOnly && (
             <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
               {isSubmitting ? 'Envoi…' : 'Envoyer'}

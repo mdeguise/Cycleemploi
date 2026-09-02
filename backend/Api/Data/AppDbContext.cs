@@ -181,6 +181,9 @@ public class AppDbContext : DbContext
             entity.Property(m => m.Comments).HasMaxLength(2000);
             entity.Property(m => m.CompletedByObjectId).HasMaxLength(200);
             entity.Property(m => m.CompletedByDisplayName).HasMaxLength(200);
+            entity.Property(m => m.CancelledByObjectId).HasMaxLength(200);
+            entity.Property(m => m.CancelledByDisplayName).HasMaxLength(200);
+            entity.Property(m => m.CancelReason).HasMaxLength(500);
 
             // NoAction, not Cascade: SQL Server refuses multiple cascade paths to the same table
             // (Request already cascades to RequestEmployee directly). Rows are cleaned up via the

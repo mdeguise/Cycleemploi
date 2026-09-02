@@ -72,13 +72,16 @@ public class D365AccessApprovalSummaryDto
     public string RequesterName { get; set; } = null!;
     public DateOnly? StartDate { get; set; }
 
-    /// <summary>"Pending" or "Completed" — see D365ApprovalStatus. Completed doesn't imply the TDX
-    /// ticket itself succeeded; TicketNumber/TicketState reflect that separately.</summary>
+    /// <summary>"Pending", "Completed" or "Cancelled" — see D365ApprovalStatus. Completed doesn't
+    /// imply the TDX ticket itself succeeded; TicketNumber/TicketState reflect that separately.</summary>
     public string Status { get; set; } = null!;
 
     public DateTime CreatedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
     public string? CompletedByDisplayName { get; set; }
+    public DateTime? CancelledAt { get; set; }
+    public string? CancelledByDisplayName { get; set; }
+    public string? CancelReason { get; set; }
 
     public string? TicketNumber { get; set; }
     public string? TicketState { get; set; }
@@ -92,11 +95,20 @@ public class D365AccessApprovalDetailDto
     public int RequestId { get; set; }
     public string RequestNumber { get; set; } = null!;
     public string Status { get; set; } = null!;
+    public string? CancelledByDisplayName { get; set; }
+    public DateTime? CancelledAt { get; set; }
+    public string? CancelReason { get; set; }
 
     /// <summary>False for a viewer who can see this (an Administration Admin, for oversight) but is
     /// not a matched D365Approver — the Envoyer action stays gated to whoever the email actually
     /// went to.</summary>
     public bool CanComplete { get; set; }
+
+    /// <summary>Same matched-approver rule as CanComplete, but ALSO true for an AppUsers Admin even
+    /// when they aren't a matched approver — a safety net so a Pending request nobody is matched to
+    /// (no scoped approver, no global approver) isn't permanently stuck with no one able to cancel
+    /// it. Only ever true while Status is Pending.</summary>
+    public bool CanCancel { get; set; }
 
     // ---- Prepopulated, read-only ----
     public string RequesterName { get; set; } = null!;
@@ -154,6 +166,13 @@ public class CompleteD365AccessApprovalResultDto
     public bool Succeeded { get; set; }
     public string? TicketNumber { get; set; }
     public string? Error { get; set; }
+}
+
+public class CancelD365AccessApprovalDto
+{
+    /// <summary>Optional — shown alongside the cancellation in the Complétées/Annulées list, purely
+    /// for context; nothing downstream depends on it.</summary>
+    public string? Reason { get; set; }
 }
 
 /// <summary>Everything the standalone D365AccessRequest app needs to prefill its form once a D365
