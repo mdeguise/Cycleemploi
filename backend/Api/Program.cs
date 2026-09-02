@@ -80,11 +80,17 @@ builder.Services.AddScoped<IEmailNotificationService, SendGridEmailNotificationS
 // specific to that topology), so this is needed in production too, not just local dev. Windows
 // Auth in the browser requires credentials: 'include' on fetch plus an explicit (non-wildcard)
 // origin here — AllowCredentials() can't be combined with AllowAnyOrigin().
+//
+// vm-trm-live:8128 / d365approvals is a SEPARATE standalone app (repo mdeguise/D365Approvals) that
+// mirrors this app's "Approbations D365"/"Approbateurs D365" screens but has no backend of its
+// own — it calls THIS API directly, cross-origin, so its origin needs to be trusted here too.
 const string CorsPolicy = "Frontend";
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(CorsPolicy, policy =>
-        policy.WithOrigins("http://localhost:5173", "http://vm-trm-live:8090", "http://cycleemploi")
+        policy.WithOrigins(
+                "http://localhost:5173", "http://vm-trm-live:8090", "http://cycleemploi",
+                "http://vm-trm-live:8128", "http://d365approvals")
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials());
