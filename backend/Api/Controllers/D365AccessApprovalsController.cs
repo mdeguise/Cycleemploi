@@ -347,15 +347,15 @@ public class D365AccessApprovalsController : ControllerBase
         });
     }
 
-    /// <summary>Powers the standalone D365AccessRequest app's employee picker: once a D365 Approver
-    /// picks someone from Workday, this returns everything to prefill and display — same shape as
-    /// Detail()'s read-only section, but there is no existing approval/request to read it FROM yet.
-    /// Gated on being ANY D365Approver (not the narrower CanViewAsync, which also admits D365Viewer
-    /// and AppUsers Admin — creating a new request is an approver action, not a viewing one).</summary>
+    /// <summary>Powers the standalone D365AccessRequest app's employee picker: once someone picks a
+    /// Workday employee, this returns everything to prefill and display — same shape as Detail()'s
+    /// read-only section, but there is no existing approval/request to read it FROM yet.
+    /// Open to any authenticated employee (see AllowedAccessTypes/SubmitAdHoc below) — submitting a
+    /// request no longer requires being a D365Approver yourself; the D365Approvals "Envoyer" step
+    /// remains the actual gate before anything reaches TDX.</summary>
     [HttpGet("adhoc/prefill")]
     public async Task<ActionResult<D365AdHocPrefillDto>> AdHocPrefill([FromQuery] string workdayEmployeeId, CancellationToken ct)
     {
-        if (!await _approvers.HasAnyAccessAsync(User.GetObjectId(), ct)) return Forbid();
         if (string.IsNullOrWhiteSpace(workdayEmployeeId)) return BadRequest("workdayEmployeeId est requis.");
 
         var workdayInfo = await _workday.WorkdayDemographics
@@ -394,12 +394,14 @@ public class D365AccessApprovalsController : ControllerBase
     /// Creates a minimal Request (RequestType.D365AccessOnly — no OnboardingDetail/AccessDetail/etc,
     /// it exists only to give the approval a Request to hang off of, matching every other approval's
     /// shape) + one RequestEmployee snapshot + a Pending D365AccessApproval carrying every field the
-    /// requester entered, then emails matched approvers exactly like the wizard-driven path does.</summary>
+    /// requester entered, then emails matched approvers exactly like the wizard-driven path does.
+    /// Open to any authenticated employee — the requester's own identity is recorded from their AD
+    /// claims regardless of whether they're a D365Approver; the maker-checker split still holds
+    /// because nothing reaches TDX until a real D365Approver reviews it and presses "Envoyer" in
+    /// D365Approvals.</summary>
     [HttpPost("adhoc")]
     public async Task<ActionResult<SubmitAdHocD365AccessResultDto>> SubmitAdHoc(SubmitAdHocD365AccessDto dto, CancellationToken ct)
     {
-        if (!await _approvers.HasAnyAccessAsync(User.GetObjectId(), ct)) return Forbid();
-
         if (string.IsNullOrWhiteSpace(dto.WorkdayEmployeeId)) return BadRequest("L'employé est requis.");
         if (!AllowedAccessTypes.Contains(dto.AccessType)) return BadRequest("Le type d'accès est requis.");
         if (string.IsNullOrWhiteSpace(dto.JobTitleEnglish)) return BadRequest("Le titre du poste (anglais) est requis.");
