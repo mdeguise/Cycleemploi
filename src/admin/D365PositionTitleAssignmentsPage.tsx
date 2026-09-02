@@ -160,7 +160,7 @@ export function D365PositionTitleAssignmentsPage({ me }: { me: MeDto }) {
                   return (
                     <tr key={title} style={{ borderBottom: '1px solid var(--border, #eee)' }}>
                       <td style={{ padding: '8px 12px' }}>{title}</td>
-                      <td style={{ padding: '8px 12px', color: 'var(--muted)', fontFamily: 'monospace', fontSize: '0.9em' }}>
+                      <td style={{ padding: '8px 12px', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '0.9em' }}>
                         {row.jobCodes.length > 0 ? row.jobCodes.join(', ') : '—'}
                       </td>
                       <td style={{ padding: '8px 12px' }}>

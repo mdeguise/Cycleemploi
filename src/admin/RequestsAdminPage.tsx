@@ -75,7 +75,7 @@ function TicketRow({
           {failed ? 'Échec' : 'Créé'}
         </span>
       </td>
-      <td style={{ padding: '6px 10px', fontFamily: 'monospace' }}>{ticket.ticketNumber ?? '—'}</td>
+      <td style={{ padding: '6px 10px', fontFamily: 'var(--mono)' }}>{ticket.ticketNumber ?? '—'}</td>
       <td style={{ padding: '6px 10px', fontSize: 12, maxWidth: 380 }}>
         {failed ? (
           <>

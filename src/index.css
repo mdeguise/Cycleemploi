@@ -25,6 +25,9 @@
   --radius-sm: 8px;
 
   --sans: 'Segoe UI', 'Inter', system-ui, -apple-system, Roboto, sans-serif;
+  /* For ticket numbers, codes, and other fixed-width data — pairs with --sans instead of
+     falling back to whatever generic "monospace" resolves to per browser/OS. */
+  --mono: 'Cascadia Mono', 'Consolas', 'SFMono-Regular', Menlo, monospace;
 
   color-scheme: light;
   color: var(--ink);

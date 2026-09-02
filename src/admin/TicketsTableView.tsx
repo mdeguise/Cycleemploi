@@ -22,7 +22,7 @@ function TicketCell({ tickets }: { tickets: TicketRefDto[] }) {
         const style = STATE_STYLE[t.state] ?? STATE_STYLE.Unknown;
         return (
           <div key={t.requestTicketId} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{t.ticketNumber}</span>
+            <span style={{ fontFamily: 'var(--mono)', fontWeight: 600 }}>{t.ticketNumber}</span>
             <span
               title={t.stateLabel ?? undefined}
               style={{ background: style.bg, color: '#fff', borderRadius: 9, padding: '1px 7px', fontSize: 11, fontWeight: 700 }}

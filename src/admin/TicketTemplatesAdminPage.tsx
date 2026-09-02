@@ -86,7 +86,7 @@ function InlineEditor({
           background: 'var(--bg-page)',
           borderRadius: 6,
           fontSize: 13,
-          fontFamily: 'monospace',
+          fontFamily: 'var(--mono)',
           marginBottom: 10,
           color: 'var(--ink-soft)',
         }}
