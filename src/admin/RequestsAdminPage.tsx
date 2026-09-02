@@ -19,6 +19,7 @@ const TYPE_LABELS: Record<string, string> = {
   Onboarding: 'Nouvelle intégration',
   Reactivation: 'Réactivation',
   Offboarding: 'Cessation',
+  D365AccessOnly: 'Accès D365 (directe)',
 };
 
 const dateOnly = (v?: string | null) => (v ? new Date(v).toLocaleDateString('fr-CA') : '—');

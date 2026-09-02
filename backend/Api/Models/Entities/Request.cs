@@ -4,7 +4,14 @@ public enum RequestType
 {
     Onboarding,
     Reactivation,
-    Offboarding
+    Offboarding,
+
+    /// <summary>A direct D365 access request submitted from the standalone D365AccessRequest app —
+    /// NOT part of the onboarding/réactivation/offboarding wizard. Carries no OnboardingDetail,
+    /// AccessDetail, etc.; it exists solely to give its D365AccessApproval a Request to hang off
+    /// of, matching every other approval's shape. Stored as a string (see AppDbContext), so adding
+    /// this value needed no migration.</summary>
+    D365AccessOnly
 }
 
 public enum RequestStatus

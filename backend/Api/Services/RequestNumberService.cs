@@ -23,6 +23,7 @@ public class RequestNumberService
             RequestType.Onboarding => "INT",
             RequestType.Reactivation => "REA",
             RequestType.Offboarding => "TER",
+            RequestType.D365AccessOnly => "D365",
             _ => throw new ArgumentOutOfRangeException(nameof(type))
         };
 

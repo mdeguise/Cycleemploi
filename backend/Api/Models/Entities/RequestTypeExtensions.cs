@@ -10,6 +10,7 @@ public static class RequestTypeExtensions
         RequestType.Onboarding => "Nouvelle intégration",
         RequestType.Reactivation => "Réactivation",
         RequestType.Offboarding => "Avis de terminaison ou mise à pied temporaire",
+        RequestType.D365AccessOnly => "Accès D365 (demande directe)",
         _ => type.ToString()
     };
 }

@@ -85,13 +85,18 @@ builder.Services.AddScoped<IEmailNotificationService, SendGridEmailNotificationS
 // vm-trm-live:8128 / d365approvals is a SEPARATE standalone app (repo mdeguise/D365Approvals) that
 // mirrors this app's "Approbations D365"/"Approbateurs D365" screens but has no backend of its
 // own — it calls THIS API directly, cross-origin, so its origin needs to be trusted here too.
+//
+// vm-trm-live:8129 / d365accessrequest is likewise a separate standalone app (repo
+// mdeguise/D365AccessRequest) — a single-page "submit a brand-new D365 access request" form that
+// calls the D365AccessApprovalsController "adhoc" endpoints and /api/employees/search directly.
 const string CorsPolicy = "Frontend";
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(CorsPolicy, policy =>
         policy.WithOrigins(
                 "http://localhost:5173", "http://vm-trm-live:8090", "http://cycleemploi",
-                "http://vm-trm-live:8128", "http://d365approvals")
+                "http://vm-trm-live:8128", "http://d365approvals",
+                "http://vm-trm-live:8129", "http://d365accessrequest")
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials());

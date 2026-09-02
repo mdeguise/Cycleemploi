@@ -31,6 +31,7 @@ public class D365AccessApprovalsController : ControllerBase
     private readonly IAdDirectoryService _ad;
     private readonly ITicketOrchestrationService _orchestration;
     private readonly ITicketStatusService _statuses;
+    private readonly RequestNumberService _requestNumbers;
     private readonly ILogger<D365AccessApprovalsController> _logger;
 
     public D365AccessApprovalsController(
@@ -42,6 +43,7 @@ public class D365AccessApprovalsController : ControllerBase
         IAdDirectoryService ad,
         ITicketOrchestrationService orchestration,
         ITicketStatusService statuses,
+        RequestNumberService requestNumbers,
         ILogger<D365AccessApprovalsController> logger)
     {
         _db = db;
@@ -52,6 +54,7 @@ public class D365AccessApprovalsController : ControllerBase
         _ad = ad;
         _orchestration = orchestration;
         _statuses = statuses;
+        _requestNumbers = requestNumbers;
         _logger = logger;
     }
 
@@ -166,19 +169,7 @@ public class D365AccessApprovalsController : ControllerBase
         if (!await CanViewAsync(ct)) return Forbid();
         var canComplete = await _approvers.CanActOnAsync(User.GetObjectId(), workdayInfo?.PositionTitle, ct);
 
-        string? managerName = workdayInfo?.Manager;
-        if (!string.IsNullOrWhiteSpace(workdayInfo?.ManagerId))
-        {
-            var manager = await _workday.WorkdayDemographics
-                .Where(w => w.EmployeeId == workdayInfo.ManagerId && w.PrimaryJob == true)
-                .Select(w => new { w.FirstName, w.PreferredFirstName, w.LastName })
-                .FirstOrDefaultAsync(ct);
-            if (manager is not null)
-            {
-                managerName = $"{manager.PreferredFirstName ?? manager.FirstName} {manager.LastName}";
-            }
-        }
-
+        var managerName = await ResolveManagerNameAsync(workdayInfo?.ManagerId, workdayInfo?.Manager, ct);
         var peers = await BuildPeersAsync(employee.WorkdayEmployeeId, workdayInfo?.JobCode, workdayInfo?.PositionTitle, ct);
 
         return Ok(new D365AccessApprovalDetailDto
@@ -208,6 +199,22 @@ public class D365AccessApprovalsController : ControllerBase
             RoleCatalog = TdxD365RoleCheckboxes.All.ToList(),
             Peers = peers
         });
+    }
+
+    /// <summary>Resolves the manager's PREFERRED name where possible (a Workday primary-job row of
+    /// their own), falling back to Workday's own raw Manager string when the manager isn't (or is
+    /// no longer) one — shared by Detail() and the ad-hoc prefill endpoint; List() has its own
+    /// batched version of the same lookup since it's resolving many employees at once.</summary>
+    private async Task<string?> ResolveManagerNameAsync(string? managerId, string? fallbackManagerName, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(managerId)) return fallbackManagerName;
+
+        var manager = await _workday.WorkdayDemographics
+            .Where(w => w.EmployeeId == managerId && w.PrimaryJob == true)
+            .Select(w => new { w.FirstName, w.PreferredFirstName, w.LastName })
+            .FirstOrDefaultAsync(ct);
+
+        return manager is not null ? $"{manager.PreferredFirstName ?? manager.FirstName} {manager.LastName}" : fallbackManagerName;
     }
 
     /// <summary>"{Job_Profile} - {Position_Title}" — Workday's own Job_Profile is already English
@@ -333,5 +340,132 @@ public class D365AccessApprovalsController : ControllerBase
             TicketNumber = result.TicketNumber,
             Error = result.Error
         });
+    }
+
+    /// <summary>Powers the standalone D365AccessRequest app's employee picker: once a D365 Approver
+    /// picks someone from Workday, this returns everything to prefill and display — same shape as
+    /// Detail()'s read-only section, but there is no existing approval/request to read it FROM yet.
+    /// Gated on being ANY D365Approver (not the narrower CanViewAsync, which also admits D365Viewer
+    /// and AppUsers Admin — creating a new request is an approver action, not a viewing one).</summary>
+    [HttpGet("adhoc/prefill")]
+    public async Task<ActionResult<D365AdHocPrefillDto>> AdHocPrefill([FromQuery] string workdayEmployeeId, CancellationToken ct)
+    {
+        if (!await _approvers.HasAnyAccessAsync(User.GetObjectId(), ct)) return Forbid();
+        if (string.IsNullOrWhiteSpace(workdayEmployeeId)) return BadRequest("workdayEmployeeId est requis.");
+
+        var workdayInfo = await _workday.WorkdayDemographics
+            .Where(w => w.EmployeeId == workdayEmployeeId && w.PrimaryJob == true)
+            .Select(w => new
+            {
+                w.JobCode, w.JobProfile, w.PositionTitle, w.JobFamilyGroup, w.CostCenter,
+                w.WorkEmail, w.Email, w.ManagerId, w.Manager, w.FirstName, w.PreferredFirstName, w.LastName
+            })
+            .FirstOrDefaultAsync(ct);
+        if (workdayInfo is null) return NotFound("Employé introuvable (ou son emploi n'est pas l'emploi principal).");
+
+        var managerName = await ResolveManagerNameAsync(workdayInfo.ManagerId, workdayInfo.Manager, ct);
+        var peers = await BuildPeersAsync(workdayEmployeeId, workdayInfo.JobCode, workdayInfo.PositionTitle, ct);
+
+        return Ok(new D365AdHocPrefillDto
+        {
+            WorkdayEmployeeId = workdayEmployeeId,
+            EmployeeName = $"{workdayInfo.PreferredFirstName ?? workdayInfo.FirstName} {workdayInfo.LastName}",
+            EmployeeEmail = workdayInfo.WorkEmail ?? workdayInfo.Email,
+            ManagerName = managerName,
+            PositionTitle = workdayInfo.PositionTitle,
+            JobCode = workdayInfo.JobCode,
+            Departement = workdayInfo.JobFamilyGroup,
+            LegalEntity = FixedLegalEntity,
+            DepartmentNumber = workdayInfo.CostCenter,
+            JobTitleEnglishSuggestion = BuildDefaultJobTitle(workdayInfo.JobProfile, workdayInfo.PositionTitle),
+            RoleCatalog = TdxD365RoleCheckboxes.All.ToList(),
+            Peers = peers
+        });
+    }
+
+    /// <summary>Submits a brand-new, fully-filled-out D365 access request for an employee who never
+    /// went through the onboarding/réactivation wizard — see SubmitAdHocD365AccessDto's doc comment.
+    /// Creates a minimal Request (RequestType.D365AccessOnly — no OnboardingDetail/AccessDetail/etc,
+    /// it exists only to give the approval a Request to hang off of, matching every other approval's
+    /// shape) + one RequestEmployee snapshot + a Pending D365AccessApproval carrying every field the
+    /// requester entered, then emails matched approvers exactly like the wizard-driven path does.</summary>
+    [HttpPost("adhoc")]
+    public async Task<ActionResult<SubmitAdHocD365AccessResultDto>> SubmitAdHoc(SubmitAdHocD365AccessDto dto, CancellationToken ct)
+    {
+        if (!await _approvers.HasAnyAccessAsync(User.GetObjectId(), ct)) return Forbid();
+
+        if (string.IsNullOrWhiteSpace(dto.WorkdayEmployeeId)) return BadRequest("L'employé est requis.");
+        if (string.IsNullOrWhiteSpace(dto.JobTitleEnglish)) return BadRequest("Le titre du poste (anglais) est requis.");
+        if (dto.ApprovalLimit < 0) return BadRequest("La limite d'approbation ne peut pas être négative.");
+        var invalidRoles = dto.Roles.Except(TdxD365RoleCheckboxes.All).ToList();
+        if (invalidRoles.Count > 0) return BadRequest($"Rôle(s) inconnu(s) : {string.Join(", ", invalidRoles)}");
+
+        var workdayInfo = await _workday.WorkdayDemographics
+            .Where(w => w.EmployeeId == dto.WorkdayEmployeeId && w.PrimaryJob == true)
+            .Select(w => new
+            {
+                w.JobCode, w.PositionTitle, w.JobFamilyGroup, w.CostCenter, w.TimeType, w.WorkerType,
+                w.Manager, w.FirstName, w.PreferredFirstName, w.LastName
+            })
+            .FirstOrDefaultAsync(ct);
+        if (workdayInfo is null) return BadRequest("Employé introuvable (ou son emploi n'est pas l'emploi principal).");
+
+        var requesterInfo = _ad.GetUserInfo(User.GetSamAccountName());
+        var employeeName = $"{workdayInfo.PreferredFirstName ?? workdayInfo.FirstName} {workdayInfo.LastName}";
+
+        var request = new Request
+        {
+            RequestNumber = await _requestNumbers.GenerateAsync(RequestType.D365AccessOnly, ct),
+            RequestType = RequestType.D365AccessOnly,
+            Status = RequestStatus.Soumise,
+            CreatedByObjectId = User.GetObjectId(),
+            CreatedByDisplayName = requesterInfo.DisplayName ?? User.GetObjectId(),
+            RequesterEmail = requesterInfo.Email,
+            CreatedAt = DateTime.UtcNow,
+            SubmittedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+        request.Employees.Add(new RequestEmployee
+        {
+            WorkdayEmployeeId = dto.WorkdayEmployeeId,
+            NameSnapshot = employeeName,
+            PositionSnapshot = workdayInfo.PositionTitle,
+            DepartementSnapshot = workdayInfo.JobFamilyGroup,
+            CodeEmploiSnapshot = workdayInfo.JobCode,
+            TypeEmploiSnapshot = workdayInfo.TimeType != null && workdayInfo.WorkerType != null ? $"{workdayInfo.TimeType} — {workdayInfo.WorkerType}" : workdayInfo.TimeType,
+            GestionnaireSnapshot = workdayInfo.Manager,
+            IsPrimary = true
+        });
+        _db.Requests.Add(request);
+        await _db.SaveChangesAsync(ct);
+
+        var approval = new D365AccessApproval
+        {
+            RequestId = request.RequestId,
+            RequestEmployeeId = request.Employees.Single().RequestEmployeeId,
+            Status = D365ApprovalStatus.Pending,
+            JobTitleEnglish = dto.JobTitleEnglish.Trim(),
+            LegalEntity = FixedLegalEntity,
+            DepartmentNumber = workdayInfo.CostCenter,
+            ApprovalLimit = dto.ApprovalLimit,
+            LevyEmployee = dto.LevyEmployee,
+            ApAccessDetails = string.IsNullOrWhiteSpace(dto.ApAccessDetails) ? null : dto.ApAccessDetails.Trim(),
+            AdditionalLegalEntities = string.IsNullOrWhiteSpace(dto.AdditionalLegalEntities) ? null : dto.AdditionalLegalEntities.Trim(),
+            DefaultShippingAddress = string.IsNullOrWhiteSpace(dto.DefaultShippingAddress) ? null : dto.DefaultShippingAddress.Trim(),
+            Comments = string.IsNullOrWhiteSpace(dto.Comments) ? null : dto.Comments.Trim(),
+            CreatedAt = DateTime.UtcNow
+        };
+        foreach (var role in dto.Roles.Distinct())
+        {
+            approval.Roles.Add(new D365AccessApprovalRole { Role = role });
+        }
+        _db.D365AccessApprovals.Add(approval);
+        await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation("D365 approver {Approver} submitted ad-hoc D365 access request {RequestNumber} for {Employee}", User.GetObjectId(), request.RequestNumber, employeeName);
+
+        await _orchestration.NotifyD365ApproversOfAdHocRequestAsync(request, approval, workdayInfo.PositionTitle, ct);
+
+        return Ok(new SubmitAdHocD365AccessResultDto { RequestId = request.RequestId, RequestNumber = request.RequestNumber });
     }
 }

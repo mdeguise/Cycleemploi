@@ -23,6 +23,11 @@ public interface ITicketOrchestrationService
     /// saved fields — called by D365AccessApprovalsController.Complete right after an approver
     /// submits the form.</summary>
     Task<TicketRetryResult> CreateD365AccessTicketAsync(Request request, D365AccessApproval approval, CancellationToken ct);
+
+    /// <summary>Emails the matched D365Approvers (or IT, if none match) that a fully-filled-out
+    /// ad-hoc D365 access request is ready for their review — called by
+    /// D365AccessApprovalsController.SubmitAdHoc right after it creates the Pending approval.</summary>
+    Task NotifyD365ApproversOfAdHocRequestAsync(Request request, D365AccessApproval approval, string? positionTitle, CancellationToken ct);
 }
 
 /// <summary>All the downstream ticket-system integrations, extracted out of RequestsController so
@@ -554,6 +559,66 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         catch (Exception emailEx)
         {
             _logger.LogError(emailEx, "Failed to email D365 approvers for request {RequestNumber}", request.RequestNumber);
+        }
+    }
+
+    /// <summary>Same recipient-matching and fallback-to-IT logic as
+    /// TryCreateD365AccessApprovalRequestAsync, but the wording assumes the approval is ALREADY
+    /// fully filled out (ad-hoc submissions from D365AccessRequest carry every field from the
+    /// moment they're created) — the approver's job here is to review and press Envoyer, not to
+    /// fill in blanks.</summary>
+    public async Task NotifyD365ApproversOfAdHocRequestAsync(Request request, D365AccessApproval approval, string? positionTitle, CancellationToken ct)
+    {
+        var employee = request.Employees.FirstOrDefault(e => e.RequestEmployeeId == approval.RequestEmployeeId)
+            ?? request.Employees.FirstOrDefault(e => e.IsPrimary) ?? request.Employees.FirstOrDefault();
+        if (employee is null) return;
+
+        var approvers = await _d365Approvers.MatchingAsync(positionTitle, ct);
+        var recipients = approvers.Where(a => !string.IsNullOrWhiteSpace(a.Email)).Select(a => a.Email!).ToList();
+
+        var link = string.IsNullOrWhiteSpace(_appOptions.BaseUrl)
+            ? $"/admin/d365-approvals/{request.RequestId}"
+            : $"{_appOptions.BaseUrl.TrimEnd('/')}/admin/d365-approvals/{request.RequestId}";
+
+        if (recipients.Count == 0)
+        {
+            _logger.LogWarning("No D365Approver matched ad-hoc request {RequestNumber} (position title {PositionTitle}) — emailing IT instead", request.RequestNumber, positionTitle);
+
+            var fallbackSubject = $"[Cycle Emploi] Aucun approbateur D365 configuré — demande #{request.RequestNumber} — {employee.NameSnapshot}";
+            var fallbackBody =
+                $"La demande #{request.RequestNumber} (accès D365, demande directe) a été remplie par {request.CreatedByDisplayName} pour " +
+                $"{employee.NameSnapshot} (titre de poste : {positionTitle ?? "inconnu"}), mais aucun approbateur D365 (global ou pour ce titre " +
+                "de poste) n'est configuré pour recevoir la demande.\n\n" +
+                $"Ajoutez un approbateur dans Administration > Approbateurs D365, puis envoyez le formulaire vous-même à ce lien :\n{link}\n";
+
+            try
+            {
+                await _email.SendAsync(fallbackSubject, fallbackBody, ct);
+            }
+            catch (Exception emailEx)
+            {
+                _logger.LogError(emailEx, "Also failed to send the no-D365-approver-configured email for ad-hoc request {RequestNumber}", request.RequestNumber);
+            }
+            return;
+        }
+
+        var subject = $"[Cycle Emploi] Approbation D365 requise — demande #{request.RequestNumber} — {employee.NameSnapshot}";
+        var body =
+            $"{request.CreatedByDisplayName} a rempli une demande d'accès D365 pour {employee.NameSnapshot} et l'a soumise pour révision.\n\n" +
+            "== Détails ==\n" +
+            $"Employé : {employee.NameSnapshot}\n" +
+            $"Titre de poste : {positionTitle ?? "inconnu"}\n" +
+            $"Département : {employee.DepartementSnapshot}\n" +
+            $"Rempli par : {request.CreatedByDisplayName}\n\n" +
+            $"Le formulaire est déjà entièrement rempli — vérifiez-le et appuyez sur « Envoyer » pour créer le billet TDX :\n{link}\n";
+
+        try
+        {
+            await _email.SendAsync(subject, body, recipients, ct);
+        }
+        catch (Exception emailEx)
+        {
+            _logger.LogError(emailEx, "Failed to email D365 approvers for ad-hoc request {RequestNumber}", request.RequestNumber);
         }
     }
 
