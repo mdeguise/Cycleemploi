@@ -22,6 +22,16 @@ public class CreateD365ApproverDto
     public string? PositionTitle { get; set; }
 }
 
+/// <summary>One row of the "Titres de poste" screen's master list — a distinct Workday
+/// Position_Title plus every JobCode currently filed under it (a title can be shared by more
+/// than one JobCode). JobCodes are informational only — approver routing matches on
+/// PositionTitle alone, never JobCode.</summary>
+public class D365PositionTitleDto
+{
+    public string PositionTitle { get; set; } = null!;
+    public List<string> JobCodes { get; set; } = new();
+}
+
 /// <summary>"IT Personnel" — sees the tracking list and every request's status, never the Envoyer
 /// action. See D365Viewer's doc comment.</summary>
 public class D365ViewerDto

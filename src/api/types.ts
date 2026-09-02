@@ -174,6 +174,13 @@ export interface CreateD365ApproverDto {
   positionTitle?: string | null;
 }
 
+/** One row of the "Titres de poste" master list. jobCodes is informational only — approver
+ * routing matches on positionTitle alone, never jobCode. */
+export interface D365PositionTitleDto {
+  positionTitle: string;
+  jobCodes: string[];
+}
+
 export interface D365ViewerDto {
   d365ViewerId: number;
   sam: string;

@@ -82,18 +82,34 @@ public class D365ApproversController : ControllerBase
     /// terminated employees, primary job only — same filter as EmployeesController's search) —
     /// the master list the "assign an approver per position title" screen walks through. NOT the
     /// same as D365Approver.PositionTitle values already assigned; a title can appear here with
-    /// zero approvers scoped to it, which is exactly what that screen needs to show as a gap.</summary>
+    /// zero approvers scoped to it, which is exactly what that screen needs to show as a gap.
+    /// Each title carries the JobCode(s) currently filed under it, shown for reference only — the
+    /// approver-matching itself still keys on PositionTitle alone.</summary>
     [HttpGet("position-titles")]
-    public async Task<ActionResult<List<string>>> PositionTitles(CancellationToken ct)
+    public async Task<ActionResult<List<D365PositionTitleDto>>> PositionTitles(CancellationToken ct)
     {
         if (!await CanViewAsync(ct)) return Forbid();
 
-        var titles = await _workday.WorkdayDemographics.AsNoTracking()
+        var rows = await _workday.WorkdayDemographics.AsNoTracking()
             .Where(w => w.PrimaryJob == true && w.EmploymentStatus != "Terminated" && w.PositionTitle != null && w.PositionTitle != "")
-            .Select(w => w.PositionTitle!)
+            .Select(w => new { w.PositionTitle, w.JobCode })
             .Distinct()
-            .OrderBy(t => t)
             .ToListAsync(ct);
+
+        var titles = rows
+            .GroupBy(r => r.PositionTitle!)
+            .Select(g => new D365PositionTitleDto
+            {
+                PositionTitle = g.Key,
+                JobCodes = g.Select(r => r.JobCode)
+                    .Where(c => !string.IsNullOrWhiteSpace(c))
+                    .Select(c => c!)
+                    .Distinct()
+                    .OrderBy(c => c)
+                    .ToList()
+            })
+            .OrderBy(t => t.PositionTitle)
+            .ToList();
 
         return Ok(titles);
     }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useApi } from '../api/ApiContext';
-import type { D365ApproverDto, MeDto } from '../api/types';
+import type { D365ApproverDto, D365PositionTitleDto, MeDto } from '../api/types';
 import { usePicker, PickerField } from '../components/AdPicker';
 
 /** The bare sAMAccountName from a Windows identity like "ENTERPRISE\\mdeguise" (or an email/plain
@@ -31,7 +31,7 @@ export function D365PositionTitleAssignmentsPage({ me }: { me: MeDto }) {
   const isApprover = me.isD365Approver;
   const mySam = bareSam(me.objectId);
 
-  const [titles, setTitles] = useState<string[]>([]);
+  const [titles, setTitles] = useState<D365PositionTitleDto[]>([]);
   const [approvers, setApprovers] = useState<D365ApproverDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -50,7 +50,7 @@ export function D365PositionTitleAssignmentsPage({ me }: { me: MeDto }) {
       .then(([t, a]) => {
         setTitles(t);
         setApprovers(a);
-        setOtherTitle((current) => current || t[0] || '');
+        setOtherTitle((current) => current || t[0]?.positionTitle || '');
       })
       .catch((err) => setLoadError(err instanceof Error ? err.message : 'Erreur inconnue'))
       .finally(() => setIsLoading(false));
@@ -61,7 +61,13 @@ export function D365PositionTitleAssignmentsPage({ me }: { me: MeDto }) {
   const globalCount = approvers.filter((a) => !a.positionTitle).length;
   const filteredTitles = useMemo(() => {
     const q = filter.trim().toLowerCase();
-    return q ? titles.filter((t) => t.toLowerCase().includes(q)) : titles;
+    return q
+      ? titles.filter(
+          (t) =>
+            t.positionTitle.toLowerCase().includes(q) ||
+            t.jobCodes.some((code) => code.toLowerCase().includes(q)),
+        )
+      : titles;
   }, [titles, filter]);
 
   const handleSelfAssign = async (title: string) => {
@@ -157,6 +163,7 @@ export function D365PositionTitleAssignmentsPage({ me }: { me: MeDto }) {
               <thead>
                 <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--border, #ddd)' }}>
                   <th style={{ padding: '8px 12px', position: 'sticky', top: 0, background: 'var(--bg-card, #fff)' }}>Titre de poste ({titles.length})</th>
+                  <th style={{ padding: '8px 12px', position: 'sticky', top: 0, background: 'var(--bg-card, #fff)' }}>Code(s) d'emploi</th>
                   <th style={{ padding: '8px 12px', position: 'sticky', top: 0, background: 'var(--bg-card, #fff)' }}>Approbateur</th>
                   {isApprover && <th style={{ padding: '8px 12px', position: 'sticky', top: 0, background: 'var(--bg-card, #fff)' }}></th>}
                 </tr>
@@ -164,17 +171,21 @@ export function D365PositionTitleAssignmentsPage({ me }: { me: MeDto }) {
               <tbody>
                 {filteredTitles.length === 0 && (
                   <tr>
-                    <td colSpan={isApprover ? 3 : 2} style={{ padding: '8px 12px', color: 'var(--muted)' }}>
+                    <td colSpan={isApprover ? 4 : 3} style={{ padding: '8px 12px', color: 'var(--muted)' }}>
                       {titles.length === 0 ? 'Aucun titre de poste trouvé.' : 'Aucun titre ne correspond au filtre.'}
                     </td>
                   </tr>
                 )}
-                {filteredTitles.map((title) => {
+                {filteredTitles.map((row) => {
+                  const title = row.positionTitle;
                   const scoped = approvers.filter((a) => a.positionTitle === title);
                   const isMine = scoped.some((a) => a.sam === mySam);
                   return (
                     <tr key={title} style={{ borderBottom: '1px solid var(--border, #eee)' }}>
                       <td style={{ padding: '8px 12px' }}>{title}</td>
+                      <td style={{ padding: '8px 12px', color: 'var(--muted)', fontFamily: 'monospace', fontSize: '0.9em' }}>
+                        {row.jobCodes.length > 0 ? row.jobCodes.join(', ') : '—'}
+                      </td>
                       <td style={{ padding: '8px 12px' }}>
                         {scoped.length === 0 ? (
                           <span style={{ color: 'var(--muted)' }}>— (approbateurs globaux)</span>
@@ -232,8 +243,8 @@ export function D365PositionTitleAssignmentsPage({ me }: { me: MeDto }) {
                   <label className="field__label">Titre de poste</label>
                   <div className="field__input-wrap">
                     <select value={otherTitle} onChange={(ev) => setOtherTitle(ev.target.value)}>
-                      {titles.map((title) => (
-                        <option key={title} value={title}>{title}</option>
+                      {titles.map((t) => (
+                        <option key={t.positionTitle} value={t.positionTitle}>{t.positionTitle}</option>
                       ))}
                     </select>
                   </div>
