@@ -79,6 +79,7 @@ export function createApi(client: ApiClient) {
         client.get<AdAccountDto[]>(`/api/d365-approvers/ad-search?q=${encodeURIComponent(q)}`),
       add: (dto: CreateD365ApproverDto) => client.post<D365ApproverDto>('/api/d365-approvers', dto),
       remove: (id: number) => client.delete<void>(`/api/d365-approvers/${id}`),
+      positionTitles: () => client.get<string[]>('/api/d365-approvers/position-titles'),
     },
     d365Viewers: {
       list: () => client.get<D365ViewerDto[]>('/api/d365-viewers'),

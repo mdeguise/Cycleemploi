@@ -28,6 +28,7 @@ import { TicketTemplatesAdminPage } from './admin/TicketTemplatesAdminPage';
 import { AppUsersAdminPage } from './admin/AppUsersAdminPage';
 import { RequestsAdminPage } from './admin/RequestsAdminPage';
 import { D365ApproversAdminPage } from './admin/D365ApproversAdminPage';
+import { D365PositionTitleAssignmentsPage } from './admin/D365PositionTitleAssignmentsPage';
 import { D365ApprovalsListPage } from './admin/D365ApprovalsListPage';
 import { D365ApprovalFormPage } from './admin/D365ApprovalFormPage';
 import type { MeDto } from './api/types';
@@ -62,6 +63,7 @@ function AdminLayout({ title, me, children }: { title: string; me: MeDto; childr
           {me.isTicketTemplateAdmin && (
             <>
               <Link to="/admin/d365-approvers">Approbateurs D365</Link>
+              <Link to="/admin/d365-position-titles">Titres de poste</Link>
               <Link to="/admin/ticket-templates">Gabarits des billets</Link>
               <Link to="/admin/app-users">Administrateurs</Link>
             </>
@@ -214,6 +216,16 @@ function AuthenticatedApp() {
             <AdminLayout title="Administration — Approbateurs D365" me={me}>
               <TicketTemplateAdminGuard me={me}>
                 <D365ApproversAdminPage />
+              </TicketTemplateAdminGuard>
+            </AdminLayout>
+          }
+        />
+        <Route
+          path="/admin/d365-position-titles"
+          element={
+            <AdminLayout title="Administration — Titres de poste" me={me}>
+              <TicketTemplateAdminGuard me={me}>
+                <D365PositionTitleAssignmentsPage />
               </TicketTemplateAdminGuard>
             </AdminLayout>
           }

@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using TremblantLifecycle.Api.Data;
 using TremblantLifecycle.Api.Models.Dtos;
 using TremblantLifecycle.Api.Services;
 
@@ -18,12 +20,14 @@ public class D365ApproversController : ControllerBase
     private readonly ID365ApproverService _approvers;
     private readonly IAppUserService _appUsers;
     private readonly IAdDirectoryService _ad;
+    private readonly WorkdayContext _workday;
 
-    public D365ApproversController(ID365ApproverService approvers, IAppUserService appUsers, IAdDirectoryService ad)
+    public D365ApproversController(ID365ApproverService approvers, IAppUserService appUsers, IAdDirectoryService ad, WorkdayContext workday)
     {
         _approvers = approvers;
         _appUsers = appUsers;
         _ad = ad;
+        _workday = workday;
     }
 
     private Task<bool> IsCallerAdminAsync(CancellationToken ct) =>
@@ -63,6 +67,26 @@ public class D365ApproversController : ControllerBase
             DisplayName = a.Cn ?? a.Sam,
             Email = a.Email
         }).ToList());
+    }
+
+    /// <summary>Every distinct Workday Position_Title currently in use (active/inactive-but-not-
+    /// terminated employees, primary job only — same filter as EmployeesController's search) —
+    /// the master list the "assign an approver per position title" screen walks through. NOT the
+    /// same as D365Approver.PositionTitle values already assigned; a title can appear here with
+    /// zero approvers scoped to it, which is exactly what that screen needs to show as a gap.</summary>
+    [HttpGet("position-titles")]
+    public async Task<ActionResult<List<string>>> PositionTitles(CancellationToken ct)
+    {
+        if (!await IsCallerAdminAsync(ct)) return Forbid();
+
+        var titles = await _workday.WorkdayDemographics.AsNoTracking()
+            .Where(w => w.PrimaryJob == true && w.EmploymentStatus != "Terminated" && w.PositionTitle != null && w.PositionTitle != "")
+            .Select(w => w.PositionTitle!)
+            .Distinct()
+            .OrderBy(t => t)
+            .ToListAsync(ct);
+
+        return Ok(titles);
     }
 
     [HttpPost]
