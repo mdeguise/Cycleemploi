@@ -223,7 +223,7 @@ function AuthenticatedApp() {
           element={
             <AdminLayout title="Administration — Approbations D365" me={me}>
               <D365ApprovalsSectionGuard me={me}>
-                <D365ApprovalsListPage />
+                <D365ApprovalsListPage me={me} />
               </D365ApprovalsSectionGuard>
             </AdminLayout>
           }
@@ -233,7 +233,7 @@ function AuthenticatedApp() {
           element={
             <AdminLayout title="Administration — Approbations D365" me={me}>
               <D365ApprovalsSectionGuard me={me}>
-                <D365ApprovalFormPage />
+                <D365ApprovalFormPage me={me} />
               </D365ApprovalsSectionGuard>
             </AdminLayout>
           }

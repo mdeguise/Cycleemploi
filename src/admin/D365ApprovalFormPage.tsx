@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApi } from '../api/ApiContext';
 import { Field } from '../components/FormField';
-import type { D365AccessApprovalDetailDto } from '../api/types';
+import type { D365AccessApprovalDetailDto, MeDto } from '../api/types';
 
-export function D365ApprovalFormPage() {
+export function D365ApprovalFormPage({ me }: { me: MeDto }) {
   const { requestId } = useParams<{ requestId: string }>();
   const navigate = useNavigate();
   const api = useApi();
@@ -118,8 +118,17 @@ export function D365ApprovalFormPage() {
       )}
       {!data.canComplete && data.status === 'Pending' && (
         <div className="big-notice">
-          Vous consultez cette demande, mais vous n'êtes pas l'approbateur assigné — seul un approbateur D365 associé
-          (globalement ou pour le titre de poste « {data.positionTitle ?? '—'} ») peut la compléter.
+          {me.isD365Approver ? (
+            <>
+              Vous consultez cette demande, mais vous n'êtes pas l'approbateur assigné — seul un approbateur D365 associé
+              (globalement ou pour le titre de poste « {data.positionTitle ?? '—'} ») peut la compléter.
+            </>
+          ) : (
+            <>
+              Vous consultez cette demande à titre de Personnel TI (accès en lecture seule) — seul un approbateur
+              D365 associé peut la compléter et l'envoyer à TDX.
+            </>
+          )}
         </div>
       )}
       {data.status === 'Completed' && !submitResult && (

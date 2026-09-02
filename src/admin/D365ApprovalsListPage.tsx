@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApi } from '../api/ApiContext';
-import type { D365AccessApprovalSummaryDto } from '../api/types';
+import type { D365AccessApprovalSummaryDto, MeDto } from '../api/types';
 
 const TDX_TICKET_URL = 'https://get.alterra.support/TDNext/Apps/278/Tickets/TicketDet?TicketID=';
 
-export function D365ApprovalsListPage() {
+export function D365ApprovalsListPage({ me }: { me: MeDto }) {
+  // A D365Viewer who isn't ALSO a D365Approver can open a pending request but never act on it —
+  // the link still goes to the same form page (canComplete drives the read-only state there), only
+  // the label changes so "Personnel TI" isn't invited to fill out something they can't send.
+  const canAct = me.isD365Approver;
   const api = useApi();
   const [rows, setRows] = useState<D365AccessApprovalSummaryDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -83,7 +87,7 @@ export function D365ApprovalsListPage() {
                   <td style={{ padding: '8px 12px' }}>{new Date(r.createdAt).toLocaleDateString('fr-CA')}</td>
                   <td style={{ padding: '8px 12px', textAlign: 'right' }}>
                     <Link className="review-section__edit" to={`/admin/d365-approvals/${r.requestId}`}>
-                      Remplir le formulaire
+                      {canAct ? 'Remplir le formulaire' : 'Voir les détails'}
                     </Link>
                   </td>
                 </tr>
