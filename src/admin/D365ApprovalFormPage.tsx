@@ -14,12 +14,11 @@ export function D365ApprovalFormPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [jobTitleEnglish, setJobTitleEnglish] = useState('');
-  const [legalEntity, setLegalEntity] = useState('');
-  const [departmentNumber, setDepartmentNumber] = useState('');
   const [approvalLimit, setApprovalLimit] = useState('');
   const [levyEmployee, setLevyEmployee] = useState(false);
   const [apAccessDetails, setApAccessDetails] = useState('');
   const [additionalLegalEntities, setAdditionalLegalEntities] = useState('');
+  const [comments, setComments] = useState('');
   const [roles, setRoles] = useState<string[]>([]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -35,12 +34,11 @@ export function D365ApprovalFormPage() {
       .then((d) => {
         setData(d);
         setJobTitleEnglish(d.jobTitleEnglish ?? '');
-        setLegalEntity(d.legalEntity ?? '');
-        setDepartmentNumber(d.departmentNumber ?? '');
         setApprovalLimit(d.approvalLimit != null ? String(d.approvalLimit) : '');
         setLevyEmployee(d.levyEmployee ?? false);
         setApAccessDetails(d.apAccessDetails ?? '');
         setAdditionalLegalEntities(d.additionalLegalEntities ?? '');
+        setComments(d.comments ?? '');
         setRoles(d.roles);
       })
       .catch((err) => setLoadError(err instanceof Error ? err.message : 'Erreur inconnue'))
@@ -56,8 +54,8 @@ export function D365ApprovalFormPage() {
     if (!requestId) return;
     setSubmitError(null);
 
-    if (!jobTitleEnglish.trim() || !legalEntity.trim() || !departmentNumber.trim()) {
-      setSubmitError('Le titre du poste (anglais), l\'entité légale et le numéro de département sont requis.');
+    if (!jobTitleEnglish.trim()) {
+      setSubmitError('Le titre du poste (anglais) est requis.');
       return;
     }
     const limit = Number(approvalLimit);
@@ -70,12 +68,11 @@ export function D365ApprovalFormPage() {
     try {
       const result = await api.d365AccessApprovals.complete(Number(requestId), {
         jobTitleEnglish: jobTitleEnglish.trim(),
-        legalEntity: legalEntity.trim(),
-        departmentNumber: departmentNumber.trim(),
         approvalLimit: limit,
         levyEmployee,
         apAccessDetails: apAccessDetails.trim() || null,
         additionalLegalEntities: additionalLegalEntities.trim() || null,
+        comments: comments.trim() || null,
         roles,
       });
       setSubmitResult(result);
@@ -104,6 +101,12 @@ export function D365ApprovalFormPage() {
         </div>
       </div>
 
+      {!submitResult && data.status === 'Pending' && (
+        <div className="big-notice">
+          En appuyant sur « Envoyer », une véritable demande d'accès D365 sera créée dans TDX (formulaire « D365 -
+          Access », équipe ENT - FinApp Triage) — cette action n'est pas réversible depuis cette page.
+        </div>
+      )}
       {submitResult?.succeeded && (
         <div className="big-notice">
           Billet TDX créé{submitResult.ticketNumber ? ` — numéro ${submitResult.ticketNumber}` : ''}. Cette approbation est
@@ -130,6 +133,10 @@ export function D365ApprovalFormPage() {
         <Field label="Gestionnaire"><input type="text" value={data.managerName ?? '—'} disabled /></Field>
         <Field label="Date de début"><input type="text" value={data.startDate ?? '—'} disabled /></Field>
         <Field label="Demandé par"><input type="text" value={data.requesterName} disabled /></Field>
+        <Field label="Resort"><input type="text" value="Tremblant" disabled /></Field>
+        <Field label="Access Type"><input type="text" value="New Access" disabled /></Field>
+        <Field label="Entité légale"><input type="text" value={data.legalEntity} disabled /></Field>
+        <Field label="Numéro de département"><input type="text" value={data.departmentNumber ?? '—'} disabled /></Field>
       </div>
 
       <form onSubmit={handleSubmit}>
@@ -137,12 +144,6 @@ export function D365ApprovalFormPage() {
         <div className="field-grid field-grid--2">
           <Field label="Titre du poste (anglais)" required>
             <input type="text" value={jobTitleEnglish} onChange={(ev) => setJobTitleEnglish(ev.target.value)} disabled={readOnly} />
-          </Field>
-          <Field label="Entité légale" required>
-            <input type="text" value={legalEntity} onChange={(ev) => setLegalEntity(ev.target.value)} disabled={readOnly} />
-          </Field>
-          <Field label="Numéro de département" required>
-            <input type="text" value={departmentNumber} onChange={(ev) => setDepartmentNumber(ev.target.value)} disabled={readOnly} />
           </Field>
           <Field label="Limite d'approbation ($)" required>
             <input type="number" min="0" step="0.01" value={approvalLimit} onChange={(ev) => setApprovalLimit(ev.target.value)} disabled={readOnly} />
@@ -178,6 +179,10 @@ export function D365ApprovalFormPage() {
 
         <Field label="Entités légales additionnelles (optionnel)">
           <textarea value={additionalLegalEntities} onChange={(ev) => setAdditionalLegalEntities(ev.target.value)} disabled={readOnly} />
+        </Field>
+
+        <Field label="Commentaires (optionnel)">
+          <textarea value={comments} onChange={(ev) => setComments(ev.target.value)} disabled={readOnly} />
         </Field>
 
         {data.peers.length > 0 && (

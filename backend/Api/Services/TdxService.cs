@@ -148,6 +148,10 @@ public class TdxService : ITdxService
             rows.Add(("Additional Legal Entities Needing Access To", input.AdditionalLegalEntities));
         }
         rows.Add(("Approval Limit", input.ApprovalLimit.ToString("C0", System.Globalization.CultureInfo.GetCultureInfo("en-US"))));
+        if (!string.IsNullOrWhiteSpace(input.Comments))
+        {
+            rows.Add(("Comments", input.Comments));
+        }
 
         var sb = new StringBuilder();
         sb.Append("<table class=\"table table-hover table-striped\">");

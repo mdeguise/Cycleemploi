@@ -19,6 +19,10 @@ namespace TremblantLifecycle.Api.Controllers;
 [Authorize]
 public class D365AccessApprovalsController : ControllerBase
 {
+    /// <summary>Every D365 access request uses the same D365 F&amp;O legal entity — set here, never
+    /// an approver input.</summary>
+    private const string FixedLegalEntity = "6201";
+
     private readonly AppDbContext _db;
     private readonly WorkdayContext _workday;
     private readonly ID365ApproverService _approvers;
@@ -124,7 +128,7 @@ public class D365AccessApprovalsController : ControllerBase
 
         var workdayInfo = await _workday.WorkdayDemographics
             .Where(w => w.EmployeeId == employee.WorkdayEmployeeId && w.PrimaryJob == true)
-            .Select(w => new { w.JobCode, w.PositionTitle, w.WorkEmail, w.Email, w.ManagerId, w.Manager })
+            .Select(w => new { w.JobCode, w.JobProfile, w.PositionTitle, w.CostCenter, w.WorkEmail, w.Email, w.ManagerId, w.Manager })
             .FirstOrDefaultAsync(ct);
 
         if (!await CanViewAsync(ct)) return Forbid();
@@ -159,17 +163,29 @@ public class D365AccessApprovalsController : ControllerBase
             JobCode = workdayInfo?.JobCode ?? employee.CodeEmploiSnapshot,
             Departement = employee.DepartementSnapshot,
             StartDate = approval.Request.OnboardingDetail?.DateEntreePrevue,
-            JobTitleEnglish = approval.JobTitleEnglish ?? workdayInfo?.PositionTitle ?? employee.PositionSnapshot,
-            LegalEntity = approval.LegalEntity,
-            DepartmentNumber = approval.DepartmentNumber,
+            JobTitleEnglish = approval.JobTitleEnglish ?? BuildDefaultJobTitle(workdayInfo?.JobProfile, workdayInfo?.PositionTitle ?? employee.PositionSnapshot),
+            LegalEntity = FixedLegalEntity,
+            DepartmentNumber = approval.DepartmentNumber ?? workdayInfo?.CostCenter,
             ApprovalLimit = approval.ApprovalLimit,
             ApAccessDetails = approval.ApAccessDetails,
             AdditionalLegalEntities = approval.AdditionalLegalEntities,
+            Comments = approval.Comments,
             LevyEmployee = approval.LevyEmployee,
             Roles = approval.Roles.Select(r => r.Role).OrderBy(r => r).ToList(),
             RoleCatalog = TdxD365RoleCheckboxes.All.ToList(),
             Peers = peers
         });
+    }
+
+    /// <summary>"{Job_Profile} - {Position_Title}" — Workday's own Job_Profile is already English
+    /// (e.g. "0115U - Maintenance Attendant"), unlike Position_Title (French-only at Tremblant), so
+    /// this gives the approver a starting point with both the English label and the French title
+    /// for context, which they can trim down. Falls back gracefully if either half is missing.</summary>
+    private static string? BuildDefaultJobTitle(string? jobProfile, string? positionTitle)
+    {
+        var parts = new[] { jobProfile, positionTitle }.Where(p => !string.IsNullOrWhiteSpace(p));
+        var joined = string.Join(" - ", parts);
+        return string.IsNullOrWhiteSpace(joined) ? null : joined;
     }
 
     /// <summary>Same Job Code AND Position Title, excluding this employee, and the D365 security
@@ -226,16 +242,16 @@ public class D365AccessApprovalsController : ControllerBase
         }
 
         var employee = approval.Request.Employees.FirstOrDefault(e => e.RequestEmployeeId == approval.RequestEmployeeId);
-        var positionTitle = employee is null ? null : await _workday.WorkdayDemographics
+        var workdayInfo = employee is null ? null : await _workday.WorkdayDemographics
             .Where(w => w.EmployeeId == employee.WorkdayEmployeeId && w.PrimaryJob == true)
-            .Select(w => w.PositionTitle)
+            .Select(w => new { w.PositionTitle, w.CostCenter })
             .FirstOrDefaultAsync(ct);
 
-        if (!await _approvers.CanActOnAsync(User.GetObjectId(), positionTitle, ct)) return Forbid();
+        if (!await _approvers.CanActOnAsync(User.GetObjectId(), workdayInfo?.PositionTitle, ct)) return Forbid();
 
-        if (string.IsNullOrWhiteSpace(dto.JobTitleEnglish) || string.IsNullOrWhiteSpace(dto.LegalEntity) || string.IsNullOrWhiteSpace(dto.DepartmentNumber))
+        if (string.IsNullOrWhiteSpace(dto.JobTitleEnglish))
         {
-            return BadRequest("Le titre du poste (anglais), l'entité légale et le numéro de département sont requis.");
+            return BadRequest("Le titre du poste (anglais) est requis.");
         }
         if (dto.ApprovalLimit < 0)
         {
@@ -248,12 +264,13 @@ public class D365AccessApprovalsController : ControllerBase
         }
 
         approval.JobTitleEnglish = dto.JobTitleEnglish.Trim();
-        approval.LegalEntity = dto.LegalEntity.Trim();
-        approval.DepartmentNumber = dto.DepartmentNumber.Trim();
+        approval.LegalEntity = FixedLegalEntity;
+        approval.DepartmentNumber = workdayInfo?.CostCenter;
         approval.ApprovalLimit = dto.ApprovalLimit;
         approval.LevyEmployee = dto.LevyEmployee;
         approval.ApAccessDetails = string.IsNullOrWhiteSpace(dto.ApAccessDetails) ? null : dto.ApAccessDetails.Trim();
         approval.AdditionalLegalEntities = string.IsNullOrWhiteSpace(dto.AdditionalLegalEntities) ? null : dto.AdditionalLegalEntities.Trim();
+        approval.Comments = string.IsNullOrWhiteSpace(dto.Comments) ? null : dto.Comments.Trim();
         approval.Roles.Clear();
         foreach (var role in dto.Roles.Distinct())
         {

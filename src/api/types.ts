@@ -206,11 +206,14 @@ export interface D365AccessApprovalDetailDto {
   departement?: string | null;
   startDate?: string | null;
   jobTitleEnglish?: string | null;
-  legalEntity?: string | null;
+  /** Fixed at "6201" for every request — display only, never an editable input. */
+  legalEntity: string;
+  /** The employee's Workday Cost_Center, verbatim — display only, never an editable input. */
   departmentNumber?: string | null;
   approvalLimit?: number | null;
   apAccessDetails?: string | null;
   additionalLegalEntities?: string | null;
+  comments?: string | null;
   levyEmployee?: boolean | null;
   roles: string[];
   roleCatalog: string[];
@@ -219,12 +222,11 @@ export interface D365AccessApprovalDetailDto {
 
 export interface CompleteD365AccessApprovalDto {
   jobTitleEnglish: string;
-  legalEntity: string;
-  departmentNumber: string;
   approvalLimit: number;
   levyEmployee: boolean;
   apAccessDetails?: string | null;
   additionalLegalEntities?: string | null;
+  comments?: string | null;
   roles: string[];
 }
 

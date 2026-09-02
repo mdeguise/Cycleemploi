@@ -26,6 +26,7 @@ public class WorkdayContext : DbContext
             entity.Property(e => e.LastName).HasColumnName("Last_Name");
             entity.Property(e => e.PositionTitle).HasColumnName("Position_Title");
             entity.Property(e => e.JobCode).HasColumnName("Job_Code");
+            entity.Property(e => e.JobProfile).HasColumnName("Job_Profile");
             entity.Property(e => e.JobFamilyGroup).HasColumnName("Job_Family_Group");
             entity.Property(e => e.TimeType).HasColumnName("Time_Type");
             entity.Property(e => e.WorkerType).HasColumnName("Worker_Type");

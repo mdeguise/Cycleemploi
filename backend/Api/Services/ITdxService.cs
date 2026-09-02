@@ -49,7 +49,8 @@ public record D365AccessTicketInput(
     IReadOnlyList<string> Roles,
     decimal ApprovalLimit,
     string? ApAccessDetails,
-    string? AdditionalLegalEntities
+    string? AdditionalLegalEntities,
+    string? Comments = null
 );
 
 public class TdxTicketException(string message) : Exception(message);

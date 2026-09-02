@@ -76,13 +76,20 @@ public class D365AccessApprovalDetailDto
     public string? Departement { get; set; }
     public DateOnly? StartDate { get; set; }
 
+    /// <summary>Fixed at "6201" for every request — shown for transparency, never an approver
+    /// input. See D365AccessApprovalsController.FixedLegalEntity.</summary>
+    public string LegalEntity { get; set; } = null!;
+
+    /// <summary>The employee's Workday Cost_Center, verbatim — shown for transparency, never an
+    /// approver input.</summary>
+    public string? DepartmentNumber { get; set; }
+
     // ---- Editable by the approver (prefilled if already Completed) ----
     public string? JobTitleEnglish { get; set; }
-    public string? LegalEntity { get; set; }
-    public string? DepartmentNumber { get; set; }
     public decimal? ApprovalLimit { get; set; }
     public string? ApAccessDetails { get; set; }
     public string? AdditionalLegalEntities { get; set; }
+    public string? Comments { get; set; }
     public bool? LevyEmployee { get; set; }
     public List<string> Roles { get; set; } = [];
 
@@ -95,12 +102,11 @@ public class D365AccessApprovalDetailDto
 public class CompleteD365AccessApprovalDto
 {
     public string JobTitleEnglish { get; set; } = null!;
-    public string LegalEntity { get; set; } = null!;
-    public string DepartmentNumber { get; set; } = null!;
     public decimal ApprovalLimit { get; set; }
     public bool LevyEmployee { get; set; }
     public string? ApAccessDetails { get; set; }
     public string? AdditionalLegalEntities { get; set; }
+    public string? Comments { get; set; }
     public List<string> Roles { get; set; } = [];
 }
 

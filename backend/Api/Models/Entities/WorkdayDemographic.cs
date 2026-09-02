@@ -15,6 +15,11 @@ public class WorkdayDemographic
     public string? LastName { get; set; }
     public string? PositionTitle { get; set; }
     public string? JobCode { get; set; }
+
+    /// <summary>Workday's own job profile label — unlike PositionTitle (French-only at Tremblant),
+    /// this is already in English (e.g. "0115U - Maintenance Attendant"), confirmed against real
+    /// data. Used to build the default "Titre du poste (anglais)" on the D365 access approval form.</summary>
+    public string? JobProfile { get; set; }
     public string? JobFamilyGroup { get; set; }
     public string? TimeType { get; set; }
     public string? WorkerType { get; set; }

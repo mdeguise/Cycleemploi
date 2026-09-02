@@ -38,16 +38,29 @@ public class D365AccessApproval
     // ---- Filled in by the approver when they complete the form ----
 
     /// <summary>English translation of the position title — the TDX form must be entirely in
-    /// English and Workday's Position_Title is French-only at Tremblant. Pre-filled with the French
-    /// title as a starting point; the approver is expected to translate it.</summary>
+    /// English and Workday's Position_Title is French-only at Tremblant. Pre-filled from Workday's
+    /// own Job_Profile (already English) joined with Position_Title as a starting point; the
+    /// approver may edit it.</summary>
     public string? JobTitleEnglish { get; set; }
 
+    /// <summary>Fixed at "6201" for every request — see
+    /// D365AccessApprovalsController.FixedLegalEntity — set server-side, never an approver input.
+    /// Still a real column (not a hardcoded literal at the TDX call site) so it's visible in the
+    /// saved record for audit.</summary>
     public string? LegalEntity { get; set; }
+
+    /// <summary>Always the employee's Workday Cost_Center, resolved server-side at completion time
+    /// — never an approver input, same reasoning as LegalEntity.</summary>
     public string? DepartmentNumber { get; set; }
+
     public decimal? ApprovalLimit { get; set; }
     public string? ApAccessDetails { get; set; }
     public string? AdditionalLegalEntities { get; set; }
     public bool? LevyEmployee { get; set; }
+
+    /// <summary>Free-text comments from the approver — included on the TDX ticket only when
+    /// non-empty, same pattern as ApAccessDetails/AdditionalLegalEntities.</summary>
+    public string? Comments { get; set; }
 
     public ICollection<D365AccessApprovalRole> Roles { get; set; } = new List<D365AccessApprovalRole>();
 

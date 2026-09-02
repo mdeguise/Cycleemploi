@@ -622,7 +622,8 @@ public class TicketOrchestrationService : ITicketOrchestrationService
                 Roles: approval.Roles.Select(r => r.Role).ToList(),
                 ApprovalLimit: approval.ApprovalLimit ?? 0,
                 ApAccessDetails: approval.ApAccessDetails,
-                AdditionalLegalEntities: approval.AdditionalLegalEntities);
+                AdditionalLegalEntities: approval.AdditionalLegalEntities,
+                Comments: approval.Comments);
 
             var ticketId = await _tdx.CreateD365AccessTicketAsync(input, ct);
             _logger.LogInformation("Created D365 Access TDX ticket {TicketId} for request {RequestNumber}, employee {EmployeeName}", ticketId, request.RequestNumber, employee.NameSnapshot);

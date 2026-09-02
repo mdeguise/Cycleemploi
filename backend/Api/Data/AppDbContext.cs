@@ -160,10 +160,13 @@ public class AppDbContext : DbContext
             entity.Property(m => m.Status).HasConversion<string>().HasMaxLength(20);
             entity.Property(m => m.JobTitleEnglish).HasMaxLength(200);
             entity.Property(m => m.LegalEntity).HasMaxLength(200);
-            entity.Property(m => m.DepartmentNumber).HasMaxLength(50);
+            // Widened from a short numeric code — this is now always the employee's Workday
+            // Cost_Center verbatim (e.g. "Lodging Maintenance (404006)"), not just a number.
+            entity.Property(m => m.DepartmentNumber).HasMaxLength(200);
             entity.Property(m => m.ApprovalLimit).HasColumnType("decimal(18,2)");
             entity.Property(m => m.ApAccessDetails).HasMaxLength(2000);
             entity.Property(m => m.AdditionalLegalEntities).HasMaxLength(2000);
+            entity.Property(m => m.Comments).HasMaxLength(2000);
             entity.Property(m => m.CompletedByObjectId).HasMaxLength(200);
             entity.Property(m => m.CompletedByDisplayName).HasMaxLength(200);
 
