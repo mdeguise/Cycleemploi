@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useApi } from '../api/ApiContext';
 import type { D365ApproverDto, D365PositionTitleDto, MeDto } from '../api/types';
-import { usePicker, PickerField } from '../components/AdPicker';
 
 /** The bare sAMAccountName from a Windows identity like "ENTERPRISE\\mdeguise" (or an email/plain
  * sam), lowercased — mirrors the backend's AppUserService.Normalize so a client-side "is this my
@@ -21,10 +20,10 @@ function bareSam(identity: string): string {
  * the caller alongside whoever is already there, it never replaces them; the Approbateur column
  * already lists every name as its own removable chip.
  *
- * Self-assign lives directly in the table row now (one click, no title dropdown to align with
- * first) — a standalone dropdown+button above a 300+ row table was easy to lose track of. The
- * admin-only "assign someone else" flow keeps its own title dropdown + AD picker below the table,
- * since that action still needs to name BOTH a title and an account. */
+ * Self-assign lives directly in the table row (one click, no title dropdown to align with first)
+ * — a standalone dropdown+button above a 300+ row table was easy to lose track of. Adding someone
+ * ELSE as an approver is handled entirely by the separate "Approbateurs D365" screen now; this
+ * page is self-service only (assign/remove your own row per title). */
 export function D365PositionTitleAssignmentsPage({ me }: { me: MeDto }) {
   const api = useApi();
   const isAdmin = me.isTicketTemplateAdmin;
@@ -37,11 +36,7 @@ export function D365PositionTitleAssignmentsPage({ me }: { me: MeDto }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
   const [assigningTitle, setAssigningTitle] = useState<string | null>(null);
-
-  const [otherTitle, setOtherTitle] = useState('');
-  const [otherError, setOtherError] = useState<string | null>(null);
-  const [isAssigningOther, setIsAssigningOther] = useState(false);
-  const picker = usePicker((q) => api.d365Approvers.adSearch(q));
+  const [removingTitle, setRemovingTitle] = useState<string | null>(null);
 
   const load = () => {
     setIsLoading(true);
@@ -50,7 +45,6 @@ export function D365PositionTitleAssignmentsPage({ me }: { me: MeDto }) {
       .then(([t, a]) => {
         setTitles(t);
         setApprovers(a);
-        setOtherTitle((current) => current || t[0]?.positionTitle || '');
       })
       .catch((err) => setLoadError(err instanceof Error ? err.message : 'Erreur inconnue'))
       .finally(() => setIsLoading(false));
@@ -88,36 +82,6 @@ export function D365PositionTitleAssignmentsPage({ me }: { me: MeDto }) {
     }
   };
 
-  const handleAssignOther = async (ev: React.FormEvent) => {
-    ev.preventDefault();
-    setOtherError(null);
-
-    if (!otherTitle) {
-      setOtherError('Choisissez un titre de poste.');
-      return;
-    }
-    if (!picker.picked) {
-      setOtherError('Choisissez un compte dans la liste de résultats.');
-      return;
-    }
-
-    setIsAssigningOther(true);
-    try {
-      await api.d365Approvers.add({
-        sam: picker.picked.sam,
-        displayName: picker.picked.displayName,
-        email: picker.picked.email ?? null,
-        positionTitle: otherTitle,
-      });
-      picker.reset();
-      load();
-    } catch (err) {
-      setOtherError(err instanceof Error ? err.message : 'Erreur inconnue');
-    } finally {
-      setIsAssigningOther(false);
-    }
-  };
-
   const handleRemove = async (id: number) => {
     setLoadError(null);
     try {
@@ -125,6 +89,19 @@ export function D365PositionTitleAssignmentsPage({ me }: { me: MeDto }) {
       load();
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Erreur inconnue');
+    }
+  };
+
+  const handleSelfRemove = async (title: string, id: number) => {
+    setLoadError(null);
+    setRemovingTitle(title);
+    try {
+      await api.d365Approvers.remove(id);
+      load();
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Erreur inconnue');
+    } finally {
+      setRemovingTitle(null);
     }
   };
 
@@ -214,18 +191,27 @@ export function D365PositionTitleAssignmentsPage({ me }: { me: MeDto }) {
                       </td>
                       {isApprover && (
                         <td style={{ padding: '8px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                          {isMine ? (
-                            <span className="required-note">Déjà assigné</span>
-                          ) : (
+                          <div style={{ display: 'inline-flex', gap: 8 }}>
                             <button
                               type="button"
                               className="review-section__edit"
                               onClick={() => handleSelfAssign(title)}
-                              disabled={assigningTitle === title}
+                              disabled={isMine || assigningTitle === title}
                             >
                               {assigningTitle === title ? 'Assignation…' : 'M\'assigner ce titre'}
                             </button>
-                          )}
+                            <button
+                              type="button"
+                              className="review-section__edit"
+                              onClick={() => {
+                                const mine = scoped.find((a) => a.sam === mySam);
+                                if (mine) handleSelfRemove(title, mine.d365ApproverId);
+                              }}
+                              disabled={!isMine || removingTitle === title}
+                            >
+                              {removingTitle === title ? 'Retrait…' : 'Me retirer de ce titre'}
+                            </button>
+                          </div>
                         </td>
                       )}
                     </tr>
@@ -234,31 +220,6 @@ export function D365PositionTitleAssignmentsPage({ me }: { me: MeDto }) {
               </tbody>
             </table>
           </div>
-
-          {isAdmin && (
-            <>
-              <div className="field-section-title" style={{ marginTop: 24 }}>Assigner un autre compte (admin)</div>
-              <form onSubmit={handleAssignOther} style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 520 }}>
-                <div className="field">
-                  <label className="field__label">Titre de poste</label>
-                  <div className="field__input-wrap">
-                    <select value={otherTitle} onChange={(ev) => setOtherTitle(ev.target.value)}>
-                      {titles.map((t) => (
-                        <option key={t.positionTitle} value={t.positionTitle}>{t.positionTitle}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <PickerField picker={picker} />
-                {otherError && <div className="required-note" style={{ color: 'var(--tremblant-red-dark)' }}>{otherError}</div>}
-                <div>
-                  <button type="submit" className="btn btn-primary" disabled={isAssigningOther || !otherTitle || !picker.picked}>
-                    Assigner
-                  </button>
-                </div>
-              </form>
-            </>
-          )}
         </>
       )}
     </div>
