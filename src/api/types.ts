@@ -230,6 +230,9 @@ export interface D365AccessApprovalDetailDto {
   legalEntity: string;
   /** The employee's Workday Cost_Center, verbatim — display only, never an editable input. */
   departmentNumber?: string | null;
+  /** "New Access" | "Change Access" | "Remove Access" — display only, set at submission (by the
+   * D365AccessRequest app, or "New Access" by default for the onboarding-wizard-driven flow). */
+  accessType: string;
   approvalLimit?: number | null;
   apAccessDetails?: string | null;
   additionalLegalEntities?: string | null;

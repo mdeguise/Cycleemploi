@@ -689,7 +689,8 @@ public class TicketOrchestrationService : ITicketOrchestrationService
                 ApAccessDetails: approval.ApAccessDetails,
                 AdditionalLegalEntities: approval.AdditionalLegalEntities,
                 DefaultShippingAddress: approval.DefaultShippingAddress,
-                Comments: approval.Comments);
+                Comments: approval.Comments,
+                AccessType: approval.AccessType ?? "New Access");
 
             var ticketId = await _tdx.CreateD365AccessTicketAsync(input, ct);
             _logger.LogInformation("Created D365 Access TDX ticket {TicketId} for request {RequestNumber}, employee {EmployeeName}", ticketId, request.RequestNumber, employee.NameSnapshot);

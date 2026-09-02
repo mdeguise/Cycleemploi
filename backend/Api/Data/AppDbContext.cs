@@ -168,6 +168,7 @@ public class AppDbContext : DbContext
             entity.HasOne(d => d.Request).WithOne(r => r.D365AccessApproval)
                 .HasForeignKey<D365AccessApproval>(d => d.RequestId).OnDelete(DeleteBehavior.Cascade);
             entity.Property(m => m.Status).HasConversion<string>().HasMaxLength(20);
+            entity.Property(m => m.AccessType).HasMaxLength(20);
             entity.Property(m => m.JobTitleEnglish).HasMaxLength(200);
             entity.Property(m => m.LegalEntity).HasMaxLength(200);
             // Widened from a short numeric code — this is now always the employee's Workday

@@ -35,6 +35,15 @@ public class D365AccessApproval
 
     public D365ApprovalStatus Status { get; set; } = D365ApprovalStatus.Pending;
 
+    /// <summary>"New Access" | "Change Access" | "Remove Access" — the real TDX form's own
+    /// wording, matched exactly so the value can be sent straight through (see
+    /// D365AccessApprovalsController.AllowedAccessTypes). Null on every approval created by the
+    /// wizard-driven onboarding flow (that path never asked — it's always a new hire getting D365
+    /// for the first time); D365AccessTicketInput/TdxService fall back to "New Access" when null,
+    /// preserving that flow's existing behavior unchanged. Ad-hoc requests from the standalone
+    /// D365AccessRequest app always set it explicitly — that app can request any of the three.</summary>
+    public string? AccessType { get; set; }
+
     // ---- Filled in by the approver when they complete the form ----
 
     /// <summary>English translation of the position title — the TDX form must be entirely in

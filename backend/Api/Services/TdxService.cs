@@ -115,7 +115,7 @@ public class TdxService : ITdxService
         {
             ("Requested on behalf of:", $"{input.RequesterName} <{input.RequesterEmail}>"),
             ("Resort", "Tremblant"),
-            ("Access Type", "New Access"),
+            ("Access Type", input.AccessType),
             ("Levy Employee", input.LevyEmployee ? "Yes" : "No"),
             ("User's Legal Name", input.EmployeeName),
             ("User's Email Address", input.EmployeeEmail),

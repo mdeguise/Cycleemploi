@@ -106,6 +106,11 @@ public class D365AccessApprovalDetailDto
     /// approver input.</summary>
     public string? DepartmentNumber { get; set; }
 
+    /// <summary>"New Access" | "Change Access" | "Remove Access" — see
+    /// D365AccessApproval.AccessType's doc comment. Defaults to "New Access" for approvals from
+    /// the wizard-driven onboarding flow, which never asks.</summary>
+    public string AccessType { get; set; } = null!;
+
     // ---- Editable by the approver (prefilled if already Completed) ----
     public string? JobTitleEnglish { get; set; }
     public decimal? ApprovalLimit { get; set; }
@@ -168,6 +173,10 @@ public class D365AdHocPrefillDto
 
     public List<string> RoleCatalog { get; set; } = [];
     public List<D365PeerRoleDto> Peers { get; set; } = [];
+
+    /// <summary>"New Access" | "Change Access" | "Remove Access" — see
+    /// D365AccessApprovalsController.AllowedAccessTypes.</summary>
+    public List<string> AccessTypeCatalog { get; set; } = [];
 }
 
 /// <summary>Submits a brand-new, fully-filled-out D365 access request for an employee who was NOT
@@ -179,6 +188,10 @@ public class D365AdHocPrefillDto
 public class SubmitAdHocD365AccessDto
 {
     public string WorkdayEmployeeId { get; set; } = null!;
+
+    /// <summary>Must be one of D365AccessApprovalsController.AllowedAccessTypes.</summary>
+    public string AccessType { get; set; } = null!;
+
     public string JobTitleEnglish { get; set; } = null!;
     public decimal ApprovalLimit { get; set; }
     public bool LevyEmployee { get; set; }

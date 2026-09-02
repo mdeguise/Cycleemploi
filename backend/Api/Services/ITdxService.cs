@@ -51,7 +51,8 @@ public record D365AccessTicketInput(
     string? ApAccessDetails,
     string? AdditionalLegalEntities,
     string? DefaultShippingAddress = null,
-    string? Comments = null
+    string? Comments = null,
+    string AccessType = "New Access"
 );
 
 public class TdxTicketException(string message) : Exception(message);

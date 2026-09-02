@@ -23,6 +23,10 @@ public class D365AccessApprovalsController : ControllerBase
     /// an approver input.</summary>
     private const string FixedLegalEntity = "6201";
 
+    /// <summary>The real TDX form's own wording for its "Access Type" dropdown — matched exactly
+    /// (see D365AccessApproval.AccessType) so the value can be sent straight through.</summary>
+    private static readonly string[] AllowedAccessTypes = ["New Access", "Change Access", "Remove Access"];
+
     private readonly AppDbContext _db;
     private readonly WorkdayContext _workday;
     private readonly ID365ApproverService _approvers;
@@ -189,6 +193,7 @@ public class D365AccessApprovalsController : ControllerBase
             JobTitleEnglish = approval.JobTitleEnglish ?? BuildDefaultJobTitle(workdayInfo?.JobProfile, workdayInfo?.PositionTitle ?? employee.PositionSnapshot),
             LegalEntity = FixedLegalEntity,
             DepartmentNumber = approval.DepartmentNumber ?? workdayInfo?.CostCenter,
+            AccessType = approval.AccessType ?? "New Access",
             ApprovalLimit = approval.ApprovalLimit,
             ApAccessDetails = approval.ApAccessDetails,
             AdditionalLegalEntities = approval.AdditionalLegalEntities,
@@ -379,7 +384,8 @@ public class D365AccessApprovalsController : ControllerBase
             DepartmentNumber = workdayInfo.CostCenter,
             JobTitleEnglishSuggestion = BuildDefaultJobTitle(workdayInfo.JobProfile, workdayInfo.PositionTitle),
             RoleCatalog = TdxD365RoleCheckboxes.All.ToList(),
-            Peers = peers
+            Peers = peers,
+            AccessTypeCatalog = AllowedAccessTypes.ToList()
         });
     }
 
@@ -395,6 +401,7 @@ public class D365AccessApprovalsController : ControllerBase
         if (!await _approvers.HasAnyAccessAsync(User.GetObjectId(), ct)) return Forbid();
 
         if (string.IsNullOrWhiteSpace(dto.WorkdayEmployeeId)) return BadRequest("L'employé est requis.");
+        if (!AllowedAccessTypes.Contains(dto.AccessType)) return BadRequest("Le type d'accès est requis.");
         if (string.IsNullOrWhiteSpace(dto.JobTitleEnglish)) return BadRequest("Le titre du poste (anglais) est requis.");
         if (dto.ApprovalLimit < 0) return BadRequest("La limite d'approbation ne peut pas être négative.");
         var invalidRoles = dto.Roles.Except(TdxD365RoleCheckboxes.All).ToList();
@@ -444,6 +451,7 @@ public class D365AccessApprovalsController : ControllerBase
             RequestId = request.RequestId,
             RequestEmployeeId = request.Employees.Single().RequestEmployeeId,
             Status = D365ApprovalStatus.Pending,
+            AccessType = dto.AccessType,
             JobTitleEnglish = dto.JobTitleEnglish.Trim(),
             LegalEntity = FixedLegalEntity,
             DepartmentNumber = workdayInfo.CostCenter,

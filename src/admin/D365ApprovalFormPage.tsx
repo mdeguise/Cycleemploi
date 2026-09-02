@@ -146,7 +146,7 @@ export function D365ApprovalFormPage({ me }: { me: MeDto }) {
         <Field label="Date de début"><input type="text" value={data.startDate ?? '—'} disabled /></Field>
         <Field label="Demandé par"><input type="text" value={data.requesterName} disabled /></Field>
         <Field label="Resort"><input type="text" value="Tremblant" disabled /></Field>
-        <Field label="Access Type"><input type="text" value="New Access" disabled /></Field>
+        <Field label="Access Type"><input type="text" value={data.accessType} disabled /></Field>
         <Field label="Entité légale"><input type="text" value={data.legalEntity} disabled /></Field>
         <Field label="Numéro de département"><input type="text" value={data.departmentNumber ?? '—'} disabled /></Field>
       </div>
