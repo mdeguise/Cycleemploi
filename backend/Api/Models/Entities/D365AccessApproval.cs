@@ -56,10 +56,18 @@ public class D365AccessApproval
     public decimal? ApprovalLimit { get; set; }
     public string? ApAccessDetails { get; set; }
     public string? AdditionalLegalEntities { get; set; }
+
+    /// <summary>Confirmed as a real row on the TDX form (between AP Access Details and Approval
+    /// Limit) via a real historical "D365 - Access" ticket — not on the form for every request
+    /// (only appeared once, for a Procurement-flavoured role), so kept optional-if-present, same
+    /// pattern as ApAccessDetails/AdditionalLegalEntities.</summary>
+    public string? DefaultShippingAddress { get; set; }
+
     public bool? LevyEmployee { get; set; }
 
-    /// <summary>Free-text comments from the approver — included on the TDX ticket only when
-    /// non-empty, same pattern as ApAccessDetails/AdditionalLegalEntities.</summary>
+    /// <summary>Free-text comments from the approver — included on the TDX ticket (as "Additional
+    /// Details or Comments", the real field's label) only when non-empty, same pattern as
+    /// ApAccessDetails/AdditionalLegalEntities.</summary>
     public string? Comments { get; set; }
 
     public ICollection<D365AccessApprovalRole> Roles { get; set; } = new List<D365AccessApprovalRole>();

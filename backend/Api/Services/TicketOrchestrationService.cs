@@ -623,6 +623,7 @@ public class TicketOrchestrationService : ITicketOrchestrationService
                 ApprovalLimit: approval.ApprovalLimit ?? 0,
                 ApAccessDetails: approval.ApAccessDetails,
                 AdditionalLegalEntities: approval.AdditionalLegalEntities,
+                DefaultShippingAddress: approval.DefaultShippingAddress,
                 Comments: approval.Comments);
 
             var ticketId = await _tdx.CreateD365AccessTicketAsync(input, ct);

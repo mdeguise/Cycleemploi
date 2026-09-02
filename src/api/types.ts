@@ -213,6 +213,7 @@ export interface D365AccessApprovalDetailDto {
   approvalLimit?: number | null;
   apAccessDetails?: string | null;
   additionalLegalEntities?: string | null;
+  defaultShippingAddress?: string | null;
   comments?: string | null;
   levyEmployee?: boolean | null;
   roles: string[];
@@ -226,6 +227,7 @@ export interface CompleteD365AccessApprovalDto {
   levyEmployee: boolean;
   apAccessDetails?: string | null;
   additionalLegalEntities?: string | null;
+  defaultShippingAddress?: string | null;
   comments?: string | null;
   roles: string[];
 }

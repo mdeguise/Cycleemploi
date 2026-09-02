@@ -169,6 +169,7 @@ public class D365AccessApprovalsController : ControllerBase
             ApprovalLimit = approval.ApprovalLimit,
             ApAccessDetails = approval.ApAccessDetails,
             AdditionalLegalEntities = approval.AdditionalLegalEntities,
+            DefaultShippingAddress = approval.DefaultShippingAddress,
             Comments = approval.Comments,
             LevyEmployee = approval.LevyEmployee,
             Roles = approval.Roles.Select(r => r.Role).OrderBy(r => r).ToList(),
@@ -276,6 +277,7 @@ public class D365AccessApprovalsController : ControllerBase
         approval.LevyEmployee = dto.LevyEmployee;
         approval.ApAccessDetails = string.IsNullOrWhiteSpace(dto.ApAccessDetails) ? null : dto.ApAccessDetails.Trim();
         approval.AdditionalLegalEntities = string.IsNullOrWhiteSpace(dto.AdditionalLegalEntities) ? null : dto.AdditionalLegalEntities.Trim();
+        approval.DefaultShippingAddress = string.IsNullOrWhiteSpace(dto.DefaultShippingAddress) ? null : dto.DefaultShippingAddress.Trim();
         approval.Comments = string.IsNullOrWhiteSpace(dto.Comments) ? null : dto.Comments.Trim();
         approval.Roles.Clear();
         foreach (var role in dto.Roles.Distinct())

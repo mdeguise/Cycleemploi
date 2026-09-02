@@ -18,6 +18,7 @@ export function D365ApprovalFormPage() {
   const [levyEmployee, setLevyEmployee] = useState(false);
   const [apAccessDetails, setApAccessDetails] = useState('');
   const [additionalLegalEntities, setAdditionalLegalEntities] = useState('');
+  const [defaultShippingAddress, setDefaultShippingAddress] = useState('');
   const [comments, setComments] = useState('');
   const [roles, setRoles] = useState<string[]>([]);
 
@@ -38,6 +39,7 @@ export function D365ApprovalFormPage() {
         setLevyEmployee(d.levyEmployee ?? false);
         setApAccessDetails(d.apAccessDetails ?? '');
         setAdditionalLegalEntities(d.additionalLegalEntities ?? '');
+        setDefaultShippingAddress(d.defaultShippingAddress ?? '');
         setComments(d.comments ?? '');
         setRoles(d.roles);
       })
@@ -72,6 +74,7 @@ export function D365ApprovalFormPage() {
         levyEmployee,
         apAccessDetails: apAccessDetails.trim() || null,
         additionalLegalEntities: additionalLegalEntities.trim() || null,
+        defaultShippingAddress: defaultShippingAddress.trim() || null,
         comments: comments.trim() || null,
         roles,
       });
@@ -181,7 +184,11 @@ export function D365ApprovalFormPage() {
           <textarea value={additionalLegalEntities} onChange={(ev) => setAdditionalLegalEntities(ev.target.value)} disabled={readOnly} />
         </Field>
 
-        <Field label="Commentaires (optionnel)">
+        <Field label="Adresse d'expédition par défaut (optionnel)">
+          <input type="text" value={defaultShippingAddress} onChange={(ev) => setDefaultShippingAddress(ev.target.value)} disabled={readOnly} />
+        </Field>
+
+        <Field label="Détails additionnels ou commentaires (optionnel)">
           <textarea value={comments} onChange={(ev) => setComments(ev.target.value)} disabled={readOnly} />
         </Field>
 

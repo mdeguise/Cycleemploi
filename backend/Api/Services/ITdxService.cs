@@ -50,6 +50,7 @@ public record D365AccessTicketInput(
     decimal ApprovalLimit,
     string? ApAccessDetails,
     string? AdditionalLegalEntities,
+    string? DefaultShippingAddress = null,
     string? Comments = null
 );
 

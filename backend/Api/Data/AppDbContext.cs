@@ -166,6 +166,7 @@ public class AppDbContext : DbContext
             entity.Property(m => m.ApprovalLimit).HasColumnType("decimal(18,2)");
             entity.Property(m => m.ApAccessDetails).HasMaxLength(2000);
             entity.Property(m => m.AdditionalLegalEntities).HasMaxLength(2000);
+            entity.Property(m => m.DefaultShippingAddress).HasMaxLength(2000);
             entity.Property(m => m.Comments).HasMaxLength(2000);
             entity.Property(m => m.CompletedByObjectId).HasMaxLength(200);
             entity.Property(m => m.CompletedByDisplayName).HasMaxLength(200);

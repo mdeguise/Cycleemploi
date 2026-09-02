@@ -89,6 +89,7 @@ public class D365AccessApprovalDetailDto
     public decimal? ApprovalLimit { get; set; }
     public string? ApAccessDetails { get; set; }
     public string? AdditionalLegalEntities { get; set; }
+    public string? DefaultShippingAddress { get; set; }
     public string? Comments { get; set; }
     public bool? LevyEmployee { get; set; }
     public List<string> Roles { get; set; } = [];
@@ -106,6 +107,7 @@ public class CompleteD365AccessApprovalDto
     public bool LevyEmployee { get; set; }
     public string? ApAccessDetails { get; set; }
     public string? AdditionalLegalEntities { get; set; }
+    public string? DefaultShippingAddress { get; set; }
     public string? Comments { get; set; }
     public List<string> Roles { get; set; } = [];
 }

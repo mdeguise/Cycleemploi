@@ -97,9 +97,10 @@ public class TdxService : ITdxService
     /// visible fields — a real submission bakes them all into the ticket Description as an HTML
     /// table instead (confirmed by inspecting a real historical ticket on this form). This replicates
     /// that same table structure/row order so an automated ticket looks like a manually-submitted
-    /// one. Rows for optional fields (AP Access Details, Additional Legal Entities) are only included
-    /// when there's a value, matching what real submissions do; unchecked roles don't get a row at
-    /// all — only checked ones appear, each with value "True".</summary>
+    /// one. Rows for optional fields (AP Access Details, Additional Legal Entities, Default Shipping
+    /// Address, Additional Details or Comments) are only included when there's a value, matching
+    /// what real submissions do; unchecked roles don't get a row at all — only checked ones appear,
+    /// each with value "True".</summary>
     public async Task<int> CreateD365AccessTicketAsync(D365AccessTicketInput input, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(_options.Username) || string.IsNullOrWhiteSpace(_options.Password))
@@ -147,10 +148,16 @@ public class TdxService : ITdxService
         {
             rows.Add(("Additional Legal Entities Needing Access To", input.AdditionalLegalEntities));
         }
+        // Row order from here down (Default Shipping Address, Approval Limit, Additional Details
+        // or Comments) confirmed against a real historical "D365 - Access" ticket.
+        if (!string.IsNullOrWhiteSpace(input.DefaultShippingAddress))
+        {
+            rows.Add(("Default Shipping Address", input.DefaultShippingAddress));
+        }
         rows.Add(("Approval Limit", input.ApprovalLimit.ToString("C0", System.Globalization.CultureInfo.GetCultureInfo("en-US"))));
         if (!string.IsNullOrWhiteSpace(input.Comments))
         {
-            rows.Add(("Comments", input.Comments));
+            rows.Add(("Additional Details or Comments", input.Comments));
         }
 
         var sb = new StringBuilder();
