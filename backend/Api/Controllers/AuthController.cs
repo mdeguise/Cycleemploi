@@ -17,14 +17,16 @@ public class AuthController : ControllerBase
     private readonly ITdxService _tdx;
     private readonly TdxOptions _tdxOptions;
     private readonly IAppUserService _appUsers;
+    private readonly ID365ApproverService _d365Approvers;
 
-    public AuthController(IAdDirectoryService ad, IOptions<HrGroupOptions> hrGroupOptions, ITdxService tdx, IOptions<TdxOptions> tdxOptions, IAppUserService appUsers)
+    public AuthController(IAdDirectoryService ad, IOptions<HrGroupOptions> hrGroupOptions, ITdxService tdx, IOptions<TdxOptions> tdxOptions, IAppUserService appUsers, ID365ApproverService d365Approvers)
     {
         _ad = ad;
         _hrGroupOptions = hrGroupOptions.Value;
         _tdx = tdx;
         _tdxOptions = tdxOptions.Value;
         _appUsers = appUsers;
+        _d365Approvers = d365Approvers;
     }
 
     [HttpGet("me")]
@@ -38,6 +40,7 @@ public class AuthController : ControllerBase
         // Resolved from the Windows identity, NOT from info.Email — admin (*_adm) accounts have no
         // `mail` attribute in AD, so an email-keyed lookup silently denied them every time.
         var role = await _appUsers.GetRoleAsync(accountName, ct);
+        var isD365Approver = await _d365Approvers.HasAnyAccessAsync(accountName, ct);
 
         return Ok(new MeDto
         {
@@ -47,7 +50,8 @@ public class AuthController : ControllerBase
             IsHr = isHr,
             AdminRole = role?.ToString(),
             IsAppAdmin = role == AppUserRole.Admin,
-            IsTicketTemplateAdmin = role == AppUserRole.Admin
+            IsTicketTemplateAdmin = role == AppUserRole.Admin,
+            IsD365Approver = isD365Approver
         });
     }
 

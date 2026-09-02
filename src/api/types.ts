@@ -55,6 +55,8 @@ export interface MeDto {
   isAppAdmin: boolean;
   /** @deprecated alias for isAppAdmin, kept while the UI migrates. */
   isTicketTemplateAdmin: boolean;
+  /** ANY D365Approver row (global or scoped to a Position Title) — a DIFFERENT table from AppUsers. */
+  isD365Approver: boolean;
 }
 
 export interface HelpUrlDto {
@@ -151,15 +153,71 @@ export interface D365UserSecurityRoleDto {
   positionTitle?: string | null;
 }
 
-export interface D365JobCodeTemplateSummaryDto {
-  jobCode: string;
+// --- D365 access approval (D365ApproversController / D365AccessApprovalsController) ---
+
+export interface D365ApproverDto {
+  d365ApproverId: number;
+  sam: string;
+  displayName: string;
+  email?: string | null;
   positionTitle?: string | null;
-  isFilled: boolean;
+  createdAt: string;
+  createdByDisplayName?: string | null;
 }
 
-export interface D365JobCodeTemplateDto {
-  jobCode: string;
+export interface CreateD365ApproverDto {
+  sam: string;
+  displayName: string;
+  email?: string | null;
   positionTitle?: string | null;
+}
+
+export interface D365PeerRoleDto {
+  employeeName: string;
+  employeeId: string;
+  roles: string[];
+}
+
+export interface D365AccessApprovalSummaryDto {
+  requestId: number;
+  requestNumber: string;
+  employeeName: string;
+  positionTitle?: string | null;
+  status: string;
+  createdAt: string;
+  completedAt?: string | null;
+  completedByDisplayName?: string | null;
+  ticketNumber?: string | null;
+  ticketState?: string | null;
+  ticketStateLabel?: string | null;
+}
+
+export interface D365AccessApprovalDetailDto {
+  requestId: number;
+  requestNumber: string;
+  status: string;
+  canComplete: boolean;
+  requesterName: string;
+  employeeName: string;
+  employeeEmail?: string | null;
+  managerName?: string | null;
+  positionTitle?: string | null;
+  jobCode?: string | null;
+  departement?: string | null;
+  startDate?: string | null;
+  jobTitleEnglish?: string | null;
+  legalEntity?: string | null;
+  departmentNumber?: string | null;
+  approvalLimit?: number | null;
+  apAccessDetails?: string | null;
+  additionalLegalEntities?: string | null;
+  levyEmployee?: boolean | null;
+  roles: string[];
+  roleCatalog: string[];
+  peers: D365PeerRoleDto[];
+}
+
+export interface CompleteD365AccessApprovalDto {
   jobTitleEnglish: string;
   legalEntity: string;
   departmentNumber: string;
@@ -168,18 +226,12 @@ export interface D365JobCodeTemplateDto {
   apAccessDetails?: string | null;
   additionalLegalEntities?: string | null;
   roles: string[];
-  isFilled: boolean;
 }
 
-export interface UpsertD365JobCodeTemplateDto {
-  jobTitleEnglish: string;
-  legalEntity: string;
-  departmentNumber: string;
-  approvalLimit: number;
-  levyEmployee: boolean;
-  apAccessDetails?: string | null;
-  additionalLegalEntities?: string | null;
-  roles: string[];
+export interface CompleteD365AccessApprovalResultDto {
+  succeeded: boolean;
+  ticketNumber?: string | null;
+  error?: string | null;
 }
 
 // --- Reconciliation / "Écarts" (DiscrepanciesController) ---

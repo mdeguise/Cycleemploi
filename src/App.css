@@ -825,6 +825,19 @@
   background: var(--tremblant-red-light);
 }
 
+.choice-card--disabled {
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+
+.choice-card--disabled:hover {
+  border-color: var(--border);
+}
+
+.choice-card--disabled.choice-card--selected:hover {
+  border-color: var(--tremblant-red);
+}
+
 .choice-card__checkbox {
   width: 18px;
   height: 18px;

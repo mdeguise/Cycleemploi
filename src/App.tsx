@@ -24,11 +24,12 @@ import { ApiProvider } from './api/ApiContext';
 import { useApi } from './api/ApiContext';
 import { D365RolesAdminPage } from './admin/D365RolesAdminPage';
 import { D365UserRolesCorrectionPage } from './admin/D365UserRolesCorrectionPage';
-import { D365JobCodeTemplatesListPage } from './admin/D365JobCodeTemplatesListPage';
-import { D365JobCodeTemplateEditPage } from './admin/D365JobCodeTemplateEditPage';
 import { TicketTemplatesAdminPage } from './admin/TicketTemplatesAdminPage';
 import { AppUsersAdminPage } from './admin/AppUsersAdminPage';
 import { RequestsAdminPage } from './admin/RequestsAdminPage';
+import { D365ApproversAdminPage } from './admin/D365ApproversAdminPage';
+import { D365ApprovalsListPage } from './admin/D365ApprovalsListPage';
+import { D365ApprovalFormPage } from './admin/D365ApprovalFormPage';
 import type { MeDto } from './api/types';
 
 const ONBOARDING_STEP_COMPONENTS = [
@@ -57,9 +58,10 @@ function AdminLayout({ title, me, children }: { title: string; me: MeDto; childr
           {me.adminRole && <Link to="/admin/requests">Demandes</Link>}
           <Link to="/admin/d365-roles">Rôles D365 par code d'emploi</Link>
           <Link to="/admin/d365-user-roles">Correction des rôles D365</Link>
-          <Link to="/admin/d365-jobcode-templates">Formulaires D365 par code d'emploi</Link>
+          {(me.isD365Approver || me.adminRole) && <Link to="/admin/d365-approvals">Approbations D365</Link>}
           {me.isTicketTemplateAdmin && (
             <>
+              <Link to="/admin/d365-approvers">Approbateurs D365</Link>
               <Link to="/admin/ticket-templates">Gabarits des billets</Link>
               <Link to="/admin/app-users">Administrateurs</Link>
             </>
@@ -87,6 +89,19 @@ function AdminSectionGuard({ me, children }: { me: MeDto; children: ReactNode })
 
 function TicketTemplateAdminGuard({ me, children }: { me: MeDto; children: ReactNode }) {
   if (!me.isTicketTemplateAdmin) {
+    return (
+      <div className="step-panel">
+        <div className="big-notice">Vous n'avez pas accès à cette section.</div>
+      </div>
+    );
+  }
+  return <>{children}</>;
+}
+
+/// D365Approver access (global or scoped) OR any Administration access, for oversight — completing
+/// a SPECIFIC approval is gated separately, server-side, on being a matching approver.
+function D365ApprovalsSectionGuard({ me, children }: { me: MeDto; children: ReactNode }) {
+  if (!me.isD365Approver && !me.adminRole) {
     return (
       <div className="step-panel">
         <div className="big-notice">Vous n'avez pas accès à cette section.</div>
@@ -163,22 +178,6 @@ function AuthenticatedApp() {
           }
         />
         <Route
-          path="/admin/d365-jobcode-templates"
-          element={
-            <AdminLayout title="Administration — Formulaires D365 par code d'emploi" me={me}>
-              <D365JobCodeTemplatesListPage />
-            </AdminLayout>
-          }
-        />
-        <Route
-          path="/admin/d365-jobcode-templates/:jobCode"
-          element={
-            <AdminLayout title="Administration — Formulaires D365 par code d'emploi" me={me}>
-              <D365JobCodeTemplateEditPage />
-            </AdminLayout>
-          }
-        />
-        <Route
           path="/admin/ticket-templates"
           element={
             <AdminLayout title="Administration — Gabarits des billets" me={me}>
@@ -205,6 +204,36 @@ function AuthenticatedApp() {
               <AdminSectionGuard me={me}>
                 <RequestsAdminPage />
               </AdminSectionGuard>
+            </AdminLayout>
+          }
+        />
+        <Route
+          path="/admin/d365-approvers"
+          element={
+            <AdminLayout title="Administration — Approbateurs D365" me={me}>
+              <TicketTemplateAdminGuard me={me}>
+                <D365ApproversAdminPage />
+              </TicketTemplateAdminGuard>
+            </AdminLayout>
+          }
+        />
+        <Route
+          path="/admin/d365-approvals"
+          element={
+            <AdminLayout title="Administration — Approbations D365" me={me}>
+              <D365ApprovalsSectionGuard me={me}>
+                <D365ApprovalsListPage />
+              </D365ApprovalsSectionGuard>
+            </AdminLayout>
+          }
+        />
+        <Route
+          path="/admin/d365-approvals/:requestId"
+          element={
+            <AdminLayout title="Administration — Approbations D365" me={me}>
+              <D365ApprovalsSectionGuard me={me}>
+                <D365ApprovalFormPage />
+              </D365ApprovalsSectionGuard>
             </AdminLayout>
           }
         />

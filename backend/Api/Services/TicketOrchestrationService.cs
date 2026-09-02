@@ -18,6 +18,11 @@ public interface ITicketOrchestrationService
     /// <summary>Re-runs the ONE integration a RequestTicket row represents. Used by the
     /// Administration screen's Réessayer button.</summary>
     Task<TicketRetryResult> RetryAsync(Request request, RequestTicket ticket, CancellationToken ct);
+
+    /// <summary>Builds and sends the real TDX "D365 - Access" ticket from a completed approval's
+    /// saved fields — called by D365AccessApprovalsController.Complete right after an approver
+    /// submits the form.</summary>
+    Task<TicketRetryResult> CreateD365AccessTicketAsync(Request request, D365AccessApproval approval, CancellationToken ct);
 }
 
 /// <summary>All the downstream ticket-system integrations, extracted out of RequestsController so
@@ -39,6 +44,8 @@ public class TicketOrchestrationService : ITicketOrchestrationService
     private readonly ITdxService _tdx;
     private readonly IEmailNotificationService _email;
     private readonly IRequestTicketService _tickets;
+    private readonly ID365ApproverService _d365Approvers;
+    private readonly AppOptions _appOptions;
     private readonly ILogger<TicketOrchestrationService> _logger;
 
     /// <summary>Systèmes junction rows store the catalog's display text directly — these must match
@@ -57,6 +64,8 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         ITdxService tdx,
         IEmailNotificationService email,
         IRequestTicketService tickets,
+        ID365ApproverService d365Approvers,
+        IOptions<AppOptions> appOptions,
         ILogger<TicketOrchestrationService> logger)
     {
         _db = db;
@@ -68,6 +77,8 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         _tdx = tdx;
         _email = email;
         _tickets = tickets;
+        _d365Approvers = d365Approvers;
+        _appOptions = appOptions.Value;
         _logger = logger;
     }
 
@@ -78,7 +89,7 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         var freshdeskTicketId = await TryCreateFreshdeskTicketAsync(request, requester, ct);
         await TryCreateD365BadgeTicketAsync(request, freshdeskTicketId, ct);
         await TryCreateTdxTicketAsync(request, requester, ct);
-        await TryCreateD365AccessTicketAsync(request, requester, ct);
+        await TryCreateD365AccessApprovalRequestAsync(request, ct);
     }
 
 
@@ -141,8 +152,17 @@ public class TicketOrchestrationService : ITicketOrchestrationService
                 }
 
                 case TicketKind.D365Access:
-                    await TryCreateD365AccessTicketAsync(request, requester, ct, ticket.RequestEmployeeId);
+                {
+                    var approval = await _db.D365AccessApprovals.Include(a => a.Roles)
+                        .FirstOrDefaultAsync(a => a.RequestId == request.RequestId, ct);
+                    if (approval is null || approval.Status != D365ApprovalStatus.Completed)
+                    {
+                        return new TicketRetryResult(false, null,
+                            "Aucune approbation D365 complétée n'a été trouvée pour cette demande — un approbateur doit d'abord remplir le formulaire (voir Administration > Approbations D365).");
+                    }
+                    await CreateD365AccessTicketAsync(request, approval, ct);
                     break;
+                }
 
                 default:
                     return new TicketRetryResult(false, null, $"Type de billet non pris en charge : {ticket.Kind}.");
@@ -449,13 +469,14 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         }
     }
 
-    /// <summary>Creates a TDX ticket on the "D365 - Access" form (FormID 10799) when "Accès D365"
-    /// was selected — Onboarding/Réactivation only, for the primary employee, same gating pattern as
-    /// the badge/alarm D365 integration. Looks up the employee's job code in D365JobCodeTemplate for
-    /// the roles/legal entity/approval limit/etc. answers; if no template has been filled out yet for
-    /// that job code, fails open (email notifies IT to fill it in and create the ticket by hand)
-    /// rather than blocking the submission or guessing at values.</summary>
-    private async Task TryCreateD365AccessTicketAsync(Request request, AdUserInfo requester, CancellationToken ct, int? onlyRequestEmployeeId = null)
+    /// <summary>Creates the D365AccessApproval "pending" row when "Accès D365" was selected —
+    /// Onboarding/Réactivation only, for the primary employee, same gating pattern as the
+    /// badge/alarm D365 integration. Replaces the old design (an admin pre-fills a per-job-code
+    /// template before anyone needs it — in practice that table shipped and stayed completely
+    /// empty). Instead, a matched D365Approver is emailed a link to a prepopulated French form; no
+    /// TDX call happens here at all, only once they complete it — see CreateD365AccessTicketAsync
+    /// and D365AccessApprovalsController.Complete.</summary>
+    private async Task TryCreateD365AccessApprovalRequestAsync(Request request, CancellationToken ct)
     {
         if (request.RequestType == RequestType.Offboarding) return;
 
@@ -464,40 +485,108 @@ public class TicketOrchestrationService : ITicketOrchestrationService
 
         var employee = request.Employees.FirstOrDefault(e => e.IsPrimary) ?? request.Employees.FirstOrDefault();
         if (employee is null) return;
-        if (onlyRequestEmployeeId is { } onlyAccessEmployeeId && employee.RequestEmployeeId != onlyAccessEmployeeId) return;
+
+        // Idempotent — RunAllAsync only ever runs once per real submission, but guard anyway rather
+        // than risk a second Pending row (and a second round of approver emails) for one request.
+        if (await _db.D365AccessApprovals.AnyAsync(a => a.RequestId == request.RequestId, ct)) return;
+
+        var approval = new D365AccessApproval
+        {
+            RequestId = request.RequestId,
+            RequestEmployeeId = employee.RequestEmployeeId,
+            Status = D365ApprovalStatus.Pending,
+            CreatedAt = DateTime.UtcNow
+        };
+        _db.D365AccessApprovals.Add(approval);
+        await _db.SaveChangesAsync(ct);
+
+        var positionTitle = await _workday.WorkdayDemographics
+            .Where(w => w.EmployeeId == employee.WorkdayEmployeeId && w.PrimaryJob == true)
+            .Select(w => w.PositionTitle)
+            .FirstOrDefaultAsync(ct);
+
+        var approvers = await _d365Approvers.MatchingAsync(positionTitle, ct);
+        var recipients = approvers.Where(a => !string.IsNullOrWhiteSpace(a.Email)).Select(a => a.Email!).ToList();
+
+        var link = string.IsNullOrWhiteSpace(_appOptions.BaseUrl)
+            ? $"/admin/d365-approvals/{request.RequestId}"
+            : $"{_appOptions.BaseUrl.TrimEnd('/')}/admin/d365-approvals/{request.RequestId}";
+
+        if (recipients.Count == 0)
+        {
+            _logger.LogWarning("No D365Approver matched request {RequestNumber} (position title {PositionTitle}) — emailing IT instead", request.RequestNumber, positionTitle);
+
+            var fallbackSubject = $"[Cycle Emploi] Aucun approbateur D365 configuré — demande #{request.RequestNumber} — {employee.NameSnapshot}";
+            var fallbackBody =
+                $"La demande #{request.RequestNumber} ({request.RequestType.ToFrenchLabel()}) demande l'accès D365 pour {employee.NameSnapshot} " +
+                $"(titre de poste : {positionTitle ?? "inconnu"}), mais aucun approbateur D365 (global ou pour ce titre de poste) n'est configuré " +
+                "pour recevoir la demande.\n\n" +
+                $"Ajoutez un approbateur dans Administration > Approbateurs D365, puis complétez le formulaire vous-même à ce lien :\n{link}\n";
+
+            try
+            {
+                await _email.SendAsync(fallbackSubject, fallbackBody, ct);
+            }
+            catch (Exception emailEx)
+            {
+                _logger.LogError(emailEx, "Also failed to send the no-D365-approver-configured email for request {RequestNumber}", request.RequestNumber);
+            }
+            return;
+        }
+
+        var subject = $"[Cycle Emploi] Approbation D365 requise — demande #{request.RequestNumber} — {employee.NameSnapshot}";
+        var body =
+            $"La demande #{request.RequestNumber} ({request.RequestType.ToFrenchLabel()}) demande l'accès D365 pour {employee.NameSnapshot}.\n\n" +
+            "== Détails ==\n" +
+            $"Employé : {employee.NameSnapshot}\n" +
+            $"Titre de poste : {positionTitle ?? "inconnu"}\n" +
+            $"Département : {employee.DepartementSnapshot}\n" +
+            $"Demandé par : {request.CreatedByDisplayName}\n\n" +
+            $"Veuillez remplir le formulaire d'accès D365 à ce lien :\n{link}\n\n" +
+            "Le formulaire est prérempli avec les informations connues de l'employé; il vous reste à préciser les rôles D365 " +
+            "requis et quelques champs financiers. Un tableau des employés occupant un poste similaire, avec les rôles D365 " +
+            "qu'ils détiennent déjà, y est affiché pour vous aider à décider.";
 
         try
         {
-            var requesterInfo = requester;
-            var requesterName = requesterInfo.DisplayName ?? request.CreatedByDisplayName;
-            var requesterEmail = requesterInfo.Email;
+            await _email.SendAsync(subject, body, recipients, ct);
+        }
+        catch (Exception emailEx)
+        {
+            _logger.LogError(emailEx, "Failed to email D365 approvers for request {RequestNumber}", request.RequestNumber);
+        }
+    }
+
+    /// <summary>Builds and sends the real TDX "D365 - Access" ticket from a COMPLETED approval's
+    /// saved fields. Called both right after an approver submits the form
+    /// (D365AccessApprovalsController.Complete) and by RetryAsync if that TDX call itself failed —
+    /// the approver's decisions (which roles, what approval limit, ...) are never re-asked for on a
+    /// retry, only the downstream TDX call is re-attempted, same as every other ticket kind.</summary>
+    public async Task<TicketRetryResult> CreateD365AccessTicketAsync(Request request, D365AccessApproval approval, CancellationToken ct)
+    {
+        var employee = request.Employees.FirstOrDefault(e => e.RequestEmployeeId == approval.RequestEmployeeId)
+            ?? request.Employees.FirstOrDefault(e => e.IsPrimary) ?? request.Employees.FirstOrDefault();
+        if (employee is null)
+        {
+            return new TicketRetryResult(false, null, "Aucun employé sur cette demande.");
+        }
+
+        try
+        {
+            var requesterName = request.CreatedByDisplayName;
+            var requesterEmail = request.RequesterEmail;
             if (string.IsNullOrWhiteSpace(requesterEmail))
             {
-                throw new InvalidOperationException("Could not resolve requester email from AD.");
+                throw new InvalidOperationException("Cette demande n'a pas de courriel de demandeur enregistré (elle a été soumise avant que ce champ existe).");
             }
 
             var workdayInfo = await _workday.WorkdayDemographics
                 .Where(w => w.EmployeeId == employee.WorkdayEmployeeId && w.PrimaryJob == true)
-                .Select(w => new { w.JobCode, w.PositionTitle, w.WorkEmail, w.Email, w.ManagerId, w.Manager })
+                .Select(w => new { w.WorkEmail, w.Email, w.ManagerId, w.Manager })
                 .FirstOrDefaultAsync(ct);
             if (workdayInfo is null)
             {
                 throw new InvalidOperationException($"No active Workday record found for employee {employee.WorkdayEmployeeId}.");
-            }
-
-            var jobCode = workdayInfo.JobCode ?? employee.CodeEmploiSnapshot;
-            if (string.IsNullOrWhiteSpace(jobCode))
-            {
-                throw new InvalidOperationException("Employee has no job code — cannot look up their D365 access template.");
-            }
-
-            var template = await _db.D365JobCodeTemplates
-                .Include(t => t.Roles)
-                .FirstOrDefaultAsync(t => t.JobCode == jobCode, ct);
-            if (template is null)
-            {
-                throw new InvalidOperationException(
-                    $"No D365 access template has been filled out yet for job code {jobCode} — see Formulaires D365 par code d'emploi.");
             }
 
             var employeeEmail = workdayInfo.WorkEmail ?? workdayInfo.Email;
@@ -524,20 +613,21 @@ public class TicketOrchestrationService : ITicketOrchestrationService
                 RequesterEmail: requesterEmail,
                 EmployeeName: employee.NameSnapshot,
                 EmployeeEmail: employeeEmail,
-                JobTitle: template.JobTitleEnglish,
-                LegalEntity: template.LegalEntity,
-                DepartmentNumber: template.DepartmentNumber,
-                LevyEmployee: template.LevyEmployee,
+                JobTitle: approval.JobTitleEnglish,
+                LegalEntity: approval.LegalEntity ?? "",
+                DepartmentNumber: approval.DepartmentNumber ?? "",
+                LevyEmployee: approval.LevyEmployee ?? false,
                 ManagerName: managerName,
                 StartDate: request.OnboardingDetail?.DateEntreePrevue,
-                Roles: template.Roles.Select(r => r.Role).ToList(),
-                ApprovalLimit: template.ApprovalLimit,
-                ApAccessDetails: template.ApAccessDetails,
-                AdditionalLegalEntities: template.AdditionalLegalEntities);
+                Roles: approval.Roles.Select(r => r.Role).ToList(),
+                ApprovalLimit: approval.ApprovalLimit ?? 0,
+                ApAccessDetails: approval.ApAccessDetails,
+                AdditionalLegalEntities: approval.AdditionalLegalEntities);
 
             var ticketId = await _tdx.CreateD365AccessTicketAsync(input, ct);
             _logger.LogInformation("Created D365 Access TDX ticket {TicketId} for request {RequestNumber}, employee {EmployeeName}", ticketId, request.RequestNumber, employee.NameSnapshot);
             await _tickets.RecordSuccessAsync(request.RequestId, TicketKind.D365Access, employee.RequestEmployeeId, ticketId.ToString(), ct);
+            return new TicketRetryResult(true, ticketId.ToString(), null);
         }
         catch (Exception ex)
         {
@@ -546,23 +636,15 @@ public class TicketOrchestrationService : ITicketOrchestrationService
 
             var subject = $"[Cycle Emploi] Échec de création de billet TDX D365 Access — demande #{request.RequestNumber} — {employee.NameSnapshot}";
             var body =
-                $"La demande #{request.RequestNumber} ({request.RequestType.ToFrenchLabel()}) a été soumise avec succès, " +
-                $"mais la création automatique du billet TDX « D365 - Access » pour {employee.NameSnapshot} a échoué. Le billet devra être créé manuellement.\n\n" +
-                "== Détails de la demande ==\n" +
-                $"Employé: {employee.NameSnapshot}\n" +
-                $"Code d'emploi: {employee.CodeEmploiSnapshot}\n" +
-                $"Demandé par: {request.CreatedByDisplayName}\n" +
-                $"Date de soumission: {request.SubmittedAt:yyyy-MM-dd HH:mm} UTC\n\n" +
+                $"Un approbateur D365 a complété le formulaire pour la demande #{request.RequestNumber} ({request.RequestType.ToFrenchLabel()}), " +
+                $"mais la création du billet TDX « D365 - Access » pour {employee.NameSnapshot} a échoué. " +
+                "Le billet peut être relancé depuis Administration > Demandes (bouton Réessayer) une fois la cause corrigée — " +
+                "les informations déjà saisies par l'approbateur sont conservées et ne seront pas redemandées.\n\n" +
                 "== Détails de l'erreur ==\n" +
                 $"Type: {ex.GetType().Name}\n" +
                 $"Message: {ex.Message}\n" +
                 (ex.InnerException is not null ? $"Cause interne: {ex.InnerException.Message}\n" : "") +
-                $"Survenue: {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC\n\n" +
-                "== Étapes à vérifier ==\n" +
-                "1. Si l'erreur mentionne « No D365 access template has been filled out »: remplir le formulaire D365 pour ce code d'emploi dans Formulaires D365 par code d'emploi, puis créer le billet TDX manuellement pour cette demande (il ne sera pas recréé automatiquement après coup).\n" +
-                "2. Si l'erreur mentionne « No active Workday record » ou « no email address »: vérifier les données Workday de l'employé.\n" +
-                "3. Consulter les journaux applicatifs sur vm-trm-live pour la trace complète, en recherchant le numéro de demande ci-dessus.\n" +
-                "4. Une fois la cause corrigée, créer le billet manuellement dans TDX (application OneIT, formulaire D365 - Access) avec les détails ci-dessus.";
+                $"Survenue: {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC\n";
 
             try
             {
@@ -572,6 +654,8 @@ public class TicketOrchestrationService : ITicketOrchestrationService
             {
                 _logger.LogError(emailEx, "Also failed to send the D365-Access-ticket-failure notification email for request {RequestNumber}, employee {EmployeeName}", request.RequestNumber, employee.NameSnapshot);
             }
+
+            return new TicketRetryResult(false, null, ex.Message);
         }
     }
 }

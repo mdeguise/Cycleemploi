@@ -3,7 +3,7 @@ import { Field, SectionTitle } from '../components/FormField';
 import { StepFooter } from '../components/StepFooter';
 import { ChoiceCard } from '../components/ChoiceCard';
 import { AppsIcon, FileTextIcon } from '../components/icons';
-import { APPLICATIONS } from '../data/catalogs';
+import { APPLICATIONS, DYNAWAY, ACCES_D365 } from '../data/catalogs';
 
 export function Step5Applications() {
   const { request, setRequest } = useWizard();
@@ -14,7 +14,20 @@ export function Step5Applications() {
       const set = new Set(prev.applications.applications);
       if (set.has(id)) set.delete(id);
       else set.add(id);
-      return { ...prev, applications: { ...prev.applications, applications: Array.from(set) } };
+      const nowSelected = set.has(id);
+
+      // Dynaway implicitly requires D365 access — selecting it auto-checks Accès D365 in the
+      // Access step; see Step3Access, which locks that checkbox while Dynaway stays selected.
+      const accessSystemes = new Set(prev.access.systemes);
+      if (id === DYNAWAY && nowSelected) {
+        accessSystemes.add(ACCES_D365);
+      }
+
+      return {
+        ...prev,
+        applications: { ...prev.applications, applications: Array.from(set) },
+        access: { ...prev.access, systemes: Array.from(accessSystemes) },
+      };
     });
   };
 

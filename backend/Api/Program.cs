@@ -52,10 +52,12 @@ builder.Services.AddAuthorization(options =>
 builder.Services.Configure<HrGroupOptions>(builder.Configuration.GetSection("HrGroup"));
 builder.Services.Configure<AccessOptions>(builder.Configuration.GetSection("Access"));
 builder.Services.Configure<AdOptions>(builder.Configuration.GetSection("Ad"));
+builder.Services.Configure<AppOptions>(builder.Configuration.GetSection("App"));
 builder.Services.AddScoped<IAdDirectoryService, AdDirectoryService>();
 builder.Services.AddScoped<RequestAuthorizationService>();
 builder.Services.AddScoped<RequestNumberService>();
 builder.Services.AddScoped<IAppUserService, AppUserService>();
+builder.Services.AddScoped<ID365ApproverService, D365ApproverService>();
 builder.Services.AddScoped<ITicketTemplateService, TicketTemplateService>();
 builder.Services.AddScoped<IEmployeeFieldsService, EmployeeFieldsService>();
 builder.Services.AddScoped<IRequestTicketService, RequestTicketService>();

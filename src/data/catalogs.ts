@@ -113,7 +113,12 @@ export const APPLICATIONS: ApplicationItem[] = [
   { nom: 'Microsoft 365', editeur: 'Microsoft', description: 'Courriel Outlook, OneDrive, Word, Excel et Power Point' },
   { nom: 'Teams', editeur: 'Microsoft', description: 'Messagerie, réunions et collaboration' },
   { nom: 'Dynamics 365', editeur: 'Microsoft', description: 'Applications de gestion des opérations et des processus d\'affaires' },
+  { nom: 'Dynaway', editeur: 'Dynaway', description: 'Gestion des actifs et de la maintenance (EAM) — requiert automatiquement un accès D365.' },
 ];
+
+/** Selecting this application implicitly requires D365 access — see Step5Applications/Step3Access,
+ * which lock ACCES_D365 checked in the Access step while this stays selected. */
+export const DYNAWAY = 'Dynaway';
 
 export const OUI_NON = ['Oui', 'Non'];
 

@@ -4,13 +4,15 @@ import { Field, SectionTitle } from '../components/FormField';
 import { StepFooter } from '../components/StepFooter';
 import { ChoiceCard } from '../components/ChoiceCard';
 import { LockIcon, AlertTriangleIcon } from '../components/icons';
-import { SYSTEMES_ACCES, POS_HEBERGEMENT_SYSTEMES, ACCES_BADGE, BESOIN_CODE_ALARME } from '../data/catalogs';
+import { SYSTEMES_ACCES, POS_HEBERGEMENT_SYSTEMES, ACCES_BADGE, BESOIN_CODE_ALARME, ACCES_D365, DYNAWAY } from '../data/catalogs';
 
 export function Step3Access() {
   const { request, setRequest } = useWizard();
   const a = request.access;
+  const dynawaySelected = request.applications.applications.includes(DYNAWAY);
 
   const toggleSysteme = (id: string) => {
+    if (id === ACCES_D365 && dynawaySelected) return; // locked — see Step5Applications
     setRequest((prev) => {
       const set = new Set(prev.access.systemes);
       if (set.has(id)) set.delete(id);
@@ -74,6 +76,8 @@ export function Step3Access() {
               description={sys.description}
               selected={a.systemes.includes(sys.nom)}
               onToggle={() => toggleSysteme(sys.nom)}
+              disabled={sys.nom === ACCES_D365 && dynawaySelected}
+              disabledHint={sys.nom === ACCES_D365 && dynawaySelected ? 'Requis automatiquement — Dynaway est sélectionné dans Applications.' : undefined}
             />
             {sys.nom === ACCES_BADGE && a.systemes.includes(ACCES_BADGE) && (
               <Field label="Zones ou édifices requis">

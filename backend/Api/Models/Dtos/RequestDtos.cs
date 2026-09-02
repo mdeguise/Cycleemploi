@@ -131,6 +131,11 @@ public class MeDto
     /// <summary>Deprecated alias for <see cref="IsAppAdmin"/>, kept so the existing frontend guards
     /// keep working while the UI migrates to IsAppAdmin/AdminRole. Remove once nothing reads it.</summary>
     public bool IsTicketTemplateAdmin { get; set; }
+
+    /// <summary>True if this identity has ANY D365Approver row (global or scoped to a Position
+    /// Title) — gates the "Approbations D365" nav link, a DIFFERENT table from AppUsers. See
+    /// D365Approver's doc comment.</summary>
+    public bool IsD365Approver { get; set; }
 }
 
 public class HelpUrlDto

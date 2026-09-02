@@ -54,5 +54,6 @@ public class Request
     public ApplicationsDetail? ApplicationsDetail { get; set; }
     public OffboardingDetail? OffboardingDetail { get; set; }
     public OffboardingConfidentialComment? ConfidentialComment { get; set; }
+    public D365AccessApproval? D365AccessApproval { get; set; }
     public ICollection<Attachment> Attachments { get; set; } = new List<Attachment>();
 }

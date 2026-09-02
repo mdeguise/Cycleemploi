@@ -27,11 +27,12 @@ public class AppDbContext : DbContext
     public DbSet<D365SecurityRoleMapping> D365SecurityRoleMappings => Set<D365SecurityRoleMapping>();
     public DbSet<D365UserSecurityRole> D365UserSecurityRoles => Set<D365UserSecurityRole>();
     public DbSet<DynawayUser> DynawayUsers => Set<DynawayUser>();
-    public DbSet<D365JobCodeTemplate> D365JobCodeTemplates => Set<D365JobCodeTemplate>();
-    public DbSet<D365JobCodeTemplateRole> D365JobCodeTemplateRoles => Set<D365JobCodeTemplateRole>();
     public DbSet<AppUser> AppUsers => Set<AppUser>();
     public DbSet<TicketTemplate> TicketTemplates => Set<TicketTemplate>();
     public DbSet<RequestTicket> RequestTickets => Set<RequestTicket>();
+    public DbSet<D365Approver> D365Approvers => Set<D365Approver>();
+    public DbSet<D365AccessApproval> D365AccessApprovals => Set<D365AccessApproval>();
+    public DbSet<D365AccessApprovalRole> D365AccessApprovalRoles => Set<D365AccessApprovalRole>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -136,24 +137,49 @@ public class AppDbContext : DbContext
             entity.HasIndex(m => m.Login);
         });
 
-        modelBuilder.Entity<D365JobCodeTemplate>(entity =>
+        modelBuilder.Entity<D365Approver>(entity =>
         {
-            entity.Property(m => m.JobCode).HasMaxLength(50).IsRequired();
-            entity.Property(m => m.JobTitleEnglish).HasMaxLength(200).IsRequired();
-            entity.Property(m => m.LegalEntity).HasMaxLength(200).IsRequired();
-            entity.Property(m => m.DepartmentNumber).HasMaxLength(50).IsRequired();
+            entity.Property(m => m.Sam).HasMaxLength(100).IsRequired();
+            entity.Property(m => m.Email).HasMaxLength(200);
+            entity.Property(m => m.DisplayName).HasMaxLength(200).IsRequired();
+            entity.Property(m => m.PositionTitle).HasMaxLength(200);
+            entity.Property(m => m.CreatedByDisplayName).HasMaxLength(200);
+            // A person can be listed once as a global approver (PositionTitle null) and separately
+            // scoped to specific titles — but not added twice for the exact same scope. HasFilter(null)
+            // is essential, not cosmetic — see RequestTicket's doc comment for why: EF Core defaults a
+            // unique index over a nullable column to "WHERE [PositionTitle] IS NOT NULL", which would
+            // let the SAME person be added as a global approver (PositionTitle null) twice.
+            entity.HasIndex(m => new { m.Sam, m.PositionTitle }).IsUnique().HasFilter(null);
+        });
+
+        modelBuilder.Entity<D365AccessApproval>(entity =>
+        {
+            entity.HasKey(d => d.RequestId);
+            entity.HasOne(d => d.Request).WithOne(r => r.D365AccessApproval)
+                .HasForeignKey<D365AccessApproval>(d => d.RequestId).OnDelete(DeleteBehavior.Cascade);
+            entity.Property(m => m.Status).HasConversion<string>().HasMaxLength(20);
+            entity.Property(m => m.JobTitleEnglish).HasMaxLength(200);
+            entity.Property(m => m.LegalEntity).HasMaxLength(200);
+            entity.Property(m => m.DepartmentNumber).HasMaxLength(50);
             entity.Property(m => m.ApprovalLimit).HasColumnType("decimal(18,2)");
             entity.Property(m => m.ApAccessDetails).HasMaxLength(2000);
             entity.Property(m => m.AdditionalLegalEntities).HasMaxLength(2000);
-            entity.HasIndex(m => m.JobCode).IsUnique();
+            entity.Property(m => m.CompletedByObjectId).HasMaxLength(200);
+            entity.Property(m => m.CompletedByDisplayName).HasMaxLength(200);
+
+            // NoAction, not Cascade: SQL Server refuses multiple cascade paths to the same table
+            // (Request already cascades to RequestEmployee directly). Rows are cleaned up via the
+            // Request cascade anyway.
+            entity.HasOne<RequestEmployee>().WithMany()
+                .HasForeignKey(d => d.RequestEmployeeId).OnDelete(DeleteBehavior.NoAction);
         });
 
-        modelBuilder.Entity<D365JobCodeTemplateRole>(entity =>
+        modelBuilder.Entity<D365AccessApprovalRole>(entity =>
         {
             entity.Property(m => m.Role).HasMaxLength(200).IsRequired();
-            entity.HasOne(m => m.D365JobCodeTemplate).WithMany(t => t.Roles)
-                .HasForeignKey(m => m.D365JobCodeTemplateId).OnDelete(DeleteBehavior.Cascade);
-            entity.HasIndex(m => new { m.D365JobCodeTemplateId, m.Role }).IsUnique();
+            entity.HasOne(m => m.D365AccessApproval).WithMany(a => a.Roles)
+                .HasForeignKey(m => m.RequestId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(m => new { m.RequestId, m.Role }).IsUnique();
         });
 
         modelBuilder.Entity<RequestTicket>(entity =>

@@ -15,18 +15,26 @@ public class SendGridEmailNotificationService : IEmailNotificationService
         _logger = logger;
     }
 
-    public async Task SendAsync(string subject, string body, CancellationToken ct)
+    public Task SendAsync(string subject, string body, CancellationToken ct) =>
+        SendAsync(subject, body, [_options.ToAddress], ct);
+
+    public async Task SendAsync(string subject, string body, IReadOnlyList<string> toAddresses, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(_options.ApiKey))
         {
-            _logger.LogWarning("SendGrid API key not configured — skipping failure-notification email. Subject: {Subject}\n{Body}", subject, body);
+            _logger.LogWarning("SendGrid API key not configured — skipping email to {ToAddresses}. Subject: {Subject}\n{Body}", string.Join(", ", toAddresses), subject, body);
+            return;
+        }
+        if (toAddresses.Count == 0)
+        {
+            _logger.LogWarning("No recipients given — skipping email. Subject: {Subject}", subject);
             return;
         }
 
         var client = new SendGridClient(_options.ApiKey);
-        var message = MailHelper.CreateSingleEmail(
+        var message = MailHelper.CreateSingleEmailToMultipleRecipients(
             new EmailAddress(_options.FromAddress),
-            new EmailAddress(_options.ToAddress),
+            toAddresses.Select(a => new EmailAddress(a)).ToList(),
             subject,
             body,
             htmlContent: null);

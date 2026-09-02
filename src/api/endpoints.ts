@@ -12,8 +12,6 @@ import type {
   CreateD365SecurityRoleMappingDto,
   CreateHelpTicketDto,
   CreateRequestDto,
-  D365JobCodeTemplateDto,
-  D365JobCodeTemplateSummaryDto,
   D365SecurityRoleMappingDto,
   D365UserSecurityRoleDto,
   DiscrepanciesDto,
@@ -25,7 +23,12 @@ import type {
   TicketTemplateDto,
   UpdateRequestDto,
   UpdateTicketTemplateDto,
-  UpsertD365JobCodeTemplateDto,
+  D365ApproverDto,
+  CreateD365ApproverDto,
+  D365AccessApprovalSummaryDto,
+  D365AccessApprovalDetailDto,
+  CompleteD365AccessApprovalDto,
+  CompleteD365AccessApprovalResultDto,
 } from './types';
 
 export function createApi(client: ApiClient) {
@@ -68,14 +71,19 @@ export function createApi(client: ApiClient) {
     discrepancies: {
       get: () => client.get<DiscrepanciesDto>('/api/discrepancies'),
     },
-    d365JobCodeTemplates: {
-      list: () => client.get<D365JobCodeTemplateSummaryDto[]>('/api/d365-jobcode-templates'),
-      catalog: () => client.get<string[]>('/api/d365-jobcode-templates/catalog'),
-      get: (jobCode: string) =>
-        client.get<D365JobCodeTemplateDto>(`/api/d365-jobcode-templates/${encodeURIComponent(jobCode)}`),
-      upsert: (jobCode: string, dto: UpsertD365JobCodeTemplateDto) =>
-        client.put<D365JobCodeTemplateDto>(`/api/d365-jobcode-templates/${encodeURIComponent(jobCode)}`, dto),
-      remove: (jobCode: string) => client.delete<void>(`/api/d365-jobcode-templates/${encodeURIComponent(jobCode)}`),
+    d365Approvers: {
+      list: () => client.get<D365ApproverDto[]>('/api/d365-approvers'),
+      adSearch: (q: string) =>
+        client.get<AdAccountDto[]>(`/api/d365-approvers/ad-search?q=${encodeURIComponent(q)}`),
+      add: (dto: CreateD365ApproverDto) => client.post<D365ApproverDto>('/api/d365-approvers', dto),
+      remove: (id: number) => client.delete<void>(`/api/d365-approvers/${id}`),
+    },
+    d365AccessApprovals: {
+      list: () => client.get<D365AccessApprovalSummaryDto[]>('/api/d365-access-approvals'),
+      detail: (requestId: number) =>
+        client.get<D365AccessApprovalDetailDto>(`/api/d365-access-approvals/${requestId}`),
+      complete: (requestId: number, dto: CompleteD365AccessApprovalDto) =>
+        client.post<CompleteD365AccessApprovalResultDto>(`/api/d365-access-approvals/${requestId}/complete`, dto),
     },
     ticketTemplates: {
       list: () => client.get<TicketTemplateDto[]>('/api/ticket-templates'),
