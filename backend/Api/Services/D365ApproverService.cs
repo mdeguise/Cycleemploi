@@ -21,6 +21,8 @@ public interface ID365ApproverService
 
     Task<List<D365Approver>> ListAsync(CancellationToken ct);
 
+    Task<D365Approver?> GetAsync(int d365ApproverId, CancellationToken ct);
+
     /// <summary>Every approver eligible to act on a request for this position title — global
     /// approvers plus those scoped to it — used to build the notification-email recipient list.</summary>
     Task<List<D365Approver>> MatchingAsync(string? positionTitle, CancellationToken ct);
@@ -69,6 +71,9 @@ public class D365ApproverService : ID365ApproverService
             .ThenBy(a => a.PositionTitle)
             .ThenBy(a => a.DisplayName)
             .ToListAsync(ct);
+
+    public Task<D365Approver?> GetAsync(int d365ApproverId, CancellationToken ct) =>
+        _db.D365Approvers.AsNoTracking().FirstOrDefaultAsync(a => a.D365ApproverId == d365ApproverId, ct);
 
     public Task<List<D365Approver>> MatchingAsync(string? positionTitle, CancellationToken ct) =>
         _db.D365Approvers.AsNoTracking()

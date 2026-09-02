@@ -63,10 +63,12 @@ function AdminLayout({ title, me, children }: { title: string; me: MeDto; childr
           {me.isTicketTemplateAdmin && (
             <>
               <Link to="/admin/d365-approvers">Approbateurs D365</Link>
-              <Link to="/admin/d365-position-titles">Titres de poste</Link>
               <Link to="/admin/ticket-templates">Gabarits des billets</Link>
               <Link to="/admin/app-users">Administrateurs</Link>
             </>
+          )}
+          {(me.isTicketTemplateAdmin || me.isD365Approver) && (
+            <Link to="/admin/d365-position-titles">Titres de poste</Link>
           )}
           <Link to="/">Retour à l'application</Link>
         </div>
@@ -91,6 +93,19 @@ function AdminSectionGuard({ me, children }: { me: MeDto; children: ReactNode })
 
 function TicketTemplateAdminGuard({ me, children }: { me: MeDto; children: ReactNode }) {
   if (!me.isTicketTemplateAdmin) {
+    return (
+      <div className="step-panel">
+        <div className="big-notice">Vous n'avez pas accès à cette section.</div>
+      </div>
+    );
+  }
+  return <>{children}</>;
+}
+
+/// Admin (full control) OR any D365Approver (self-service — see D365PositionTitleAssignmentsPage).
+/// Personnel TI (D365Viewer without D365Approver) stays out, same as Approbateurs D365 itself.
+function PositionTitlesGuard({ me, children }: { me: MeDto; children: ReactNode }) {
+  if (!me.isTicketTemplateAdmin && !me.isD365Approver) {
     return (
       <div className="step-panel">
         <div className="big-notice">Vous n'avez pas accès à cette section.</div>
@@ -224,9 +239,9 @@ function AuthenticatedApp() {
           path="/admin/d365-position-titles"
           element={
             <AdminLayout title="Administration — Titres de poste" me={me}>
-              <TicketTemplateAdminGuard me={me}>
-                <D365PositionTitleAssignmentsPage />
-              </TicketTemplateAdminGuard>
+              <PositionTitlesGuard me={me}>
+                <D365PositionTitleAssignmentsPage me={me} />
+              </PositionTitlesGuard>
             </AdminLayout>
           }
         />
