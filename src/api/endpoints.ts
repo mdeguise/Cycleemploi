@@ -25,6 +25,8 @@ import type {
   UpdateTicketTemplateDto,
   D365ApproverDto,
   CreateD365ApproverDto,
+  D365ViewerDto,
+  CreateD365ViewerDto,
   D365AccessApprovalSummaryDto,
   D365AccessApprovalDetailDto,
   CompleteD365AccessApprovalDto,
@@ -77,6 +79,13 @@ export function createApi(client: ApiClient) {
         client.get<AdAccountDto[]>(`/api/d365-approvers/ad-search?q=${encodeURIComponent(q)}`),
       add: (dto: CreateD365ApproverDto) => client.post<D365ApproverDto>('/api/d365-approvers', dto),
       remove: (id: number) => client.delete<void>(`/api/d365-approvers/${id}`),
+    },
+    d365Viewers: {
+      list: () => client.get<D365ViewerDto[]>('/api/d365-viewers'),
+      adSearch: (q: string) =>
+        client.get<AdAccountDto[]>(`/api/d365-viewers/ad-search?q=${encodeURIComponent(q)}`),
+      add: (dto: CreateD365ViewerDto) => client.post<D365ViewerDto>('/api/d365-viewers', dto),
+      remove: (id: number) => client.delete<void>(`/api/d365-viewers/${id}`),
     },
     d365AccessApprovals: {
       list: () => client.get<D365AccessApprovalSummaryDto[]>('/api/d365-access-approvals'),

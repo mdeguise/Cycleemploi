@@ -58,7 +58,7 @@ function AdminLayout({ title, me, children }: { title: string; me: MeDto; childr
           {me.adminRole && <Link to="/admin/requests">Demandes</Link>}
           <Link to="/admin/d365-roles">Rôles D365 par code d'emploi</Link>
           <Link to="/admin/d365-user-roles">Correction des rôles D365</Link>
-          {(me.isD365Approver || me.adminRole) && <Link to="/admin/d365-approvals">Approbations D365</Link>}
+          {(me.isD365Approver || me.isD365Viewer || me.adminRole) && <Link to="/admin/d365-approvals">Approbations D365</Link>}
           {me.isTicketTemplateAdmin && (
             <>
               <Link to="/admin/d365-approvers">Approbateurs D365</Link>
@@ -98,10 +98,11 @@ function TicketTemplateAdminGuard({ me, children }: { me: MeDto; children: React
   return <>{children}</>;
 }
 
-/// D365Approver access (global or scoped) OR any Administration access, for oversight — completing
-/// a SPECIFIC approval is gated separately, server-side, on being a matching approver.
+/// D365Approver access (global or scoped), D365Viewer access (view-only "IT Personnel"), OR any
+/// Administration access, for oversight — completing a SPECIFIC approval is gated separately,
+/// server-side, on being a matching approver.
 function D365ApprovalsSectionGuard({ me, children }: { me: MeDto; children: ReactNode }) {
-  if (!me.isD365Approver && !me.adminRole) {
+  if (!me.isD365Approver && !me.isD365Viewer && !me.adminRole) {
     return (
       <div className="step-panel">
         <div className="big-notice">Vous n'avez pas accès à cette section.</div>

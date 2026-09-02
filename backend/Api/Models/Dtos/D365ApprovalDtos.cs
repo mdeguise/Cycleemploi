@@ -22,6 +22,25 @@ public class CreateD365ApproverDto
     public string? PositionTitle { get; set; }
 }
 
+/// <summary>"IT Personnel" — sees the tracking list and every request's status, never the Envoyer
+/// action. See D365Viewer's doc comment.</summary>
+public class D365ViewerDto
+{
+    public int D365ViewerId { get; set; }
+    public string Sam { get; set; } = null!;
+    public string DisplayName { get; set; } = null!;
+    public string? Email { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public string? CreatedByDisplayName { get; set; }
+}
+
+public class CreateD365ViewerDto
+{
+    public string Sam { get; set; } = null!;
+    public string DisplayName { get; set; } = null!;
+    public string? Email { get; set; }
+}
+
 /// <summary>One peer employee (same Job Code and Position Title) and the D365 security roles they
 /// already hold, per the imported D365UserSecurityRole snapshot — shown to an approver as reference
 /// context so they aren't picking roles blind.</summary>

@@ -58,6 +58,7 @@ builder.Services.AddScoped<RequestAuthorizationService>();
 builder.Services.AddScoped<RequestNumberService>();
 builder.Services.AddScoped<IAppUserService, AppUserService>();
 builder.Services.AddScoped<ID365ApproverService, D365ApproverService>();
+builder.Services.AddScoped<ID365ViewerService, D365ViewerService>();
 builder.Services.AddScoped<ITicketTemplateService, TicketTemplateService>();
 builder.Services.AddScoped<IEmployeeFieldsService, EmployeeFieldsService>();
 builder.Services.AddScoped<IRequestTicketService, RequestTicketService>();

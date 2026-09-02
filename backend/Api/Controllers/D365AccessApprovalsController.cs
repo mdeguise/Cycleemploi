@@ -26,6 +26,7 @@ public class D365AccessApprovalsController : ControllerBase
     private readonly AppDbContext _db;
     private readonly WorkdayContext _workday;
     private readonly ID365ApproverService _approvers;
+    private readonly ID365ViewerService _viewers;
     private readonly IAppUserService _appUsers;
     private readonly IAdDirectoryService _ad;
     private readonly ITicketOrchestrationService _orchestration;
@@ -36,6 +37,7 @@ public class D365AccessApprovalsController : ControllerBase
         AppDbContext db,
         WorkdayContext workday,
         ID365ApproverService approvers,
+        ID365ViewerService viewers,
         IAppUserService appUsers,
         IAdDirectoryService ad,
         ITicketOrchestrationService orchestration,
@@ -45,6 +47,7 @@ public class D365AccessApprovalsController : ControllerBase
         _db = db;
         _workday = workday;
         _approvers = approvers;
+        _viewers = viewers;
         _appUsers = appUsers;
         _ad = ad;
         _orchestration = orchestration;
@@ -52,10 +55,16 @@ public class D365AccessApprovalsController : ControllerBase
         _logger = logger;
     }
 
-    /// <summary>Any D365Approver access at all, OR any Administration access (Lecteur/Admin) for
-    /// oversight — enough to LIST and VIEW, not to complete one.</summary>
+    /// <summary>D365Approver or D365Viewer access, OR AppUsers Admin as a safety net (so an
+    /// administrator never loses the ability to look, same philosophy as AdminRequestsController's
+    /// confidential-comment rule) — enough to LIST and VIEW, not to complete one. Deliberately
+    /// narrower than "any Administration access" (a plain Lecteur no longer sees this section): the
+    /// standalone D365Approvals app is meant to be reachable only by matched approvers and IT
+    /// Personnel viewers, not by every Administration reader.</summary>
     private async Task<bool> CanViewAsync(CancellationToken ct) =>
-        await _approvers.HasAnyAccessAsync(User.GetObjectId(), ct) || await _appUsers.HasAnyAccessAsync(User.GetObjectId(), ct);
+        await _approvers.HasAnyAccessAsync(User.GetObjectId(), ct) ||
+        await _viewers.HasAnyAccessAsync(User.GetObjectId(), ct) ||
+        await _appUsers.IsAdminAsync(User.GetObjectId(), ct);
 
     [HttpGet]
     public async Task<ActionResult<List<D365AccessApprovalSummaryDto>>> List(CancellationToken ct)

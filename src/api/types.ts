@@ -57,6 +57,8 @@ export interface MeDto {
   isTicketTemplateAdmin: boolean;
   /** ANY D365Approver row (global or scoped to a Position Title) — a DIFFERENT table from AppUsers. */
   isD365Approver: boolean;
+  /** "IT Personnel" — sees the D365 tracking list and status, never the Envoyer action. */
+  isD365Viewer: boolean;
 }
 
 export interface HelpUrlDto {
@@ -170,6 +172,21 @@ export interface CreateD365ApproverDto {
   displayName: string;
   email?: string | null;
   positionTitle?: string | null;
+}
+
+export interface D365ViewerDto {
+  d365ViewerId: number;
+  sam: string;
+  displayName: string;
+  email?: string | null;
+  createdAt: string;
+  createdByDisplayName?: string | null;
+}
+
+export interface CreateD365ViewerDto {
+  sam: string;
+  displayName: string;
+  email?: string | null;
 }
 
 export interface D365PeerRoleDto {

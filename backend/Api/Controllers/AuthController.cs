@@ -18,8 +18,9 @@ public class AuthController : ControllerBase
     private readonly TdxOptions _tdxOptions;
     private readonly IAppUserService _appUsers;
     private readonly ID365ApproverService _d365Approvers;
+    private readonly ID365ViewerService _d365Viewers;
 
-    public AuthController(IAdDirectoryService ad, IOptions<HrGroupOptions> hrGroupOptions, ITdxService tdx, IOptions<TdxOptions> tdxOptions, IAppUserService appUsers, ID365ApproverService d365Approvers)
+    public AuthController(IAdDirectoryService ad, IOptions<HrGroupOptions> hrGroupOptions, ITdxService tdx, IOptions<TdxOptions> tdxOptions, IAppUserService appUsers, ID365ApproverService d365Approvers, ID365ViewerService d365Viewers)
     {
         _ad = ad;
         _hrGroupOptions = hrGroupOptions.Value;
@@ -27,6 +28,7 @@ public class AuthController : ControllerBase
         _tdxOptions = tdxOptions.Value;
         _appUsers = appUsers;
         _d365Approvers = d365Approvers;
+        _d365Viewers = d365Viewers;
     }
 
     [HttpGet("me")]
@@ -41,6 +43,7 @@ public class AuthController : ControllerBase
         // `mail` attribute in AD, so an email-keyed lookup silently denied them every time.
         var role = await _appUsers.GetRoleAsync(accountName, ct);
         var isD365Approver = await _d365Approvers.HasAnyAccessAsync(accountName, ct);
+        var isD365Viewer = await _d365Viewers.HasAnyAccessAsync(accountName, ct);
 
         return Ok(new MeDto
         {
@@ -51,7 +54,8 @@ public class AuthController : ControllerBase
             AdminRole = role?.ToString(),
             IsAppAdmin = role == AppUserRole.Admin,
             IsTicketTemplateAdmin = role == AppUserRole.Admin,
-            IsD365Approver = isD365Approver
+            IsD365Approver = isD365Approver,
+            IsD365Viewer = isD365Viewer
         });
     }
 

@@ -136,6 +136,7 @@ public class MeDto
     /// Title) — gates the "Approbations D365" nav link, a DIFFERENT table from AppUsers. See
     /// D365Approver's doc comment.</summary>
     public bool IsD365Approver { get; set; }
+    public bool IsD365Viewer { get; set; }
 }
 
 public class HelpUrlDto

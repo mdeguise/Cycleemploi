@@ -31,6 +31,7 @@ public class AppDbContext : DbContext
     public DbSet<TicketTemplate> TicketTemplates => Set<TicketTemplate>();
     public DbSet<RequestTicket> RequestTickets => Set<RequestTicket>();
     public DbSet<D365Approver> D365Approvers => Set<D365Approver>();
+    public DbSet<D365Viewer> D365Viewers => Set<D365Viewer>();
     public DbSet<D365AccessApproval> D365AccessApprovals => Set<D365AccessApproval>();
     public DbSet<D365AccessApprovalRole> D365AccessApprovalRoles => Set<D365AccessApprovalRole>();
 
@@ -150,6 +151,15 @@ public class AppDbContext : DbContext
             // unique index over a nullable column to "WHERE [PositionTitle] IS NOT NULL", which would
             // let the SAME person be added as a global approver (PositionTitle null) twice.
             entity.HasIndex(m => new { m.Sam, m.PositionTitle }).IsUnique().HasFilter(null);
+        });
+
+        modelBuilder.Entity<D365Viewer>(entity =>
+        {
+            entity.Property(m => m.Sam).HasMaxLength(100).IsRequired();
+            entity.Property(m => m.Email).HasMaxLength(200);
+            entity.Property(m => m.DisplayName).HasMaxLength(200).IsRequired();
+            entity.Property(m => m.CreatedByDisplayName).HasMaxLength(200);
+            entity.HasIndex(m => m.Sam).IsUnique();
         });
 
         modelBuilder.Entity<D365AccessApproval>(entity =>
