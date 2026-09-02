@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useApi } from '../api/ApiContext';
 import type { D365ApproverDto, MeDto } from '../api/types';
 import { usePicker, PickerField } from '../components/AdPicker';
@@ -17,11 +17,17 @@ function bareSam(identity: string): string {
  * Position Title at all) — see Approbateurs D365 for managing those. Multiple approvers per title
  * is intentional, same as everywhere else in this app: any one matched approver acting is enough.
  *
- * Two INDEPENDENT actions below the table, matching the backend's two tiers exactly:
+ * The assign controls sit ABOVE the table on purpose — there are 300+ titles, so anything placed
+ * below the table was effectively invisible without scrolling past all of them (a real report: an
+ * admin scrolled the whole table and never found the self-assign button). The table itself is
+ * capped to a scrollable panel with a sticky header and a text filter, so it doesn't dominate the
+ * page either.
+ *
+ * Two INDEPENDENT assign actions, matching the backend's two tiers exactly:
  *  - "M'assigner à ce titre" — visible to ANY D365Approver, admin or not. One click, no picker:
  *    it always claims the title under the CALLER's own identity. An admin who is also an approver
- *    (the common case — see D365ApproversAdminPage) needs this too; without it they had no way to
- *    add themselves short of searching AD for their own name in the picker below.
+ *    (the common case) needs this too; without it they had no way to add themselves short of
+ *    searching AD for their own name in the picker below.
  *  - "Assigner un autre compte" — Admin only, full AD picker, for assigning anyone else. */
 export function D365PositionTitleAssignmentsPage({ me }: { me: MeDto }) {
   const api = useApi();
@@ -33,6 +39,7 @@ export function D365PositionTitleAssignmentsPage({ me }: { me: MeDto }) {
   const [approvers, setApprovers] = useState<D365ApproverDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [filter, setFilter] = useState('');
 
   const [selectedTitle, setSelectedTitle] = useState('');
   const [selfError, setSelfError] = useState<string | null>(null);
@@ -58,6 +65,10 @@ export function D365PositionTitleAssignmentsPage({ me }: { me: MeDto }) {
 
   const globalCount = approvers.filter((a) => !a.positionTitle).length;
   const alreadyMine = approvers.some((a) => a.positionTitle === selectedTitle && a.sam === mySam);
+  const filteredTitles = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    return q ? titles.filter((t) => t.toLowerCase().includes(q)) : titles;
+  }, [titles, filter]);
 
   const handleSelfAssign = async () => {
     setSelfError(null);
@@ -127,7 +138,7 @@ export function D365PositionTitleAssignmentsPage({ me }: { me: MeDto }) {
         <div>
           <div className="step-panel__title">Titres de poste</div>
           <div className="step-panel__subtitle">
-            Un titre de poste sans approbateur assigné ci-dessous utilise les approbateurs{' '}
+            Un titre de poste sans approbateur assigné dans le tableau ci-dessous utilise les approbateurs{' '}
             <strong>globaux</strong> ({globalCount === 0 ? 'aucun configuré pour l\'instant' : `${globalCount} présentement`}
             {' '}— voir Approbateurs D365).
           </div>
@@ -139,59 +150,9 @@ export function D365PositionTitleAssignmentsPage({ me }: { me: MeDto }) {
 
       {!isLoading && (
         <>
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 24 }}>
-            <thead>
-              <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--border, #ddd)' }}>
-                <th style={{ padding: '8px 12px' }}>Titre de poste</th>
-                <th style={{ padding: '8px 12px' }}>Approbateur(s) assigné(s)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {titles.length === 0 && (
-                <tr>
-                  <td colSpan={2} style={{ padding: '8px 12px', color: 'var(--muted)' }}>Aucun titre de poste trouvé.</td>
-                </tr>
-              )}
-              {titles.map((title) => {
-                const scoped = approvers.filter((a) => a.positionTitle === title);
-                return (
-                  <tr key={title} style={{ borderBottom: '1px solid var(--border, #eee)' }}>
-                    <td style={{ padding: '8px 12px' }}>{title}</td>
-                    <td style={{ padding: '8px 12px' }}>
-                      {scoped.length === 0 ? (
-                        <span style={{ color: 'var(--muted)' }}>— (approbateurs globaux)</span>
-                      ) : (
-                        <div className="review-tag-list">
-                          {scoped.map((a) => {
-                            const canRemove = isAdmin || a.sam === mySam;
-                            return (
-                              <span key={a.d365ApproverId} className="review-tag" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                                {a.displayName}
-                                {canRemove && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemove(a.d365ApproverId)}
-                                    aria-label={`Retirer ${a.displayName}`}
-                                    style={{ display: 'inline-flex', border: 'none', background: 'none', cursor: 'pointer', padding: 0, color: 'inherit' }}
-                                  >
-                                    ×
-                                  </button>
-                                )}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-
           <div className="field-section-title">Assigner un titre de poste</div>
           <div className="field" style={{ maxWidth: 520 }}>
-            <label className="field__label">Titre de poste</label>
+            <label className="field__label">Titre de poste ({titles.length})</label>
             <div className="field__input-wrap">
               <select value={selectedTitle} onChange={(ev) => setSelectedTitle(ev.target.value)}>
                 {titles.map((title) => (
@@ -234,6 +195,72 @@ export function D365PositionTitleAssignmentsPage({ me }: { me: MeDto }) {
               </div>
             </form>
           )}
+
+          <div className="field-section-title" style={{ marginTop: 24 }}>Tous les titres de poste</div>
+          <div className="field" style={{ maxWidth: 380, marginBottom: 10 }}>
+            <div className="field__input-wrap">
+              <input
+                type="text"
+                value={filter}
+                onChange={(ev) => setFilter(ev.target.value)}
+                placeholder="Filtrer par titre de poste…"
+              />
+            </div>
+          </div>
+
+          <div style={{ overflow: 'auto', maxHeight: 420, border: '1px solid var(--border, #ddd)' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--border, #ddd)' }}>
+                  <th style={{ padding: '8px 12px', position: 'sticky', top: 0, background: 'var(--bg-card, #fff)' }}>Titre de poste</th>
+                  <th style={{ padding: '8px 12px', position: 'sticky', top: 0, background: 'var(--bg-card, #fff)' }}>Approbateur(s) assigné(s)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTitles.length === 0 && (
+                  <tr>
+                    <td colSpan={2} style={{ padding: '8px 12px', color: 'var(--muted)' }}>
+                      {titles.length === 0 ? 'Aucun titre de poste trouvé.' : 'Aucun titre ne correspond au filtre.'}
+                    </td>
+                  </tr>
+                )}
+                {filteredTitles.map((title) => {
+                  const scoped = approvers.filter((a) => a.positionTitle === title);
+                  return (
+                    <tr key={title} style={{ borderBottom: '1px solid var(--border, #eee)' }}>
+                      <td style={{ padding: '8px 12px' }}>{title}</td>
+                      <td style={{ padding: '8px 12px' }}>
+                        {scoped.length === 0 ? (
+                          <span style={{ color: 'var(--muted)' }}>— (approbateurs globaux)</span>
+                        ) : (
+                          <div className="review-tag-list">
+                            {scoped.map((a) => {
+                              const canRemove = isAdmin || a.sam === mySam;
+                              return (
+                                <span key={a.d365ApproverId} className="review-tag" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                  {a.displayName}
+                                  {canRemove && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemove(a.d365ApproverId)}
+                                      aria-label={`Retirer ${a.displayName}`}
+                                      style={{ display: 'inline-flex', border: 'none', background: 'none', cursor: 'pointer', padding: 0, color: 'inherit' }}
+                                    >
+                                      ×
+                                    </button>
+                                  )}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
     </div>
