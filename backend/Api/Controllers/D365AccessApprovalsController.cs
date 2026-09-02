@@ -72,7 +72,7 @@ public class D365AccessApprovalsController : ControllerBase
         if (!await CanViewAsync(ct)) return Forbid();
 
         var approvals = await _db.D365AccessApprovals.AsNoTracking()
-            .Include(a => a.Request)
+            .Include(a => a.Request).ThenInclude(r => r.OnboardingDetail)
             .OrderByDescending(a => a.CreatedAt)
             .ToListAsync(ct);
 
@@ -85,10 +85,23 @@ public class D365AccessApprovalsController : ControllerBase
             .ToDictionaryAsync(e => e.RequestEmployeeId, e => e.WorkdayEmployeeId, ct);
 
         var workdayIds = employeeWorkdayIds.Values.Distinct().ToList();
-        var positionTitles = await _workday.WorkdayDemographics
+        var workdayInfoByEmployee = await _workday.WorkdayDemographics
             .Where(w => w.PrimaryJob == true && workdayIds.Contains(w.EmployeeId))
-            .Select(w => new { w.EmployeeId, w.PositionTitle })
-            .ToDictionaryAsync(w => w.EmployeeId, w => w.PositionTitle, ct);
+            .Select(w => new { w.EmployeeId, w.PositionTitle, w.ManagerId, w.Manager })
+            .ToDictionaryAsync(w => w.EmployeeId, ct);
+
+        // Batched, same as Detail()'s single-employee lookup — resolve the manager's PREFERRED name
+        // where possible, falling back to Workday's own raw Manager string when the manager isn't
+        // (or is no longer) a primary-job row itself.
+        var managerIds = workdayInfoByEmployee.Values
+            .Select(w => w.ManagerId)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct()
+            .ToList();
+        var managerNames = await _workday.WorkdayDemographics
+            .Where(w => w.PrimaryJob == true && managerIds.Contains(w.EmployeeId))
+            .Select(w => new { w.EmployeeId, w.FirstName, w.PreferredFirstName, w.LastName })
+            .ToDictionaryAsync(w => w.EmployeeId, w => $"{w.PreferredFirstName ?? w.FirstName} {w.LastName}", ct);
 
         var requestIds = approvals.Select(a => a.RequestId).ToList();
         var d365Tickets = await _db.RequestTickets.AsNoTracking()
@@ -102,13 +115,23 @@ public class D365AccessApprovalsController : ControllerBase
             ticketByRequest.TryGetValue(a.RequestId, out var ticket);
             var live = ticket is not null && liveStatuses.TryGetValue(ticket.RequestTicketId, out var s) ? s : null;
             var workdayId = employeeWorkdayIds.GetValueOrDefault(a.RequestEmployeeId);
+            var workdayInfo = workdayId is not null ? workdayInfoByEmployee.GetValueOrDefault(workdayId) : null;
+
+            string? managerName = workdayInfo?.Manager;
+            if (!string.IsNullOrWhiteSpace(workdayInfo?.ManagerId) && managerNames.TryGetValue(workdayInfo.ManagerId, out var resolvedManagerName))
+            {
+                managerName = resolvedManagerName;
+            }
 
             return new D365AccessApprovalSummaryDto
             {
                 RequestId = a.RequestId,
                 RequestNumber = a.Request.RequestNumber,
                 EmployeeName = employeeNames.GetValueOrDefault(a.RequestEmployeeId, "?"),
-                PositionTitle = workdayId is not null ? positionTitles.GetValueOrDefault(workdayId) : null,
+                PositionTitle = workdayInfo?.PositionTitle,
+                ManagerName = managerName,
+                RequesterName = a.Request.CreatedByDisplayName,
+                StartDate = a.Request.OnboardingDetail?.DateEntreePrevue,
                 Status = a.Status.ToString(),
                 CreatedAt = a.CreatedAt,
                 CompletedAt = a.CompletedAt,

@@ -58,6 +58,9 @@ public class D365AccessApprovalSummaryDto
     public string RequestNumber { get; set; } = null!;
     public string EmployeeName { get; set; } = null!;
     public string? PositionTitle { get; set; }
+    public string? ManagerName { get; set; }
+    public string RequesterName { get; set; } = null!;
+    public DateOnly? StartDate { get; set; }
 
     /// <summary>"Pending" or "Completed" — see D365ApprovalStatus. Completed doesn't imply the TDX
     /// ticket itself succeeded; TicketNumber/TicketState reflect that separately.</summary>

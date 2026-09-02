@@ -63,37 +63,45 @@ export function D365ApprovalsListPage({ me }: { me: MeDto }) {
       {!isLoading && (
         <>
           <div className="field-section-title">En attente ({pending.length})</div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 24 }}>
-            <thead>
-              <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--border, #ddd)' }}>
-                <th style={{ padding: '8px 12px' }}>Demande</th>
-                <th style={{ padding: '8px 12px' }}>Employé</th>
-                <th style={{ padding: '8px 12px' }}>Titre de poste</th>
-                <th style={{ padding: '8px 12px' }}>Demandée le</th>
-                <th style={{ padding: '8px 12px' }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {pending.length === 0 && (
-                <tr>
-                  <td colSpan={5} style={{ padding: '8px 12px', color: 'var(--muted)' }}>Aucune approbation en attente.</td>
+          <div style={{ overflowX: 'auto', marginBottom: 24 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--border, #ddd)' }}>
+                  <th style={{ padding: '8px 12px' }}>Demande</th>
+                  <th style={{ padding: '8px 12px' }}>Employé</th>
+                  <th style={{ padding: '8px 12px' }}>Titre de poste</th>
+                  <th style={{ padding: '8px 12px' }}>Gestionnaire</th>
+                  <th style={{ padding: '8px 12px' }}>Demandé par</th>
+                  <th style={{ padding: '8px 12px' }}>Date de début</th>
+                  <th style={{ padding: '8px 12px' }}>Demandée le</th>
+                  <th style={{ padding: '8px 12px' }}></th>
                 </tr>
-              )}
-              {pending.map((r) => (
-                <tr key={r.requestId} style={{ borderBottom: '1px solid var(--border, #eee)' }}>
-                  <td style={{ padding: '8px 12px' }}>{r.requestNumber}</td>
-                  <td style={{ padding: '8px 12px' }}>{r.employeeName}</td>
-                  <td style={{ padding: '8px 12px' }}>{r.positionTitle ?? '—'}</td>
-                  <td style={{ padding: '8px 12px' }}>{new Date(r.createdAt).toLocaleDateString('fr-CA')}</td>
-                  <td style={{ padding: '8px 12px', textAlign: 'right' }}>
-                    <Link className="review-section__edit" to={`/admin/d365-approvals/${r.requestId}`}>
-                      {canAct ? 'Remplir le formulaire' : 'Voir les détails'}
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {pending.length === 0 && (
+                  <tr>
+                    <td colSpan={8} style={{ padding: '8px 12px', color: 'var(--muted)' }}>Aucune approbation en attente.</td>
+                  </tr>
+                )}
+                {pending.map((r) => (
+                  <tr key={r.requestId} style={{ borderBottom: '1px solid var(--border, #eee)' }}>
+                    <td style={{ padding: '8px 12px' }}>{r.requestNumber}</td>
+                    <td style={{ padding: '8px 12px' }}>{r.employeeName}</td>
+                    <td style={{ padding: '8px 12px' }}>{r.positionTitle ?? '—'}</td>
+                    <td style={{ padding: '8px 12px' }}>{r.managerName ?? '—'}</td>
+                    <td style={{ padding: '8px 12px' }}>{r.requesterName}</td>
+                    <td style={{ padding: '8px 12px' }}>{r.startDate ? new Date(r.startDate).toLocaleDateString('fr-CA') : '—'}</td>
+                    <td style={{ padding: '8px 12px' }}>{new Date(r.createdAt).toLocaleDateString('fr-CA')}</td>
+                    <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                      <Link className="review-section__edit" to={`/admin/d365-approvals/${r.requestId}`}>
+                        {canAct ? 'Remplir le formulaire' : 'Voir les détails'}
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
           <div className="field-section-title">Complétées ({completed.length})</div>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>

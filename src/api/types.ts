@@ -200,6 +200,9 @@ export interface D365AccessApprovalSummaryDto {
   requestNumber: string;
   employeeName: string;
   positionTitle?: string | null;
+  managerName?: string | null;
+  requesterName: string;
+  startDate?: string | null;
   status: string;
   createdAt: string;
   completedAt?: string | null;
