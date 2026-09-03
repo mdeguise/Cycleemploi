@@ -38,16 +38,27 @@ export function D365PositionTitleAssignmentsPage({ me }: { me: MeDto }) {
   const [assigningTitle, setAssigningTitle] = useState<string | null>(null);
   const [removingTitle, setRemovingTitle] = useState<string | null>(null);
 
-  const load = () => {
-    setIsLoading(true);
-    setLoadError(null);
+  // Split so a post-action refresh never toggles isLoading — that unmounts and remounts the whole
+  // table (replaced by "Chargement…" and back), which resets both the page's scroll position and
+  // the table's own internal scroll to the top on every single click. Only the very first load
+  // needs the full loading state; every refresh after that just swaps the data in place.
+  const fetchAll = () =>
     Promise.all([api.d365Approvers.positionTitles(), api.d365Approvers.list()])
       .then(([t, a]) => {
         setTitles(t);
         setApprovers(a);
       })
-      .catch((err) => setLoadError(err instanceof Error ? err.message : 'Erreur inconnue'))
-      .finally(() => setIsLoading(false));
+      .catch((err) => setLoadError(err instanceof Error ? err.message : 'Erreur inconnue'));
+
+  const load = () => {
+    setIsLoading(true);
+    setLoadError(null);
+    fetchAll().finally(() => setIsLoading(false));
+  };
+
+  const reload = () => {
+    setLoadError(null);
+    return fetchAll();
   };
 
   useEffect(load, [api]);
@@ -74,7 +85,7 @@ export function D365PositionTitleAssignmentsPage({ me }: { me: MeDto }) {
         email: me.email ?? null,
         positionTitle: title,
       });
-      load();
+      await reload();
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Erreur inconnue');
     } finally {
@@ -86,7 +97,7 @@ export function D365PositionTitleAssignmentsPage({ me }: { me: MeDto }) {
     setLoadError(null);
     try {
       await api.d365Approvers.remove(id);
-      load();
+      await reload();
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Erreur inconnue');
     }
@@ -97,7 +108,7 @@ export function D365PositionTitleAssignmentsPage({ me }: { me: MeDto }) {
     setRemovingTitle(title);
     try {
       await api.d365Approvers.remove(id);
-      load();
+      await reload();
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Erreur inconnue');
     } finally {
