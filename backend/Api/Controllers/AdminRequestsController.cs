@@ -376,6 +376,7 @@ public class AdminRequestsController : ControllerBase
             .Include(r => r.EquipmentDetail).ThenInclude(e => e!.Equipements)
             .Include(r => r.ApplicationsDetail).ThenInclude(a => a!.Applications)
             .Include(r => r.ConfidentialComment)
+            .Include(r => r.OnboardingConfidentialComment)
             .FirstOrDefaultAsync(r => r.RequestId == id, ct);
         if (request is null) return NotFound();
 

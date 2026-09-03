@@ -86,10 +86,19 @@ public static class TicketTemplateDefaults
         new("PosHebergement", "Systèmes POS et hébergement sélectionnés", TicketFieldCategory.Request),
         new("Stationnement", "Stationnement requis", TicketFieldCategory.Request),
         new("JustificationAcces", "Justification des accès demandés", TicketFieldCategory.Request),
+        new("CodeAlarmeDetails", "Précisions sur le code d'alarme", TicketFieldCategory.Request),
         new("Equipements", "Équipement sélectionné", TicketFieldCategory.Request),
         new("NotesEquipement", "Notes libres sur l'équipement", TicketFieldCategory.Request),
         new("Applications", "Applications sélectionnées", TicketFieldCategory.Request),
         new("AutreLogiciel", "Autre logiciel requis", TicketFieldCategory.Request),
+        new("CommentairesIT", "Commentaires — technologies de l'information", TicketFieldCategory.Request),
+        new("CommentairesStationnement", "Commentaires — stationnement", TicketFieldCategory.Request),
+        new("CommentairesPuceAcces", "Commentaires — carte ou puce d'accès", TicketFieldCategory.Request),
+        new("CommentairesRedingote", "Commentaires — uniformes et matériel à fournir", TicketFieldCategory.Request),
+        // CommentaireRH lives in a physically separate, access-restricted table (see
+        // OnboardingConfidentialComment's doc comment) — selectable here as the same deliberate
+        // per-ticket exception offboarding's main template already has, never a general precedent.
+        new("CommentaireRH", "Commentaire confidentiel des ressources humaines", TicketFieldCategory.Request),
     ];
 
     private static readonly IReadOnlyList<TicketTemplateField> OffboardingMainRequestFields =
@@ -103,6 +112,14 @@ public static class TicketTemplateDefaults
         new("RaisonArret", "Raison de l'arrêt de travail", TicketFieldCategory.Request),
         new("DetailsRaison", "Détails sur la raison", TicketFieldCategory.Request),
         new("Reembaucheriez", "Admissibilité à la réembauche", TicketFieldCategory.Request),
+        new("MotifNonAdmissibilite", "Motif de non-admissibilité (assurance-emploi)", TicketFieldCategory.Request),
+        new("DateRetourConnue", "Date de retour connue (mise à pied)", TicketFieldCategory.Request),
+        new("DateRetourTravail", "Date de retour au travail", TicketFieldCategory.Request),
+        new("PreavisRecu", "Préavis reçu", TicketFieldCategory.Request),
+        new("CommentairesIT", "Commentaires — technologies de l'information", TicketFieldCategory.Request),
+        new("CommentairesStationnement", "Commentaires — stationnement", TicketFieldCategory.Request),
+        new("CommentairesPuceAcces", "Commentaires — carte ou puce d'accès", TicketFieldCategory.Request),
+        new("CommentairesRedingote", "Commentaires — uniformes et matériel à fournir", TicketFieldCategory.Request),
         new("CommentaireRH", "Commentaire confidentiel des ressources humaines", TicketFieldCategory.Request),
     ];
 

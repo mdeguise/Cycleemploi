@@ -109,12 +109,17 @@ public class FreshdeskService : IFreshdeskService
                 ["RaisonArret"] = d?.RaisonArret,
                 ["DetailsRaison"] = d?.DetailsRaison,
                 ["Reembaucheriez"] = d?.Reembaucheriez,
-                // Deliberately the ONLY comment field available here — commentairesIT/
-                // Stationnement/Redingote are for other systems/tickets, not this one (per explicit
-                // product decision). CommentaireRH lives in a physically separate, access-restricted
-                // table (see OffboardingConfidentialComment's doc comment) — including it here is a
-                // deliberate exception for this specific ticket ("RH - Général"), not a general
-                // precedent.
+                ["MotifNonAdmissibilite"] = d?.MotifNonAdmissibilite,
+                ["DateRetourConnue"] = d?.DateRetourConnue,
+                ["DateRetourTravail"] = d?.DateRetourTravail is { } retourDate ? retourDate.ToString("yyyy-MM-dd") : null,
+                ["PreavisRecu"] = d?.PreavisRecu,
+                ["CommentairesIT"] = d?.CommentairesIT,
+                ["CommentairesStationnement"] = d?.CommentairesStationnement,
+                ["CommentairesPuceAcces"] = d?.CommentairesPuceAcces,
+                ["CommentairesRedingote"] = d?.CommentairesRedingote,
+                // CommentaireRH lives in a physically separate, access-restricted table (see
+                // OffboardingConfidentialComment's doc comment) — including it here is a deliberate
+                // exception for this specific ticket ("RH - Général"), not a general precedent.
                 ["CommentaireRH"] = request.ConfidentialComment?.CommentaireRH
             };
             return TicketTemplateRenderer.RenderBlock(template, requestValues, employeeValuesList);
@@ -140,10 +145,19 @@ public class FreshdeskService : IFreshdeskService
                 ["PosHebergement"] = JoinOrNull(a?.PosHebergement.Select(p => p.Value)),
                 ["Stationnement"] = a?.Stationnement,
                 ["JustificationAcces"] = a?.Justification,
+                ["CodeAlarmeDetails"] = a?.CodeAlarmeDetails,
                 ["Equipements"] = JoinOrNull(eq?.Equipements.Select(x => x.Value)),
                 ["NotesEquipement"] = eq?.Notes,
                 ["Applications"] = JoinOrNull(app?.Applications.Select(x => x.Value)),
-                ["AutreLogiciel"] = app?.AutreLogiciel
+                ["AutreLogiciel"] = app?.AutreLogiciel,
+                ["CommentairesIT"] = d?.CommentairesIT,
+                ["CommentairesStationnement"] = d?.CommentairesStationnement,
+                ["CommentairesPuceAcces"] = d?.CommentairesPuceAcces,
+                ["CommentairesRedingote"] = d?.CommentairesRedingote,
+                // Same deliberate exception as FreshdeskMainOffboarding's CommentaireRH — see that
+                // branch's comment. Lives in OnboardingConfidentialComment, a physically separate,
+                // access-restricted table (see its doc comment).
+                ["CommentaireRH"] = request.OnboardingConfidentialComment?.CommentaireRH
             };
             return TicketTemplateRenderer.RenderBlock(template, requestValues, employeeValuesList);
         }
