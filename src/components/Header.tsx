@@ -2,17 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { useApi } from '../api/ApiContext';
 import { useWizard } from '../context/WizardContext';
-import { CalendarIcon, UserIcon, ChevronDownIcon } from './icons';
+import { CalendarIcon, UserIcon } from './icons';
 import { formatDateFr } from '../utils/formatDate';
 import tremblantLogo from '../assets/logo-tremblant.png';
 import { TYPE_DEMANDE_TERMINAISON } from '../types';
-
-const STATUS_LABEL: Record<string, string> = {
-  Brouillon: 'En brouillon',
-  Soumise: 'Soumise',
-  'En traitement': 'En traitement',
-  Complétée: 'Complétée',
-};
 
 export function Header() {
   const { request } = useWizard();
@@ -61,15 +54,6 @@ export function Header() {
             Administration
           </Link>
         )}
-
-        <div className="status-pill-wrap">
-          <div className="status-pill-wrap__label">Statut</div>
-          <div className="status-pill">
-            <span className="status-dot" />
-            {STATUS_LABEL[request.statut]}
-            <ChevronDownIcon className="meta-block__icon" style={{ width: 14, height: 14 }} />
-          </div>
-        </div>
       </div>
     </header>
   );

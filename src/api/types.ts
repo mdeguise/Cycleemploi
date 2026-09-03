@@ -74,7 +74,7 @@ export interface HelpTicketResultDto {
 }
 
 export type RequestTypeApi = 'Onboarding' | 'Reactivation' | 'Offboarding';
-export type RequestStatusApi = 'Brouillon' | 'Soumise' | 'EnTraitement' | 'Completee';
+export type RequestStatusApi = 'Soumise' | 'EnTraitement' | 'Completee';
 
 export interface RequestEmployeeDto {
   workdayEmployeeId: string;
@@ -125,14 +125,10 @@ export interface RequestDto {
   commentairesRH?: string | null;
 }
 
-export type UpdateRequestDto = Omit<
-  RequestDto,
-  'requestId' | 'requestNumber' | 'requestType' | 'status' | 'demandePar' | 'createdAt'
->;
-
-export interface CreateRequestDto {
-  requestType: RequestTypeApi;
-}
+/** POST /api/requests body — the ENTIRE request, assembled across every wizard step and sent in
+ * one shot at final submission. No partial-save state: nothing reaches the server until this
+ * single call, which creates and submits the request atomically. */
+export type SubmitRequestDto = Omit<RequestDto, 'requestId' | 'requestNumber' | 'status' | 'demandePar' | 'createdAt'>;
 
 export interface D365SecurityRoleMappingDto {
   id: number;

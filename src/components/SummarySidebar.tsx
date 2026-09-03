@@ -4,13 +4,6 @@ import { formatDateFr } from '../utils/formatDate';
 import { TYPE_DEMANDE_TERMINAISON } from '../types';
 import staffPhoto from '../assets/staff2.png';
 
-const STATUS_LABEL: Record<string, string> = {
-  Brouillon: 'En brouillon',
-  Soumise: 'Soumise',
-  'En traitement': 'En traitement',
-  Complétée: 'Complétée',
-};
-
 export function SummarySidebar() {
   const { request, currentStep, stepCount } = useWizard();
   const progressPct = Math.round(((currentStep + 1) / stepCount) * 100);
@@ -47,12 +40,6 @@ export function SummarySidebar() {
         <div className="summary-row">
           <div className="summary-row__label">Demandé par</div>
           <div className="summary-row__value">{request.demandePar}</div>
-        </div>
-        <div className="summary-row">
-          <div className="summary-row__label">Statut actuel</div>
-          <div>
-            <span className="summary-status-badge">{STATUS_LABEL[request.statut]}</span>
-          </div>
         </div>
         <div className="summary-row" style={{ marginBottom: 0 }}>
           <div className="summary-row__label">Progression</div>

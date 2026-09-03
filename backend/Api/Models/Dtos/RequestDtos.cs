@@ -1,12 +1,5 @@
 namespace TremblantLifecycle.Api.Models.Dtos;
 
-/// <summary>POST /api/requests body — just enough to create the shell; the wizard fills in the
-/// rest via PUT as the user progresses through steps.</summary>
-public class CreateRequestDto
-{
-    public string RequestType { get; set; } = null!; // "Onboarding" | "Reactivation" | "Offboarding"
-}
-
 public class RequestEmployeeDto
 {
     public string WorkdayEmployeeId { get; set; } = null!;
@@ -18,8 +11,8 @@ public class RequestEmployeeDto
     public string? GestionnaireSnapshot { get; set; }
 }
 
-/// <summary>Full request shape for GET/PUT — mirrors src/types.ts's OnboardingRequest closely so
-/// the frontend's mapping stays close to a 1:1 rename rather than a real transform.
+/// <summary>Full request shape returned by GET/POST — mirrors src/types.ts's OnboardingRequest
+/// closely so the frontend's mapping stays close to a 1:1 rename rather than a real transform.
 /// CommentairesRH is included ONLY when RequestAuthorizationService.CanReadConfidentialCommentAsync
 /// allows it for the calling user — see RequestsController.</summary>
 public class RequestDto
@@ -75,11 +68,15 @@ public class RequestDto
     public string? CommentairesRH { get; set; }
 }
 
-/// <summary>PUT /api/requests/{id} body — same shape as RequestDto minus server-owned fields
-/// (RequestId/RequestNumber/Status/DemandePar/CreatedAt). Employees are replaced wholesale on each
-/// PUT (simplest correct behavior for a multi-step wizard that can add/remove selections freely).</summary>
-public class UpdateRequestDto
+/// <summary>POST /api/requests body — the ENTIRE request, assembled client-side across every wizard
+/// step and sent in one shot at final submission. There is no partial-save/draft state: nothing
+/// touches the database until this single call, which creates the Request and submits it
+/// atomically (validation failures leave no row behind at all — see RequestsController.Create).
+/// Same shape as RequestDto minus server-owned fields (RequestId/RequestNumber/Status/DemandePar/
+/// CreatedAt).</summary>
+public class SubmitRequestDto
 {
+    public string RequestType { get; set; } = null!; // "Onboarding" | "Reactivation" | "Offboarding"
     public List<RequestEmployeeDto> Employees { get; set; } = [];
     public DateOnly? DateEntreePrevue { get; set; }
     public string? RegleDePaye { get; set; }

@@ -8,7 +8,6 @@ import { Header } from './components/Header';
 import tremblantLogo from './assets/logo-tremblant.png';
 import { StepNav } from './components/StepNav';
 import { SummarySidebar } from './components/SummarySidebar';
-import { TipBanner } from './components/TipBanner';
 import { Step1Employee } from './steps/Step1Employee';
 import { Step2Position } from './steps/Step2Position';
 import { Step3Access } from './steps/Step3Access';
@@ -143,7 +142,6 @@ function WizardBody() {
         <StepComponent />
         <SummarySidebar />
       </div>
-      <TipBanner />
     </div>
   );
 }

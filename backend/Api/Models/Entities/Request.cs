@@ -16,7 +16,6 @@ public enum RequestType
 
 public enum RequestStatus
 {
-    Brouillon,
     Soumise,
     EnTraitement,
     Completee
@@ -33,10 +32,13 @@ public class Request
     public string RequestNumber { get; set; } = null!;
 
     public RequestType RequestType { get; set; }
-    public RequestStatus Status { get; set; } = RequestStatus.Brouillon;
 
-    /// <summary>Entra ID object id of the submitting manager — the authorization check for
-    /// re-reading a draft's own RH comment keys off this.</summary>
+    /// <summary>Always Soumise the moment a Request row exists — there is no partial-save/draft
+    /// state; the wizard collects everything client-side and creates+submits atomically in one
+    /// call (see RequestsController.Create). EnTraitement/Completee are reserved for a future
+    /// manual/admin transition and are never set by this codebase today.</summary>
+    public RequestStatus Status { get; set; } = RequestStatus.Soumise;
+
     public string CreatedByObjectId { get; set; } = null!;
     public string CreatedByDisplayName { get; set; } = null!;
 

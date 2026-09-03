@@ -1,8 +1,8 @@
-import { createContext, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 import { createEmptyRequest, TYPE_DEMANDE_TERMINAISON, type OnboardingRequest, type TypeDemande } from '../types';
 import { REGLE_DE_PAYE_AUTRE, PAY_GROUP_NON_UNION } from '../data/catalogs';
 import { useApi } from '../api/ApiContext';
-import type { RequestTypeApi, UpdateRequestDto } from '../api/types';
+import type { RequestTypeApi, SubmitRequestDto } from '../api/types';
 
 export interface StepDescriptor {
   key: string;
@@ -38,12 +38,14 @@ function toRequestTypeApi(typeDemande: TypeDemande): RequestTypeApi {
   return 'Onboarding';
 }
 
-/** Maps local wizard state to the shape PUT /api/requests/{id} expects. Pure function, no
- * side effects — kept next to the context that's the only caller for now, move to src/api if a
- * second caller ever needs it. */
-function toUpdateDto(request: OnboardingRequest): UpdateRequestDto {
+/** Maps local wizard state to the shape POST /api/requests expects — the ENTIRE request, sent in
+ * one shot at final submission (no partial-save state; nothing reaches the server before this).
+ * Pure function, no side effects — kept next to the context that's the only caller for now, move
+ * to src/api if a second caller ever needs it. */
+function toSubmitDto(request: OnboardingRequest): SubmitRequestDto {
   const isOffboarding = request.typeDemande === TYPE_DEMANDE_TERMINAISON;
   return {
+    requestType: toRequestTypeApi(request.typeDemande),
     employees: isOffboarding
       ? request.offboarding.employees.map((e) => ({
           workdayEmployeeId: e.workdayEmployeeId,
@@ -111,19 +113,16 @@ interface WizardContextValue {
   currentStep: number;
   setCurrentStep: (step: number) => void;
   furthestStep: number;
-  goNext: () => Promise<void>;
+  goNext: () => void;
   goBack: () => void;
   goToStep: (step: number) => void;
   isStepValid: (step: number) => boolean;
   progressLabel: string;
   steps: StepDescriptor[];
   stepCount: number;
-  setTypeDemande: (typeDemande: TypeDemande) => Promise<void>;
-  /** Persists current local state to the server — called on every step navigation (a natural
-   * checkpoint) and by the "Enregistrer le brouillon" button. No-ops until a request exists
-   * (i.e. before a type is selected). */
-  syncToServer: () => Promise<void>;
-  isSyncing: boolean;
+  setTypeDemande: (typeDemande: TypeDemande) => void;
+  /** The one and only server call — sends the entire wizard state and creates+submits the
+   * request atomically. No partial-save state exists before this. */
   submitRequest: () => Promise<void>;
 }
 
@@ -162,9 +161,6 @@ export function WizardProvider({ children, demandePar }: { children: ReactNode; 
   const [request, setRequest] = useState<OnboardingRequest>(() => createEmptyRequest(demandePar));
   const [currentStep, setCurrentStep] = useState(0);
   const [furthestStep, setFurthestStep] = useState(0);
-  const [isSyncing, setIsSyncing] = useState(false);
-  // Guards against a stale in-flight create() firing twice if the user double-clicks a type card.
-  const creatingRef = useRef(false);
 
   const steps = useMemo(() => stepsFor(request.typeDemande), [request.typeDemande]);
   const stepCount = steps.length;
@@ -175,54 +171,26 @@ export function WizardProvider({ children, demandePar }: { children: ReactNode; 
     setFurthestStep((f) => Math.max(f, clamped));
   };
 
-  const syncToServer = async () => {
-    if (!request.requestId) return;
-    setIsSyncing(true);
-    try {
-      await api.requests.update(request.requestId, toUpdateDto(request));
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  const goNext = async () => {
-    await syncToServer();
-    goToStep(currentStep + 1);
-  };
+  const goNext = () => goToStep(currentStep + 1);
   const goBack = () => goToStep(currentStep - 1);
 
   const isStepValid = (step: number) => validateStep(step, request);
 
   const progressLabel = useMemo(() => `${currentStep + 1} / ${stepCount} étapes`, [currentStep, stepCount]);
 
-  const setTypeDemande = async (typeDemande: TypeDemande) => {
+  const setTypeDemande = (typeDemande: TypeDemande) => {
     setFurthestStep(currentStep);
-
-    if (!request.requestId && typeDemande && !creatingRef.current) {
-      creatingRef.current = true;
-      try {
-        const created = await api.requests.create({ requestType: toRequestTypeApi(typeDemande) });
-        setRequest((prev) => ({
-          ...prev,
-          typeDemande,
-          requestId: created.requestId,
-          demandeNumero: created.requestNumber,
-          dateCreation: created.createdAt.slice(0, 10),
-        }));
-      } finally {
-        creatingRef.current = false;
-      }
-      return;
-    }
-
     setRequest((prev) => ({ ...prev, typeDemande }));
   };
 
   const submitRequest = async () => {
-    if (!request.requestId) throw new Error('No request to submit — this should be unreachable.');
-    await syncToServer();
-    await api.requests.submit(request.requestId);
-    setRequest((prev) => ({ ...prev, statut: 'Soumise' }));
+    const created = await api.requests.submit(toSubmitDto(request));
+    setRequest((prev) => ({
+      ...prev,
+      requestId: created.requestId,
+      demandeNumero: created.requestNumber,
+      dateCreation: created.createdAt.slice(0, 10),
+    }));
   };
 
   const value: WizardContextValue = {
@@ -239,8 +207,6 @@ export function WizardProvider({ children, demandePar }: { children: ReactNode; 
     steps,
     stepCount,
     setTypeDemande,
-    syncToServer,
-    isSyncing,
     submitRequest,
   };
 

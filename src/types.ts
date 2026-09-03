@@ -1,5 +1,3 @@
-export type RequestStatus = 'Brouillon' | 'Soumise' | 'En traitement' | 'Complétée';
-
 export const TYPE_DEMANDE_TERMINAISON = 'Avis de terminaison ou mise à pied temporaire';
 
 export type TypeDemande = 'Nouvelle intégration' | 'Réactivation' | typeof TYPE_DEMANDE_TERMINAISON | '';
@@ -81,13 +79,13 @@ export interface OffboardingInfo {
 }
 
 export interface OnboardingRequest {
-  /** Null until setTypeDemande's first call creates the backend record — see WizardContext. Every
-   * field below is purely local/optimistic state until then. */
+  /** No partial-save state — everything is local/optimistic until the single submitRequest() call
+   * at the very end (see WizardContext). requestId/demandeNumero are only ever populated from that
+   * call's response, after the wizard is done. */
   requestId: number | null;
   demandeNumero: string;
   dateCreation: string;
   demandePar: string;
-  statut: RequestStatus;
   typeDemande: TypeDemande;
   employee: EmployeeSelectionInfo;
   access: AccessInfo;
@@ -103,7 +101,6 @@ export function createEmptyRequest(demandePar: string): OnboardingRequest {
     demandeNumero: '',
     dateCreation: new Date().toISOString().slice(0, 10),
     demandePar,
-    statut: 'Brouillon',
     typeDemande: '',
     employee: {
       employee: null,

@@ -11,7 +11,6 @@ import type {
   RetryTicketResultDto,
   CreateD365SecurityRoleMappingDto,
   CreateHelpTicketDto,
-  CreateRequestDto,
   D365SecurityRoleMappingDto,
   D365UserSecurityRoleDto,
   DiscrepanciesDto,
@@ -20,8 +19,8 @@ import type {
   HelpUrlDto,
   MeDto,
   RequestDto,
+  SubmitRequestDto,
   TicketTemplateDto,
-  UpdateRequestDto,
   UpdateTicketTemplateDto,
   D365ApproverDto,
   CreateD365ApproverDto,
@@ -52,11 +51,9 @@ export function createApi(client: ApiClient) {
       getById: (workdayId: number) => client.get<EmployeeDto>(`/api/employees/${workdayId}`),
     },
     requests: {
-      create: (dto: CreateRequestDto) => client.post<RequestDto>('/api/requests', dto),
+      /** Creates AND submits in one call — no partial-save state. See SubmitRequestDto. */
+      submit: (dto: SubmitRequestDto) => client.post<RequestDto>('/api/requests', dto),
       get: (id: number) => client.get<RequestDto>(`/api/requests/${id}`),
-      update: (id: number, dto: UpdateRequestDto) =>
-        client.put<void>(`/api/requests/${id}`, dto),
-      submit: (id: number) => client.post<void>(`/api/requests/${id}/submit`),
     },
     d365SecurityRoles: {
       list: () => client.get<D365SecurityRoleMappingDto[]>('/api/d365-security-roles'),

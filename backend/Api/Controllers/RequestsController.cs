@@ -52,8 +52,14 @@ public class RequestsController : ControllerBase
         _logger = logger;
     }
 
+    /// <summary>Creates AND submits a request in one atomic call — there is no partial-save/draft
+    /// state. The wizard collects everything client-side across its steps and only calls the
+    /// server once, at final submission. Server-side validation (ValidateForSubmitAsync) runs
+    /// BEFORE anything is added to the DbContext, so a validation failure leaves no row behind at
+    /// all — unlike the old Create-then-PUT-then-Submit flow, a failed attempt here is invisible to
+    /// everyone, including the requester's own abandoned browser tab.</summary>
     [HttpPost]
-    public async Task<ActionResult<RequestDto>> Create(CreateRequestDto dto, CancellationToken ct)
+    public async Task<ActionResult<RequestDto>> Create(SubmitRequestDto dto, CancellationToken ct)
     {
         if (!Enum.TryParse<RequestType>(dto.RequestType, out var requestType))
         {
@@ -61,21 +67,133 @@ public class RequestsController : ControllerBase
         }
 
         var now = DateTime.UtcNow;
+        var requester = _ad.GetUserInfo(User.GetSamAccountName());
         var request = new Request
         {
-            RequestNumber = await _requestNumbers.GenerateAsync(requestType, ct),
             RequestType = requestType,
-            Status = RequestStatus.Brouillon,
+            Status = RequestStatus.Soumise,
             CreatedByObjectId = User.GetObjectId(),
-            CreatedByDisplayName = _ad.GetUserInfo(User.GetSamAccountName()).DisplayName ?? User.GetObjectId(),
+            CreatedByDisplayName = requester.DisplayName ?? User.GetObjectId(),
             CreatedAt = now,
             UpdatedAt = now
         };
 
+        request.Employees = dto.Employees.Select((e, i) => new RequestEmployee
+        {
+            WorkdayEmployeeId = e.WorkdayEmployeeId,
+            NameSnapshot = e.NameSnapshot,
+            PositionSnapshot = e.PositionSnapshot,
+            DepartementSnapshot = e.DepartementSnapshot,
+            CodeEmploiSnapshot = e.CodeEmploiSnapshot,
+            TypeEmploiSnapshot = e.TypeEmploiSnapshot,
+            GestionnaireSnapshot = e.GestionnaireSnapshot,
+            IsPrimary = i == 0
+        }).ToList();
+
+        if (requestType is RequestType.Onboarding or RequestType.Reactivation)
+        {
+            request.OnboardingDetail = new OnboardingDetail
+            {
+                DateEntreePrevue = dto.DateEntreePrevue,
+                RegleDePaye = dto.RegleDePaye,
+                RegleDePayeCommentaire = dto.RegleDePayeCommentaire,
+                CommentairesIT = dto.CommentairesIT,
+                CommentairesStationnement = dto.CommentairesStationnement,
+                CommentairesPuceAcces = dto.CommentairesPuceAcces,
+                CommentairesRedingote = dto.CommentairesRedingote
+            };
+
+            if (dto.CommentairesRH is not null)
+            {
+                request.OnboardingConfidentialComment = new OnboardingConfidentialComment
+                {
+                    CommentaireRH = dto.CommentairesRH,
+                    UpdatedAt = now,
+                    UpdatedByObjectId = User.GetObjectId()
+                };
+            }
+        }
+
+        request.AccessDetail = new AccessDetail
+        {
+            BadgeZones = dto.BadgeZones,
+            CodeAlarmeDetails = dto.CodeAlarmeDetails,
+            Justification = dto.JustificationAcces,
+            Stationnement = dto.StationnementRequis,
+            Systemes = dto.SystemesAcces.Distinct().Select(v => new RequestAccessSysteme { Value = v }).ToList(),
+            PosHebergement = dto.SystemePosHebergement.Distinct().Select(v => new RequestAccessPos { Value = v }).ToList()
+        };
+
+        request.EquipmentDetail = new EquipmentDetail
+        {
+            Notes = dto.NotesEquipement,
+            Equipements = dto.Equipements.Distinct().Select(v => new RequestEquipment { Value = v }).ToList()
+        };
+
+        request.ApplicationsDetail = new ApplicationsDetail
+        {
+            AutreLogiciel = dto.AutreLogicielRequis,
+            Applications = dto.Applications.Distinct().Select(v => new RequestApplication { Value = v }).ToList()
+        };
+
+        if (requestType == RequestType.Offboarding)
+        {
+            request.OffboardingDetail = new OffboardingDetail
+            {
+                DerniereJournee = dto.DerniereJournee,
+                IndemniteVacances = dto.IndemniteVacances,
+                RaisonArret = dto.RaisonArret,
+                DetailsRaison = dto.DetailsRaison,
+                Reembaucheriez = dto.Reembaucheriez,
+                CommentairesIT = dto.CommentairesIT,
+                CommentairesStationnement = dto.CommentairesStationnement,
+                CommentairesPuceAcces = dto.CommentairesPuceAcces,
+                CommentairesRedingote = dto.CommentairesRedingote,
+                DateRetourConnue = dto.DateRetourConnue,
+                DateRetourTravail = dto.DateRetourTravail,
+                PreavisRecu = dto.PreavisRecu,
+                MotifNonAdmissibilite = dto.MotifNonAdmissibilite
+            };
+
+            if (dto.CommentairesRH is not null)
+            {
+                request.ConfidentialComment = new OffboardingConfidentialComment
+                {
+                    CommentaireRH = dto.CommentairesRH,
+                    UpdatedAt = now,
+                    UpdatedByObjectId = User.GetObjectId()
+                };
+            }
+        }
+
+        // Server-side re-validation mirroring WizardContext.validateStep on the frontend — client
+        // validation must never be trusted alone. Runs before the entity ever touches _db, so a
+        // failure here leaves nothing behind.
+        var errors = await ValidateForSubmitAsync(request, ct);
+        if (errors.Count > 0)
+        {
+            return BadRequest(new { errors });
+        }
+
+        request.RequestNumber = await _requestNumbers.GenerateAsync(requestType, ct);
+        request.SubmittedAt = now;
+
+        // Captured now, while the caller IS the requester. Every downstream ticket is raised under
+        // this address (in Freshdesk it drives the reply thread), and a retry is performed by an
+        // administrator — so re-deriving it from the caller later would misattribute the ticket.
+        request.RequesterEmail = requester.Email;
+
         _db.Requests.Add(request);
         await _db.SaveChangesAsync(ct);
 
-        return await GetInternal(request.RequestId, ct);
+        // Best-effort: the submission has already succeeded and is committed by this point.
+        // Downstream ticket-system integrations (Freshdesk now, TDX later) must never be able to
+        // fail a submission the requester already completed — a failure here notifies IT support by
+        // email instead, so a ticket can be created manually. Freshdesk runs first so its ticket id
+        // (if it succeeded) can be included in the D365 webhook payload for cross-referencing.
+        await _orchestration.RunAllAsync(request, requester, ct);
+
+        return Ok(MapToDto(request));
     }
 
     [HttpGet("{id:int}")]
@@ -97,152 +215,6 @@ public class RequestsController : ControllerBase
         }
 
         return Ok(dto);
-    }
-
-    [HttpPut("{id:int}")]
-    public async Task<IActionResult> Update(int id, UpdateRequestDto dto, CancellationToken ct)
-    {
-        var request = await LoadFullRequestAsync(id, ct);
-        if (request is null) return NotFound();
-
-        if (request.Status != RequestStatus.Brouillon)
-        {
-            return Conflict("Only draft requests can be updated.");
-        }
-
-        // Employees: replace wholesale — simplest correct behavior for a wizard that can freely
-        // add/remove selections across steps.
-        _db.RequestEmployees.RemoveRange(request.Employees);
-        request.Employees = dto.Employees.Select((e, i) => new RequestEmployee
-        {
-            RequestId = id,
-            WorkdayEmployeeId = e.WorkdayEmployeeId,
-            NameSnapshot = e.NameSnapshot,
-            PositionSnapshot = e.PositionSnapshot,
-            DepartementSnapshot = e.DepartementSnapshot,
-            CodeEmploiSnapshot = e.CodeEmploiSnapshot,
-            TypeEmploiSnapshot = e.TypeEmploiSnapshot,
-            GestionnaireSnapshot = e.GestionnaireSnapshot,
-            IsPrimary = i == 0
-        }).ToList();
-
-        if (request.RequestType is RequestType.Onboarding or RequestType.Reactivation)
-        {
-            request.OnboardingDetail ??= new OnboardingDetail { RequestId = id };
-            request.OnboardingDetail.DateEntreePrevue = dto.DateEntreePrevue ?? request.OnboardingDetail.DateEntreePrevue;
-            request.OnboardingDetail.RegleDePaye = dto.RegleDePaye ?? request.OnboardingDetail.RegleDePaye;
-            request.OnboardingDetail.RegleDePayeCommentaire = dto.RegleDePayeCommentaire;
-            request.OnboardingDetail.CommentairesIT = dto.CommentairesIT;
-            request.OnboardingDetail.CommentairesStationnement = dto.CommentairesStationnement;
-            request.OnboardingDetail.CommentairesPuceAcces = dto.CommentairesPuceAcces;
-            request.OnboardingDetail.CommentairesRedingote = dto.CommentairesRedingote;
-
-            // Written unconditionally here — the author can always write this as normal form entry.
-            // Whether it can be READ BACK is a separate, later check (RequestAuthorizationService),
-            // never enforced on write. Mirrors the offboarding branch below.
-            if (dto.CommentairesRH is not null)
-            {
-                request.OnboardingConfidentialComment ??= new OnboardingConfidentialComment { RequestId = id };
-                request.OnboardingConfidentialComment.CommentaireRH = dto.CommentairesRH;
-                request.OnboardingConfidentialComment.UpdatedAt = DateTime.UtcNow;
-                request.OnboardingConfidentialComment.UpdatedByObjectId = User.GetObjectId();
-            }
-        }
-
-        request.AccessDetail ??= new AccessDetail { RequestId = id };
-        request.AccessDetail.BadgeZones = dto.BadgeZones;
-        request.AccessDetail.CodeAlarmeDetails = dto.CodeAlarmeDetails;
-        request.AccessDetail.Justification = dto.JustificationAcces;
-        request.AccessDetail.Stationnement = dto.StationnementRequis;
-        ReplaceJunction(_db.RequestAccessSystemes, request.AccessDetail.Systemes, id, dto.SystemesAcces,
-            v => new RequestAccessSysteme { RequestId = id, Value = v });
-        ReplaceJunction(_db.RequestAccessPos, request.AccessDetail.PosHebergement, id, dto.SystemePosHebergement,
-            v => new RequestAccessPos { RequestId = id, Value = v });
-
-        request.EquipmentDetail ??= new EquipmentDetail { RequestId = id };
-        request.EquipmentDetail.Notes = dto.NotesEquipement;
-        ReplaceJunction(_db.RequestEquipments, request.EquipmentDetail.Equipements, id, dto.Equipements,
-            v => new RequestEquipment { RequestId = id, Value = v });
-
-        request.ApplicationsDetail ??= new ApplicationsDetail { RequestId = id };
-        request.ApplicationsDetail.AutreLogiciel = dto.AutreLogicielRequis;
-        ReplaceJunction(_db.RequestApplications, request.ApplicationsDetail.Applications, id, dto.Applications,
-            v => new RequestApplication { RequestId = id, Value = v });
-
-        if (request.RequestType == RequestType.Offboarding)
-        {
-            request.OffboardingDetail ??= new OffboardingDetail { RequestId = id };
-            request.OffboardingDetail.DerniereJournee = dto.DerniereJournee ?? request.OffboardingDetail.DerniereJournee;
-            request.OffboardingDetail.IndemniteVacances = dto.IndemniteVacances ?? request.OffboardingDetail.IndemniteVacances;
-            request.OffboardingDetail.RaisonArret = dto.RaisonArret ?? request.OffboardingDetail.RaisonArret;
-            request.OffboardingDetail.DetailsRaison = dto.DetailsRaison ?? request.OffboardingDetail.DetailsRaison;
-            request.OffboardingDetail.Reembaucheriez = dto.Reembaucheriez ?? request.OffboardingDetail.Reembaucheriez;
-            request.OffboardingDetail.CommentairesIT = dto.CommentairesIT;
-            request.OffboardingDetail.CommentairesStationnement = dto.CommentairesStationnement;
-            request.OffboardingDetail.CommentairesPuceAcces = dto.CommentairesPuceAcces;
-            request.OffboardingDetail.CommentairesRedingote = dto.CommentairesRedingote;
-            request.OffboardingDetail.DateRetourConnue = dto.DateRetourConnue;
-            request.OffboardingDetail.DateRetourTravail = dto.DateRetourTravail;
-            request.OffboardingDetail.PreavisRecu = dto.PreavisRecu;
-            request.OffboardingDetail.MotifNonAdmissibilite = dto.MotifNonAdmissibilite;
-
-            // Written unconditionally here — the author can always write this as normal form entry.
-            // Whether it can be READ BACK is a separate, later check (RequestAuthorizationService),
-            // never enforced on write.
-            if (dto.CommentairesRH is not null)
-            {
-                request.ConfidentialComment ??= new OffboardingConfidentialComment { RequestId = id };
-                request.ConfidentialComment.CommentaireRH = dto.CommentairesRH;
-                request.ConfidentialComment.UpdatedAt = DateTime.UtcNow;
-                request.ConfidentialComment.UpdatedByObjectId = User.GetObjectId();
-            }
-        }
-
-        request.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(ct);
-
-        return NoContent();
-    }
-
-    [HttpPost("{id:int}/submit")]
-    public async Task<IActionResult> Submit(int id, CancellationToken ct)
-    {
-        var request = await LoadFullRequestAsync(id, ct);
-        if (request is null) return NotFound();
-
-        if (request.Status != RequestStatus.Brouillon)
-        {
-            return Conflict("Request is not in a submittable state.");
-        }
-
-        // Server-side re-validation mirroring WizardContext.validateStep on the frontend — client
-        // validation must never be trusted alone. See the plan's API design notes.
-        var errors = await ValidateForSubmitAsync(request, ct);
-        if (errors.Count > 0)
-        {
-            return BadRequest(new { errors });
-        }
-
-        request.Status = RequestStatus.Soumise;
-        request.SubmittedAt = DateTime.UtcNow;
-        request.UpdatedAt = request.SubmittedAt.Value;
-
-        // Captured now, while the caller IS the requester. Every downstream ticket is raised under
-        // this address (in Freshdesk it drives the reply thread), and a retry is performed by an
-        // administrator — so re-deriving it from the caller later would misattribute the ticket.
-        var requester = _ad.GetUserInfo(User.GetSamAccountName());
-        request.RequesterEmail = requester.Email;
-
-        await _db.SaveChangesAsync(ct);
-
-        // Best-effort: the submission has already succeeded and is committed by this point.
-        // Downstream ticket-system integrations (Freshdesk now, TDX later) must never be able to
-        // fail a submission the requester already completed — a failure here notifies IT support by
-        // email instead, so a ticket can be created manually. Freshdesk runs first so its ticket id
-        // (if it succeeded) can be included in the D365 webhook payload for cross-referencing.
-        await _orchestration.RunAllAsync(request, requester, ct);
-
-        return NoContent();
     }
 
     private async Task<List<string>> ValidateForSubmitAsync(Request request, CancellationToken ct)
@@ -311,19 +283,4 @@ public class RequestsController : ControllerBase
             .FirstOrDefaultAsync(r => r.RequestId == id, ct);
 
     private static RequestDto MapToDto(Request r) => RequestMapper.ToDto(r);
-
-    private static void ReplaceJunction<T>(
-        Microsoft.EntityFrameworkCore.DbSet<T> dbSet,
-        ICollection<T> current,
-        int requestId,
-        List<string> newValues,
-        Func<string, T> factory) where T : class
-    {
-        dbSet.RemoveRange(current);
-        current.Clear();
-        foreach (var v in newValues.Distinct())
-        {
-            current.Add(factory(v));
-        }
-    }
 }
