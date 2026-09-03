@@ -148,6 +148,11 @@ public static class TicketTemplateDefaults
     private static readonly IReadOnlyList<TicketTemplateField> TdxDescriptionRequestFields =
     [
         new("DateEffective", "Date d'entrée prévue (Intégration/Réactivation) ou dernière journée (Terminaison)", TicketFieldCategory.Request),
+        new("Applications", "Applications sélectionnées", TicketFieldCategory.Request),
+        new("CommentairesIT", "Commentaires — technologies de l'information", TicketFieldCategory.Request),
+        new("CommentairesStationnement", "Commentaires — stationnement", TicketFieldCategory.Request),
+        new("CommentairesPuceAcces", "Commentaires — carte ou puce d'accès", TicketFieldCategory.Request),
+        new("CommentairesRedingote", "Commentaires — uniformes et matériel à fournir", TicketFieldCategory.Request),
     ];
 
     public static readonly IReadOnlyList<TicketTemplateDefinition> All =
