@@ -72,6 +72,23 @@ public class TdxService : ITdxService
         var values = await _employeeFields.ResolveAsync(employee, ct);
         values["RequestTypeLabel"] = request.RequestType.ToFrenchLabel();
         values["DateEffective"] = effectiveDateText;
+        values["Applications"] = JoinOrNull(request.ApplicationsDetail?.Applications.Select(x => x.Value));
+        if (isOffboarding)
+        {
+            var d = request.OffboardingDetail;
+            values["CommentairesIT"] = d?.CommentairesIT;
+            values["CommentairesStationnement"] = d?.CommentairesStationnement;
+            values["CommentairesPuceAcces"] = d?.CommentairesPuceAcces;
+            values["CommentairesRedingote"] = d?.CommentairesRedingote;
+        }
+        else
+        {
+            var d = request.OnboardingDetail;
+            values["CommentairesIT"] = d?.CommentairesIT;
+            values["CommentairesStationnement"] = d?.CommentairesStationnement;
+            values["CommentairesPuceAcces"] = d?.CommentairesPuceAcces;
+            values["CommentairesRedingote"] = d?.CommentairesRedingote;
+        }
 
         var title = TicketTemplateRenderer.RenderInline(titleTemplate, values);
         var description = TicketTemplateRenderer.RenderInline(descriptionTemplate, values);
@@ -352,6 +369,12 @@ public class TdxService : ITdxService
         }
 
         return uid;
+    }
+
+    private static string? JoinOrNull(IEnumerable<string>? values)
+    {
+        var list = values?.ToList();
+        return list is null || list.Count == 0 ? null : string.Join(", ", list);
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };

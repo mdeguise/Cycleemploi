@@ -138,6 +138,11 @@ public static class TicketTemplateDefaults
     private static readonly IReadOnlyList<TicketTemplateField> TdxTitleRequestFields =
     [
         new("RequestTypeLabel", "Type de demande", TicketFieldCategory.Request),
+        new("Applications", "Applications sélectionnées", TicketFieldCategory.Request),
+        new("CommentairesIT", "Commentaires — technologies de l'information", TicketFieldCategory.Request),
+        new("CommentairesStationnement", "Commentaires — stationnement", TicketFieldCategory.Request),
+        new("CommentairesPuceAcces", "Commentaires — carte ou puce d'accès", TicketFieldCategory.Request),
+        new("CommentairesRedingote", "Commentaires — uniformes et matériel à fournir", TicketFieldCategory.Request),
     ];
 
     private static readonly IReadOnlyList<TicketTemplateField> TdxDescriptionRequestFields =
