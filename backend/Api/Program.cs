@@ -13,6 +13,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("AppDb")));
 builder.Services.AddDbContext<WorkdayContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("WorkdayDb")));
+builder.Services.AddDbContext<ProcessesContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("ProcessesDb")));
 
 // --- Auth ---
 // Windows Integrated Auth (Negotiate/Kerberos) — the app trusts the same AD identity the browser
