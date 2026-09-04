@@ -101,31 +101,47 @@ public class AdDirectoryService : IAdDirectoryService
 
     public IReadOnlyList<AdAccount> GetTremblantAccounts()
     {
-        var results = new List<AdAccount>();
-        using var root = new DirectoryEntry();
-        using var searcher = new DirectorySearcher(root)
+        // Same two-domain concern as SearchAccounts — vm-trm-live is still joined to iDirectory,
+        // so a single default bind misses every account already migrated to ENTERPRISE.AD. Merge
+        // by Sam, own-domain result winning on a collision (SearchRoots order), same as SearchAccounts.
+        var bySam = new Dictionary<string, AdAccount>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var root in SearchRoots())
         {
-            // Tremblant users only, enabled and disabled alike; extensionAttribute2 = "T" is the
-            // resort tag confirmed on the live directory.
-            Filter = "(&(objectCategory=person)(objectClass=user)(extensionAttribute2=T))",
-            PageSize = 1000,
-        };
-        searcher.PropertiesToLoad.AddRange(new[] { "sAMAccountName", "cn", "userAccountControl", "employeeID", "mail" });
+            try
+            {
+                using (root)
+                using (var searcher = new DirectorySearcher(root)
+                {
+                    // Tremblant users only, enabled and disabled alike; extensionAttribute2 = "T" is
+                    // the resort tag confirmed on the live directory.
+                    Filter = "(&(objectCategory=person)(objectClass=user)(extensionAttribute2=T))",
+                    PageSize = 1000,
+                })
+                {
+                    searcher.PropertiesToLoad.AddRange(new[] { "sAMAccountName", "cn", "userAccountControl", "employeeID", "mail" });
 
-        using var found = searcher.FindAll();
-        foreach (SearchResult r in found)
-        {
-            var sam = GetProp(r, "sAMAccountName");
-            if (string.IsNullOrEmpty(sam)) continue;
+                    using var found = searcher.FindAll();
+                    foreach (SearchResult r in found)
+                    {
+                        var sam = GetProp(r, "sAMAccountName");
+                        if (string.IsNullOrEmpty(sam) || bySam.ContainsKey(sam)) continue;
 
-            var uac = r.Properties["userAccountControl"].Count > 0
-                ? Convert.ToInt32(r.Properties["userAccountControl"][0])
-                : 0;
-            var enabled = (uac & 0x2) == 0; // 0x2 = ACCOUNTDISABLE
+                        var uac = r.Properties["userAccountControl"].Count > 0
+                            ? Convert.ToInt32(r.Properties["userAccountControl"][0])
+                            : 0;
+                        var enabled = (uac & 0x2) == 0; // 0x2 = ACCOUNTDISABLE
 
-            results.Add(new AdAccount(sam, GetProp(r, "cn"), enabled, GetProp(r, "employeeID"), GetProp(r, "mail")));
+                        bySam[sam] = new AdAccount(sam, GetProp(r, "cn"), enabled, GetProp(r, "employeeID"), GetProp(r, "mail"));
+                    }
+                }
+            }
+            catch
+            {
+                // Domain unreachable (off-domain dev box, or trust hiccup) — try the next root.
+            }
         }
-        return results;
+        return bySam.Values.ToList();
     }
 
     public IReadOnlyList<AdAccount> GetAccountsByEmployeeId(IEnumerable<string> employeeIds)
