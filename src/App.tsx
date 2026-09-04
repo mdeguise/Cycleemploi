@@ -12,7 +12,6 @@ import { Step1Employee } from './steps/Step1Employee';
 import { Step2Position } from './steps/Step2Position';
 import { Step3Access } from './steps/Step3Access';
 import { Step4Equipment } from './steps/Step4Equipment';
-import { Step5Applications } from './steps/Step5Applications';
 import { StepCommentsOnboarding } from './steps/StepCommentsOnboarding';
 import { Step6Review } from './steps/Step6Review';
 import { Step2Cessation } from './steps/Step2Cessation';
@@ -37,7 +36,6 @@ const ONBOARDING_STEP_COMPONENTS = [
   Step2Position,
   Step3Access,
   Step4Equipment,
-  Step5Applications,
   StepCommentsOnboarding,
   Step6Review,
 ];

@@ -116,8 +116,8 @@ export const APPLICATIONS: ApplicationItem[] = [
   { nom: 'Dynaway', editeur: 'Dynaway', description: 'Gestion des actifs et de la maintenance (EAM) — requiert automatiquement un accès D365.' },
 ];
 
-/** Selecting this application implicitly requires D365 access — see Step5Applications/Step3Access,
- * which lock ACCES_D365 checked in the Access step while this stays selected. */
+/** Selecting this application implicitly requires D365 access — see Step3Access, which locks
+ * ACCES_D365 checked while this stays selected. */
 export const DYNAWAY = 'Dynaway';
 
 export const OUI_NON = ['Oui', 'Non'];

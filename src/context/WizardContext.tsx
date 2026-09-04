@@ -14,11 +14,10 @@ export interface StepDescriptor {
 export const ONBOARDING_STEPS: StepDescriptor[] = [
   { key: 'employee', numero: 1, titre: 'Employé', sousTitre: "Sélection de l'employé" },
   { key: 'position', numero: 2, titre: 'Poste et département', sousTitre: 'Détails du poste' },
-  { key: 'access', numero: 3, titre: 'Accès et comptes', sousTitre: 'Systèmes et accès requis' },
+  { key: 'access', numero: 3, titre: 'Accès et comptes', sousTitre: 'Systèmes, accès et applications requis' },
   { key: 'equipment', numero: 4, titre: 'Équipement', sousTitre: 'Matériel requis' },
-  { key: 'applications', numero: 5, titre: 'Applications', sousTitre: 'Logiciels et licences' },
-  { key: 'comments', numero: 6, titre: 'Commentaires et suivis', sousTitre: 'RH, TI, stationnement, matériel' },
-  { key: 'review', numero: 7, titre: 'Révision et soumission', sousTitre: 'Vérifier et envoyer' },
+  { key: 'comments', numero: 5, titre: 'Commentaires et suivis', sousTitre: 'RH, TI, stationnement, matériel' },
+  { key: 'review', numero: 6, titre: 'Révision et soumission', sousTitre: 'Vérifier et envoyer' },
 ];
 
 export const OFFBOARDING_STEPS: StepDescriptor[] = [

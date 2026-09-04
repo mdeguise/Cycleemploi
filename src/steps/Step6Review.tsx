@@ -211,7 +211,7 @@ export function Step6Review() {
           <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <AppsIcon style={{ width: 15, height: 15 }} /> Applications
           </span>
-          <span className="review-section__edit" onClick={() => goToStep(4)}>
+          <span className="review-section__edit" onClick={() => goToStep(2)}>
             Modifier
           </span>
         </div>
@@ -242,7 +242,7 @@ export function Step6Review() {
           <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <ShieldIcon style={{ width: 15, height: 15 }} /> Commentaires et suivis
           </span>
-          <span className="review-section__edit" onClick={() => goToStep(5)}>
+          <span className="review-section__edit" onClick={() => goToStep(4)}>
             Modifier
           </span>
         </div>
