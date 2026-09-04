@@ -151,33 +151,49 @@ public class AdDirectoryService : IAdDirectoryService
             .Select(id => id.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
-        var results = new List<AdAccount>();
-        if (ids.Count == 0) return results;
+        if (ids.Count == 0) return [];
 
-        using var root = new DirectoryEntry();
-        // Chunk the OR-filter so it stays well under LDAP filter-size limits.
-        foreach (var chunk in ids.Chunk(100))
+        // Same two-domain concern as SearchAccounts/GetTremblantAccounts — an employeeID already
+        // migrated to ENTERPRISE.AD would otherwise never be found. Merge by Sam, own-domain result
+        // winning on a collision (SearchRoots order).
+        var bySam = new Dictionary<string, AdAccount>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var root in SearchRoots())
         {
-            var or = string.Concat(chunk.Select(id => $"(employeeID={EscapeLdap(id)})"));
-            using var searcher = new DirectorySearcher(root)
+            try
             {
-                Filter = $"(&(objectCategory=person)(objectClass=user)(|{or}))",
-                PageSize = 1000,
-            };
-            searcher.PropertiesToLoad.AddRange(new[] { "sAMAccountName", "cn", "userAccountControl", "employeeID", "mail" });
+                using (root)
+                {
+                    // Chunk the OR-filter so it stays well under LDAP filter-size limits.
+                    foreach (var chunk in ids.Chunk(100))
+                    {
+                        var or = string.Concat(chunk.Select(id => $"(employeeID={EscapeLdap(id)})"));
+                        using var searcher = new DirectorySearcher(root)
+                        {
+                            Filter = $"(&(objectCategory=person)(objectClass=user)(|{or}))",
+                            PageSize = 1000,
+                        };
+                        searcher.PropertiesToLoad.AddRange(new[] { "sAMAccountName", "cn", "userAccountControl", "employeeID", "mail" });
 
-            using var found = searcher.FindAll();
-            foreach (SearchResult r in found)
+                        using var found = searcher.FindAll();
+                        foreach (SearchResult r in found)
+                        {
+                            var sam = GetProp(r, "sAMAccountName");
+                            if (string.IsNullOrEmpty(sam) || bySam.ContainsKey(sam)) continue;
+                            var uac = r.Properties["userAccountControl"].Count > 0
+                                ? Convert.ToInt32(r.Properties["userAccountControl"][0])
+                                : 0;
+                            bySam[sam] = new AdAccount(sam, GetProp(r, "cn"), (uac & 0x2) == 0, GetProp(r, "employeeID"), GetProp(r, "mail"));
+                        }
+                    }
+                }
+            }
+            catch
             {
-                var sam = GetProp(r, "sAMAccountName");
-                if (string.IsNullOrEmpty(sam)) continue;
-                var uac = r.Properties["userAccountControl"].Count > 0
-                    ? Convert.ToInt32(r.Properties["userAccountControl"][0])
-                    : 0;
-                results.Add(new AdAccount(sam, GetProp(r, "cn"), (uac & 0x2) == 0, GetProp(r, "employeeID"), GetProp(r, "mail")));
+                // Domain unreachable (off-domain dev box, or trust hiccup) — try the next root.
             }
         }
-        return results;
+        return bySam.Values.ToList();
     }
 
     // RFC 4515 escaping for values interpolated into an LDAP filter.
