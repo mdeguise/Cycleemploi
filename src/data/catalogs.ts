@@ -81,7 +81,6 @@ export const POS_HEBERGEMENT_SYSTEMES: PosHebergementSysteme[] = [
   },
   { nom: 'SMS', description: 'Système de point de vente (POS) hébergement et des réservations des Suites Tremblant.' },
   { nom: 'OPERA', description: 'Système de point de vente (POS) hébergement et des réservations du Holiday Inn Express.' },
-  { nom: 'SYMPHONIE', description: 'Système de point de vente (POS) nourriture et boisson (Simphony).' },
   { nom: 'APROPOS', description: 'Gestion des ventes au détail et de l\'inventaire.' },
 ];
 
