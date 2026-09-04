@@ -73,6 +73,15 @@ public class TdxService : ITdxService
         values["RequestTypeLabel"] = request.RequestType.ToFrenchLabel();
         values["DateEffective"] = effectiveDateText;
         values["Applications"] = JoinOrNull(request.ApplicationsDetail?.Applications.Select(x => x.Value));
+
+        var access = request.AccessDetail;
+        values["SystemesAcces"] = JoinOrNull(access?.Systemes.Select(x => x.Value));
+        values["ZonesBadge"] = access?.BadgeZones;
+        values["PosHebergement"] = JoinOrNull(access?.PosHebergement.Select(x => x.Value));
+        values["Stationnement"] = access?.Stationnement;
+        values["JustificationAcces"] = access?.Justification;
+        values["CodeAlarmeDetails"] = access?.CodeAlarmeDetails;
+
         if (isOffboarding)
         {
             var d = request.OffboardingDetail;

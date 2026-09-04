@@ -162,6 +162,12 @@ public static class TicketTemplateDefaults
     private static readonly IReadOnlyList<TicketTemplateField> TdxTitleRequestFields =
     [
         new("RequestTypeLabel", "Type de demande", TicketFieldCategory.Request),
+        new("SystemesAcces", "Systèmes et accès sélectionnés", TicketFieldCategory.Request),
+        new("ZonesBadge", "Zones ou édifices requis pour le badge", TicketFieldCategory.Request),
+        new("PosHebergement", "Systèmes POS et hébergement sélectionnés", TicketFieldCategory.Request),
+        new("Stationnement", "Stationnement requis", TicketFieldCategory.Request),
+        new("JustificationAcces", "Justification des accès demandés", TicketFieldCategory.Request),
+        new("CodeAlarmeDetails", "Précisions sur le code d'alarme", TicketFieldCategory.Request),
         new("Applications", "Applications sélectionnées", TicketFieldCategory.Request),
         new("CommentairesIT", "Commentaires — technologies de l'information", TicketFieldCategory.Request),
         new("CommentairesStationnement", "Commentaires — stationnement", TicketFieldCategory.Request),
@@ -172,6 +178,12 @@ public static class TicketTemplateDefaults
     private static readonly IReadOnlyList<TicketTemplateField> TdxDescriptionRequestFields =
     [
         new("DateEffective", "Date d'entrée prévue (Intégration/Réactivation) ou dernière journée (Terminaison)", TicketFieldCategory.Request),
+        new("SystemesAcces", "Systèmes et accès sélectionnés", TicketFieldCategory.Request),
+        new("ZonesBadge", "Zones ou édifices requis pour le badge", TicketFieldCategory.Request),
+        new("PosHebergement", "Systèmes POS et hébergement sélectionnés", TicketFieldCategory.Request),
+        new("Stationnement", "Stationnement requis", TicketFieldCategory.Request),
+        new("JustificationAcces", "Justification des accès demandés", TicketFieldCategory.Request),
+        new("CodeAlarmeDetails", "Précisions sur le code d'alarme", TicketFieldCategory.Request),
         new("Applications", "Applications sélectionnées", TicketFieldCategory.Request),
         new("CommentairesIT", "Commentaires — technologies de l'information", TicketFieldCategory.Request),
         new("CommentairesStationnement", "Commentaires — stationnement", TicketFieldCategory.Request),
