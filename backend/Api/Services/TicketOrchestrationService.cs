@@ -59,6 +59,13 @@ public class TicketOrchestrationService : ITicketOrchestrationService
     private const string BesoinCodeAlarmeSystemeValue = "Besoin de code d'alarme";
     private const string AccesD365SystemeValue = "Accès D365";
 
+    /// <summary>Applications junction rows store the catalog's display text directly — must match
+    /// src/data/catalogs.ts's DYNAWAY exactly. Selecting Dynaway auto-checks "Accès D365" on the
+    /// frontend (see Step3Access.tsx), so the D365 access approval it creates below is pre-commented
+    /// with why — the approver has no other way to know it came from Dynaway, not a manual request.</summary>
+    private const string DynawayApplicationValue = "Dynaway";
+    private const string DynawayCommentDefault = "Pour Dynaway Mobile Access";
+
     public TicketOrchestrationService(
         AppDbContext db,
         WorkdayContext workday,
@@ -507,11 +514,15 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         // than risk a second Pending row (and a second round of approver emails) for one request.
         if (await _db.D365AccessApprovals.AnyAsync(a => a.RequestId == request.RequestId, ct)) return;
 
+        var applications = (request.ApplicationsDetail?.Applications.Select(a => a.Value) ?? []).ToList();
+        var dynawaySelected = applications.Contains(DynawayApplicationValue);
+
         var approval = new D365AccessApproval
         {
             RequestId = request.RequestId,
             RequestEmployeeId = employee.RequestEmployeeId,
             Status = D365ApprovalStatus.Pending,
+            Comments = dynawaySelected ? DynawayCommentDefault : null,
             CreatedAt = DateTime.UtcNow
         };
         _db.D365AccessApprovals.Add(approval);
