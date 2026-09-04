@@ -12,7 +12,7 @@ import {
   ShieldIcon,
   ShirtIcon,
 } from '../components/icons';
-import { REGLE_DE_PAYE_AUTRE, ACCES_BADGE, BESOIN_CODE_ALARME } from '../data/catalogs';
+import { REGLE_DE_PAYE_AUTRE, ACCES_BADGE, BESOIN_CODE_ALARME, STATIONNEMENT_REQUIS } from '../data/catalogs';
 import { formatDateFr } from '../utils/formatDate';
 
 export function Step6Review() {
@@ -175,10 +175,12 @@ export function Step6Review() {
               )}
             </div>
           </div>
-          <div>
-            <div className="review-item__label">Stationnement requis</div>
-            <div className="review-item__value">{a.stationnement || '—'}</div>
-          </div>
+          {a.systemes.includes(STATIONNEMENT_REQUIS) && (
+            <div>
+              <div className="review-item__label">Précisions - stationnement</div>
+              <div className="review-item__value">{a.stationnement || '—'}</div>
+            </div>
+          )}
         </div>
       </div>
 

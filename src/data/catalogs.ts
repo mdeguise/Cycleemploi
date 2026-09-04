@@ -60,11 +60,13 @@ export const SYSTEMES_ACCES: AccessSystem[] = [
   { nom: 'Accès VPN', description: "Permet l'accès sécurisé au réseau corporatif à partir de l'extérieur de l'entreprise." },
   { nom: 'Badge d\'accès aux édifices', description: "Carte et puce d'accès aux bureaux et bâtiments autorisés." },
   { nom: 'Besoin de code d\'alarme', description: 'Créer un code d\'alarme individuel pour cet employé.' },
+  { nom: 'Stationnement requis', description: 'Réserver un ou des stationnements pour cet employé.' },
   { nom: 'Accès D365', description: 'Accès à Dynamics 365 (Comptes fournisseurs, Grand livre, Comptes clients, Approvisionnement)' },
 ];
 
 export const ACCES_BADGE = 'Badge d\'accès aux édifices';
 export const BESOIN_CODE_ALARME = 'Besoin de code d\'alarme';
+export const STATIONNEMENT_REQUIS = 'Stationnement requis';
 export const ACCES_D365 = 'Accès D365';
 
 export interface PosHebergementSysteme {

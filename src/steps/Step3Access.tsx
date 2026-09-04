@@ -9,6 +9,7 @@ import {
   POS_HEBERGEMENT_SYSTEMES,
   ACCES_BADGE,
   BESOIN_CODE_ALARME,
+  STATIONNEMENT_REQUIS,
   ACCES_D365,
   DYNAWAY,
   APPLICATIONS,
@@ -140,6 +141,16 @@ export function Step3Access() {
                     />
                   </Field>
                 )}
+                {sys.nom === STATIONNEMENT_REQUIS && a.systemes.includes(STATIONNEMENT_REQUIS) && (
+                  <Field label="Précisions - stationnement">
+                    <input
+                      type="text"
+                      value={a.stationnement}
+                      onChange={(ev) => updateStationnement(ev.target.value)}
+                      placeholder="Sélectionnez ou précisez le ou les stationnements requis"
+                    />
+                  </Field>
+                )}
               </Fragment>
             ))}
           </div>
@@ -160,15 +171,6 @@ export function Step3Access() {
               />
             ))}
           </div>
-
-          <Field label="Stationnement requis">
-            <input
-              type="text"
-              value={a.stationnement}
-              onChange={(ev) => updateStationnement(ev.target.value)}
-              placeholder="Sélectionnez ou précisez le ou les stationnements requis"
-            />
-          </Field>
 
           <Field label="Justification / précisions additionnelles">
             <textarea
