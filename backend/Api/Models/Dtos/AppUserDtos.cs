@@ -45,3 +45,14 @@ public class AdAccountDto
     public string DisplayName { get; set; } = null!;
     public string? Email { get; set; }
 }
+
+/// <summary>One Tremblant AD account with its enabled/disabled status — for the read-only AD
+/// directory screen (AdAccountsController), not the "add a user" picker above.</summary>
+public class AdAccountStatusDto
+{
+    public string Sam { get; set; } = null!;
+    public string DisplayName { get; set; } = null!;
+    public bool Enabled { get; set; }
+    public string? Email { get; set; }
+    public string? EmployeeId { get; set; }
+}
