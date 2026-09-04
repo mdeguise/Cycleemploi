@@ -12,12 +12,17 @@ public enum TicketKind
     /// <summary>Request-level. The main Freshdesk ticket, in the "RH - Général" queue.</summary>
     Freshdesk = 0,
 
-    /// <summary>Request-level. Freshdesk child ticket fanned out to the group that wants the full
-    /// job-code history. Depends on the parent Freshdesk ticket existing first.</summary>
+    /// <summary>Request-level. Independent Freshdesk ticket fanned out to "RH - Horaires"
+    /// (group id, see FreshdeskOptions.HorairesGroupId), the payroll/scheduling group that needs
+    /// the employee's full job-code history. Member NAME kept as-is (originally "Freshdesk child
+    /// ticket") even though it's no longer a Freshdesk parent-child relationship — this is a
+    /// persisted string value (see AppDbContext's HasConversion&lt;string&gt;), so renaming it would
+    /// break every existing RequestTicket row already using this name.</summary>
     FreshdeskChildWithJobCodes = 1,
 
-    /// <summary>Request-level. Freshdesk child ticket for the group that does not want job codes.
-    /// Depends on the parent Freshdesk ticket existing first.</summary>
+    /// <summary>Request-level. Independent Freshdesk ticket fanned out to "RH - Redingote" (group
+    /// id, see FreshdeskOptions.RedingoteGroupId), the uniforms/équipement department. Same
+    /// never-rename-this-member-name note as FreshdeskChildWithJobCodes applies.</summary>
     FreshdeskChildWithoutJobCodes = 2,
 
     /// <summary>Per-employee. TDX ticket in the "OneIT" application.</summary>
@@ -28,7 +33,11 @@ public enum TicketKind
     D365Badge = 4,
 
     /// <summary>Per-employee. TDX ticket on the D365 Access form (FinApp Triage).</summary>
-    D365Access = 5
+    D365Access = 5,
+
+    /// <summary>Request-level. Independent Freshdesk ticket fanned out to "SAC - ISAC" (group id,
+    /// see FreshdeskOptions.StationnementGroupId), the parking department.</summary>
+    FreshdeskStationnement = 6
 }
 
 public enum TicketOutcome
@@ -61,8 +70,8 @@ public class RequestTicket
     public int RequestId { get; set; }
     public Request Request { get; set; } = null!;
 
-    /// <summary>The employee this ticket is for, or null for request-level kinds (the Freshdesk
-    /// parent and its two children).</summary>
+    /// <summary>The employee this ticket is for, or null for request-level kinds (the main
+    /// Freshdesk ticket and every independent Freshdesk ticket fanned out alongside it).</summary>
     public int? RequestEmployeeId { get; set; }
     public RequestEmployee? RequestEmployee { get; set; }
 

@@ -124,20 +124,11 @@ public class TicketOrchestrationService : ITicketOrchestrationService
 
                 case TicketKind.FreshdeskChildWithJobCodes:
                 case TicketKind.FreshdeskChildWithoutJobCodes:
-                {
-                    var parent = await _db.RequestTickets.AsNoTracking()
-                        .FirstOrDefaultAsync(t => t.RequestId == request.RequestId && t.Kind == TicketKind.Freshdesk, ct);
-                    if (parent is null || parent.Outcome != TicketOutcome.Created || !long.TryParse(parent.TicketNumber, out var parentTicketId))
-                    {
-                        return new TicketRetryResult(false, null,
-                            "Le billet Freshdesk principal n'existe pas encore — relancez-le d'abord; ses billets enfants suivront.");
-                    }
-
-                    var withJobCodes = ticket.Kind == TicketKind.FreshdeskChildWithJobCodes;
-                    var groupId = withJobCodes ? _freshdeskOptions.ChildGroupIdWithJobCodes : _freshdeskOptions.ChildGroupIdWithoutJobCodes;
-                    await TryCreateFreshdeskChildTicketAsync(request, parentTicketId, requester.Email!, groupId, withJobCodes, ticket.Kind, ct);
+                case TicketKind.FreshdeskStationnement:
+                    // No parent dependency to check — these are independent tickets (no parent_id),
+                    // so unlike before, retrying one no longer requires the main ticket to exist.
+                    await TryCreateFannedOutFreshdeskTicketAsync(request, requester.Email!, ticket.Kind, ct);
                     break;
-                }
 
                 case TicketKind.Tdx:
                     await TryCreateTdxTicketAsync(request, requester, ct, ticket.RequestEmployeeId);
@@ -218,18 +209,17 @@ public class TicketOrchestrationService : ITicketOrchestrationService
             await _tickets.RecordSuccessAsync(request.RequestId, TicketKind.Freshdesk, null, ticketId.ToString(), ct);
 
             // Best-effort, independent of each other and of the main ticket above (which already
-            // succeeded and is committed) — fanning the same submission out to two other
-            // departments as Freshdesk "child" tickets of the main one.
-            // Skip a child that already exists. On the submit path nothing exists yet so both run;
-            // on a parent RETRY this prevents creating a second copy of a child that had already
-            // succeeded, while still creating the ones that never got made.
-            if (!await ChildAlreadyCreatedAsync(request.RequestId, TicketKind.FreshdeskChildWithJobCodes, ct))
+            // succeeded and is committed) — fanning the same submission out to three other
+            // departments as their own standalone Freshdesk tickets (no parent_id).
+            // Skip one that already exists. On the submit path nothing exists yet so all three run;
+            // on a RETRY of the main ticket this prevents creating a second copy of one that had
+            // already succeeded, while still creating the ones that never got made.
+            foreach (var kind in FannedOutKinds)
             {
-                await TryCreateFreshdeskChildTicketAsync(request, ticketId, requesterEmail, _freshdeskOptions.ChildGroupIdWithJobCodes, includeAllJobCodes: true, TicketKind.FreshdeskChildWithJobCodes, ct);
-            }
-            if (!await ChildAlreadyCreatedAsync(request.RequestId, TicketKind.FreshdeskChildWithoutJobCodes, ct))
-            {
-                await TryCreateFreshdeskChildTicketAsync(request, ticketId, requesterEmail, _freshdeskOptions.ChildGroupIdWithoutJobCodes, includeAllJobCodes: false, TicketKind.FreshdeskChildWithoutJobCodes, ct);
+                if (!await ChildAlreadyCreatedAsync(request.RequestId, kind, ct))
+                {
+                    await TryCreateFannedOutFreshdeskTicketAsync(request, requesterEmail, kind, ct);
+                }
             }
 
             return ticketId;
@@ -274,30 +264,53 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         }
     }
 
-    /// <summary>Creates one Freshdesk "child" ticket (Parent-child ticketing feature) of the
-    /// already-created main ticket, fanning the submission out to another department's group.
-    /// Independent failure handling from the main ticket and from the other child ticket — either
-    /// can fail without affecting the other, since the main ticket (and the submission itself) is
-    /// already committed by the time either of these run.</summary>
-    private async Task TryCreateFreshdeskChildTicketAsync(Request request, long parentTicketId, string requesterEmail, long groupId, bool includeAllJobCodes, TicketKind kind, CancellationToken ct)
+    /// <summary>Every independent (non-main) Freshdesk ticket kind fanned out on every submission —
+    /// order here is just iteration order, not significance.</summary>
+    private static readonly TicketKind[] FannedOutKinds =
+    [
+        TicketKind.FreshdeskChildWithJobCodes,
+        TicketKind.FreshdeskChildWithoutJobCodes,
+        TicketKind.FreshdeskStationnement
+    ];
+
+    private static (long GroupId, string GroupName) FannedOutDestination(TicketKind kind, FreshdeskOptions options) => kind switch
     {
+        TicketKind.FreshdeskChildWithJobCodes => (options.HorairesGroupId, "RH - Horaires"),
+        TicketKind.FreshdeskChildWithoutJobCodes => (options.RedingoteGroupId, "RH - Redingote"),
+        TicketKind.FreshdeskStationnement => (options.StationnementGroupId, "SAC - ISAC"),
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Not a fanned-out Freshdesk ticket kind.")
+    };
+
+    /// <summary>Creates one independent Freshdesk ticket (no parent_id — NOT Freshdesk's
+    /// Parent-child ticketing feature), fanning the submission out to another department's group.
+    /// Independent failure handling from the main ticket and from every other fanned-out ticket —
+    /// any of them can fail without affecting the others, since the main ticket (and the submission
+    /// itself) is already committed by the time any of these run.</summary>
+    private async Task TryCreateFannedOutFreshdeskTicketAsync(Request request, string requesterEmail, TicketKind kind, CancellationToken ct)
+    {
+        var (groupId, groupName) = FannedOutDestination(kind, _freshdeskOptions);
         try
         {
-            var childTicketId = await _freshdesk.CreateChildTicketAsync(request, parentTicketId, requesterEmail, groupId, includeAllJobCodes, ct);
-            await _tickets.RecordSuccessAsync(request.RequestId, kind, null, childTicketId.ToString(), ct);
+            var ticketId = kind switch
+            {
+                TicketKind.FreshdeskChildWithJobCodes => await _freshdesk.CreateHorairesTicketAsync(request, requesterEmail, ct),
+                TicketKind.FreshdeskChildWithoutJobCodes => await _freshdesk.CreateRedingoteTicketAsync(request, requesterEmail, ct),
+                TicketKind.FreshdeskStationnement => await _freshdesk.CreateStationnementTicketAsync(request, requesterEmail, ct),
+                _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Not a fanned-out Freshdesk ticket kind.")
+            };
+            await _tickets.RecordSuccessAsync(request.RequestId, kind, null, ticketId.ToString(), ct);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to create Freshdesk child ticket (group {GroupId}) for request {RequestNumber}", groupId, request.RequestNumber);
+            _logger.LogError(ex, "Failed to create fanned-out Freshdesk ticket ({Kind}, group {GroupName}/{GroupId}) for request {RequestNumber}", kind, groupName, groupId, request.RequestNumber);
             await _tickets.RecordFailureAsync(request.RequestId, kind, null, ex, ct);
 
-            var subject = $"[Cycle Emploi] Échec de création de ticket Freshdesk enfant (groupe {groupId}) — demande #{request.RequestNumber}";
+            var subject = $"[Cycle Emploi] Échec de création de ticket Freshdesk ({groupName}) — demande #{request.RequestNumber}";
             var body =
-                $"La demande #{request.RequestNumber} ({request.RequestType.ToFrenchLabel()}) a été soumise avec succès, et le ticket Freshdesk principal (#{parentTicketId}) a été créé, " +
-                $"mais la création du ticket enfant destiné au groupe {groupId} a échoué. Ce ticket devra être créé manuellement.\n\n" +
+                $"La demande #{request.RequestNumber} ({request.RequestType.ToFrenchLabel()}) a été soumise avec succès, " +
+                $"mais la création du ticket Freshdesk indépendant destiné au groupe {groupName} a échoué. Ce ticket devra être créé manuellement.\n\n" +
                 "== Détails de la demande ==\n" +
                 $"Demandé par: {request.CreatedByDisplayName}\n" +
-                $"Ticket principal Freshdesk: #{parentTicketId}\n" +
                 $"Date de soumission: {request.SubmittedAt:yyyy-MM-dd HH:mm} UTC\n\n" +
                 "== Détails de l'erreur ==\n" +
                 $"Type: {ex.GetType().Name}\n" +
@@ -307,8 +320,7 @@ public class TicketOrchestrationService : ITicketOrchestrationService
                 "== Étapes à vérifier ==\n" +
                 "1. Consulter les journaux applicatifs sur vm-trm-live pour la trace complète, en recherchant le numéro de demande ci-dessus.\n" +
                 "2. Si l'erreur mentionne un code HTTP Freshdesk (401/403): la clé API a peut-être expiré ou été révoquée.\n" +
-                "3. Si l'erreur mentionne \"parent_id\" ou un champ invalide: vérifier que la fonctionnalité \"Parent-child ticketing\" est toujours activée dans Freshdesk (Admin > Fonctionnalités avancées) et que le ticket principal existe toujours.\n" +
-                $"4. Une fois la cause corrigée, créer le ticket manuellement dans Freshdesk (groupe {groupId}), en le liant comme ticket enfant du ticket principal #{parentTicketId} — les données complètes de la demande restent disponibles dans l'application Cycle Emploi.";
+                $"3. Une fois la cause corrigée, créer le ticket manuellement dans Freshdesk (groupe {groupName}) — les données complètes de la demande restent disponibles dans l'application Cycle Emploi.";
 
             try
             {
@@ -316,7 +328,7 @@ public class TicketOrchestrationService : ITicketOrchestrationService
             }
             catch (Exception emailEx)
             {
-                _logger.LogError(emailEx, "Also failed to send the Freshdesk-child-ticket-failure notification email for request {RequestNumber}, group {GroupId}", request.RequestNumber, groupId);
+                _logger.LogError(emailEx, "Also failed to send the fanned-out-Freshdesk-ticket-failure notification email for request {RequestNumber}, group {GroupName}", request.RequestNumber, groupName);
             }
         }
     }

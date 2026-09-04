@@ -10,8 +10,12 @@ namespace TremblantLifecycle.Api.Models.Entities;
 ///
 /// Every ticket type is fully split by request type (Onboarding/Réactivation vs Offboarding) —
 /// they never share a template, even where the default wording happens to be similar, so editing
-/// one can never surprise the other. Freshdesk's two "child" tickets (fanned to two different real
-/// Freshdesk groups) are also each their own template per request type.
+/// one can never surprise the other. Beyond "RH - Général", three more independent Freshdesk
+/// tickets fan out on every submission (no parent_id — each a standalone ticket, correlated with
+/// the others only by sharing the same subject text and request number), each its own template per
+/// request type — see FreshdeskOptions for the real group each one targets (HorairesGroupId,
+/// RedingoteGroupId, StationnementGroupId); every template's Label/Description also names its
+/// destination explicitly.
 ///
 /// Employee-level content (name, poste, gestionnaire, the Workday-only fields like date
 /// d'embauche/centre de coûts/...) can only be placed inside a Block template's "employeeGroup"
@@ -30,6 +34,8 @@ public static class TicketTemplateKeys
     public const string FreshdeskChildWithoutCodesOnboarding = "FreshdeskChildWithoutCodesOnboarding";
     public const string FreshdeskChildWithCodesOffboarding = "FreshdeskChildWithCodesOffboarding";
     public const string FreshdeskChildWithoutCodesOffboarding = "FreshdeskChildWithoutCodesOffboarding";
+    public const string FreshdeskStationnementOnboarding = "FreshdeskStationnementOnboarding";
+    public const string FreshdeskStationnementOffboarding = "FreshdeskStationnementOffboarding";
     public const string TdxTitleOnboarding = "TdxTitleOnboarding";
     public const string TdxTitleOffboarding = "TdxTitleOffboarding";
     public const string TdxDescriptionOnboarding = "TdxDescriptionOnboarding";
@@ -127,12 +133,30 @@ public static class TicketTemplateDefaults
     [
         new("RequestTypeLabel", "Type de demande", TicketFieldCategory.Request),
         new("DateEntreePrevue", "Date d'entrée prévue", TicketFieldCategory.Request),
+        new("CommentairesRedingote", "Commentaires — uniformes et matériel à fournir", TicketFieldCategory.Request),
     ];
 
     private static readonly IReadOnlyList<TicketTemplateField> OffboardingChildRequestFields =
     [
         new("RequestTypeLabel", "Type de demande", TicketFieldCategory.Request),
         new("DerniereJournee", "Dernière journée de travail", TicketFieldCategory.Request),
+        new("CommentairesRedingote", "Commentaires — uniformes et matériel à fournir", TicketFieldCategory.Request),
+    ];
+
+    private static readonly IReadOnlyList<TicketTemplateField> OnboardingStationnementRequestFields =
+    [
+        new("RequestTypeLabel", "Type de demande", TicketFieldCategory.Request),
+        new("DateEntreePrevue", "Date d'entrée prévue", TicketFieldCategory.Request),
+        new("Stationnement", "Stationnement requis", TicketFieldCategory.Request),
+        new("CommentairesStationnement", "Commentaires — stationnement", TicketFieldCategory.Request),
+    ];
+
+    private static readonly IReadOnlyList<TicketTemplateField> OffboardingStationnementRequestFields =
+    [
+        new("RequestTypeLabel", "Type de demande", TicketFieldCategory.Request),
+        new("DerniereJournee", "Dernière journée de travail", TicketFieldCategory.Request),
+        new("Stationnement", "Stationnement requis", TicketFieldCategory.Request),
+        new("CommentairesStationnement", "Commentaires — stationnement", TicketFieldCategory.Request),
     ];
 
     private static readonly IReadOnlyList<TicketTemplateField> TdxTitleRequestFields =
@@ -159,8 +183,8 @@ public static class TicketTemplateDefaults
     [
         new(
             TicketTemplateKeys.FreshdeskSubjectOnboarding,
-            "Freshdesk — Sujet (Intégration / Réactivation)",
-            "Sujet du billet Freshdesk principal et de ses deux billets enfants, pour une intégration ou une réactivation.",
+            "Freshdesk — Sujet, tous les billets (Intégration / Réactivation)",
+            "Sujet utilisé par TOUS les billets Freshdesk d'une demande d'intégration/réactivation — le principal (RH - Général) et chacun des billets indépendants fanned-out (RH - Horaires, RH - Redingote, SAC - ISAC). Un seul sujet partagé permet de les retrouver ensemble dans Freshdesk même s'ils ne sont plus liés par parent_id.",
             TicketTemplateShape.Inline,
             SubjectRequestFields,
             AllowsEmployeeFields: false,
@@ -168,8 +192,8 @@ public static class TicketTemplateDefaults
 
         new(
             TicketTemplateKeys.FreshdeskSubjectOffboarding,
-            "Freshdesk — Sujet (Terminaison)",
-            "Sujet du billet Freshdesk principal et de ses deux billets enfants, pour un avis de terminaison ou mise à pied.",
+            "Freshdesk — Sujet, tous les billets (Terminaison)",
+            "Sujet utilisé par TOUS les billets Freshdesk d'un avis de terminaison ou mise à pied — le principal (RH - Général) et chacun des billets indépendants fanned-out (RH - Horaires, RH - Redingote, SAC - ISAC).",
             TicketTemplateShape.Inline,
             SubjectRequestFields,
             AllowsEmployeeFields: false,
@@ -177,8 +201,8 @@ public static class TicketTemplateDefaults
 
         new(
             TicketTemplateKeys.FreshdeskMainOnboarding,
-            "Freshdesk — Billet principal (Intégration / Réactivation)",
-            "Contenu du billet Freshdesk principal (groupe RH - Général) pour une intégration ou une réactivation.",
+            "Freshdesk — RH Général (Intégration / Réactivation)",
+            "Billet Freshdesk principal, envoyé au groupe RH - Général, pour une intégration ou une réactivation.",
             TicketTemplateShape.Block,
             OnboardingMainRequestFields,
             AllowsEmployeeFields: true,
@@ -205,8 +229,8 @@ public static class TicketTemplateDefaults
 
         new(
             TicketTemplateKeys.FreshdeskMainOffboarding,
-            "Freshdesk — Billet principal (Terminaison)",
-            "Contenu du billet Freshdesk principal (groupe RH - Général) pour un avis de terminaison ou mise à pied.",
+            "Freshdesk — RH Général (Terminaison)",
+            "Billet Freshdesk principal, envoyé au groupe RH - Général, pour un avis de terminaison ou mise à pied.",
             TicketTemplateShape.Block,
             OffboardingMainRequestFields,
             AllowsEmployeeFields: true,
@@ -225,8 +249,8 @@ public static class TicketTemplateDefaults
 
         new(
             TicketTemplateKeys.FreshdeskChildWithCodesOnboarding,
-            "Freshdesk — Billet enfant, avec codes d'emploi (Intégration / Réactivation)",
-            "Billet enfant Freshdesk destiné au groupe qui a besoin de l'historique des codes d'emploi, pour une intégration ou une réactivation.",
+            "Freshdesk — RH Horaires, avec codes d'emploi (Intégration / Réactivation)",
+            "Billet Freshdesk indépendant (pas un billet enfant Freshdesk — aucun lien parent_id) envoyé au groupe RH - Horaires, qui a besoin de l'historique des codes d'emploi, pour une intégration ou une réactivation.",
             TicketTemplateShape.Block,
             OnboardingChildRequestFields,
             AllowsEmployeeFields: true,
@@ -237,20 +261,22 @@ public static class TicketTemplateDefaults
 
         new(
             TicketTemplateKeys.FreshdeskChildWithoutCodesOnboarding,
-            "Freshdesk — Billet enfant, sans codes d'emploi (Intégration / Réactivation)",
-            "Billet enfant Freshdesk destiné au groupe qui n'a pas besoin des codes d'emploi, pour une intégration ou une réactivation.",
+            "Freshdesk — RH Redingote (Intégration / Réactivation)",
+            "Billet Freshdesk indépendant (pas un billet enfant Freshdesk — aucun lien parent_id) envoyé au groupe RH - Redingote (uniformes et matériel), pour une intégration ou une réactivation.",
             TicketTemplateShape.Block,
             OnboardingChildRequestFields,
             AllowsEmployeeFields: true,
             Block(
                 Field("Type de demande", "RequestTypeLabel"),
                 Field("Date de début prévue", "DateEntreePrevue"),
-                EmployeeGroup(null, ("Nom employé", "EmployeeName"), ("Gestionnaire", "Gestionnaire"), ("Titre du poste", "Poste"), ("Groupe de paye", "PayGroup")))),
+                EmployeeGroup(null, ("Nom employé", "EmployeeName"), ("Gestionnaire", "Gestionnaire"), ("Titre du poste", "Poste"), ("Groupe de paye", "PayGroup")),
+                Heading("Commentaires"),
+                Field("Uniformes et matériel à fournir", "CommentairesRedingote"))),
 
         new(
             TicketTemplateKeys.FreshdeskChildWithCodesOffboarding,
-            "Freshdesk — Billet enfant, avec codes d'emploi (Terminaison)",
-            "Billet enfant Freshdesk destiné au groupe qui a besoin de l'historique des codes d'emploi, pour un avis de terminaison ou mise à pied.",
+            "Freshdesk — RH Horaires, avec codes d'emploi (Terminaison)",
+            "Billet Freshdesk indépendant (pas un billet enfant Freshdesk — aucun lien parent_id) envoyé au groupe RH - Horaires, qui a besoin de l'historique des codes d'emploi, pour un avis de terminaison ou mise à pied.",
             TicketTemplateShape.Block,
             OffboardingChildRequestFields,
             AllowsEmployeeFields: true,
@@ -261,20 +287,52 @@ public static class TicketTemplateDefaults
 
         new(
             TicketTemplateKeys.FreshdeskChildWithoutCodesOffboarding,
-            "Freshdesk — Billet enfant, sans codes d'emploi (Terminaison)",
-            "Billet enfant Freshdesk destiné au groupe qui n'a pas besoin des codes d'emploi, pour un avis de terminaison ou mise à pied.",
+            "Freshdesk — RH Redingote (Terminaison)",
+            "Billet Freshdesk indépendant (pas un billet enfant Freshdesk — aucun lien parent_id) envoyé au groupe RH - Redingote (uniformes et matériel), pour un avis de terminaison ou mise à pied.",
             TicketTemplateShape.Block,
             OffboardingChildRequestFields,
             AllowsEmployeeFields: true,
             Block(
                 Field("Type de demande", "RequestTypeLabel"),
                 Field("Date de fin (dernière journée)", "DerniereJournee"),
-                EmployeeGroup(null, ("Nom employé", "EmployeeName"), ("Gestionnaire", "Gestionnaire"), ("Titre du poste", "Poste"), ("Groupe de paye", "PayGroup")))),
+                EmployeeGroup(null, ("Nom employé", "EmployeeName"), ("Gestionnaire", "Gestionnaire"), ("Titre du poste", "Poste"), ("Groupe de paye", "PayGroup")),
+                Heading("Commentaires"),
+                Field("Uniformes et matériel à fournir", "CommentairesRedingote"))),
+
+        new(
+            TicketTemplateKeys.FreshdeskStationnementOnboarding,
+            "Freshdesk — SAC ISAC, stationnement (Intégration / Réactivation)",
+            "Billet Freshdesk indépendant envoyé au groupe SAC - ISAC (stationnement), pour une intégration ou une réactivation.",
+            TicketTemplateShape.Block,
+            OnboardingStationnementRequestFields,
+            AllowsEmployeeFields: true,
+            Block(
+                Field("Type de demande", "RequestTypeLabel"),
+                Field("Date de début prévue", "DateEntreePrevue"),
+                EmployeeGroup(null, ("Nom employé", "EmployeeName"), ("Gestionnaire", "Gestionnaire"), ("Titre du poste", "Poste")),
+                Heading("Stationnement"),
+                Field("Stationnement requis", "Stationnement"),
+                Field("Commentaires", "CommentairesStationnement"))),
+
+        new(
+            TicketTemplateKeys.FreshdeskStationnementOffboarding,
+            "Freshdesk — SAC ISAC, stationnement (Terminaison)",
+            "Billet Freshdesk indépendant envoyé au groupe SAC - ISAC (stationnement), pour un avis de terminaison ou mise à pied.",
+            TicketTemplateShape.Block,
+            OffboardingStationnementRequestFields,
+            AllowsEmployeeFields: true,
+            Block(
+                Field("Type de demande", "RequestTypeLabel"),
+                Field("Date de fin (dernière journée)", "DerniereJournee"),
+                EmployeeGroup(null, ("Nom employé", "EmployeeName"), ("Gestionnaire", "Gestionnaire"), ("Titre du poste", "Poste")),
+                Heading("Stationnement"),
+                Field("Stationnement requis", "Stationnement"),
+                Field("Commentaires", "CommentairesStationnement"))),
 
         new(
             TicketTemplateKeys.TdxTitleOnboarding,
-            "TDX — Titre du billet (Intégration / Réactivation)",
-            "Titre du billet TDX \"Quick Incident\" (application OneIT, groupe IT Operations) pour une intégration ou une réactivation.",
+            "TDX — Titre du billet, équipe IT Operations (Intégration / Réactivation)",
+            "Titre du billet TDX \"Quick Incident\" (application OneIT, groupe T - IT Operations) pour une intégration ou une réactivation.",
             TicketTemplateShape.Inline,
             TdxTitleRequestFields,
             AllowsEmployeeFields: true,
@@ -282,8 +340,8 @@ public static class TicketTemplateDefaults
 
         new(
             TicketTemplateKeys.TdxTitleOffboarding,
-            "TDX — Titre du billet (Terminaison)",
-            "Titre du billet TDX \"Quick Incident\" pour un avis de terminaison ou mise à pied.",
+            "TDX — Titre du billet, équipe IT Operations (Terminaison)",
+            "Titre du billet TDX \"Quick Incident\" (application OneIT, groupe T - IT Operations) pour un avis de terminaison ou mise à pied.",
             TicketTemplateShape.Inline,
             TdxTitleRequestFields,
             AllowsEmployeeFields: true,
@@ -291,8 +349,8 @@ public static class TicketTemplateDefaults
 
         new(
             TicketTemplateKeys.TdxDescriptionOnboarding,
-            "TDX — Description du billet (Intégration / Réactivation)",
-            "Description (texte simple, non HTML) du billet TDX \"Quick Incident\" pour une intégration ou une réactivation.",
+            "TDX — Description du billet, équipe IT Operations (Intégration / Réactivation)",
+            "Description (texte simple, non HTML) du billet TDX \"Quick Incident\" (application OneIT, groupe T - IT Operations) pour une intégration ou une réactivation.",
             TicketTemplateShape.Inline,
             TdxDescriptionRequestFields,
             AllowsEmployeeFields: true,
@@ -300,8 +358,8 @@ public static class TicketTemplateDefaults
 
         new(
             TicketTemplateKeys.TdxDescriptionOffboarding,
-            "TDX — Description du billet (Terminaison)",
-            "Description (texte simple, non HTML) du billet TDX \"Quick Incident\" pour un avis de terminaison ou mise à pied.",
+            "TDX — Description du billet, équipe IT Operations (Terminaison)",
+            "Description (texte simple, non HTML) du billet TDX \"Quick Incident\" (application OneIT, groupe T - IT Operations) pour un avis de terminaison ou mise à pied.",
             TicketTemplateShape.Inline,
             TdxDescriptionRequestFields,
             AllowsEmployeeFields: true,

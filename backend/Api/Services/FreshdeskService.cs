@@ -49,11 +49,27 @@ public class FreshdeskService : IFreshdeskService
         return await PostTicketAsync(payload, ct);
     }
 
-    public async Task<long> CreateChildTicketAsync(Request request, long parentTicketId, string requesterEmail, long groupId, bool includeAllJobCodes, CancellationToken ct)
+    public Task<long> CreateHorairesTicketAsync(Request request, string requesterEmail, CancellationToken ct) =>
+        CreateFannedOutTicketAsync(request, requesterEmail, _options.HorairesGroupId, isOffboarding =>
+            BuildHorairesContentAsync(request, isOffboarding, ct), ct);
+
+    public Task<long> CreateRedingoteTicketAsync(Request request, string requesterEmail, CancellationToken ct) =>
+        CreateFannedOutTicketAsync(request, requesterEmail, _options.RedingoteGroupId, isOffboarding =>
+            BuildRedingoteContentAsync(request, isOffboarding, ct), ct);
+
+    public Task<long> CreateStationnementTicketAsync(Request request, string requesterEmail, CancellationToken ct) =>
+        CreateFannedOutTicketAsync(request, requesterEmail, _options.StationnementGroupId, isOffboarding =>
+            BuildStationnementContentAsync(request, isOffboarding, ct), ct);
+
+    /// <summary>Shared by every independent (non-main) Freshdesk ticket — same subject as the main
+    /// ticket, own group, own content, and deliberately NO parent_id: these are standalone tickets,
+    /// not Freshdesk's Parent-child ticketing feature, so a failure/edit on one never touches the
+    /// others. Correlated only by sharing the same subject text and request number.</summary>
+    private async Task<long> CreateFannedOutTicketAsync(Request request, string requesterEmail, long groupId, Func<bool, Task<string>> buildDescription, CancellationToken ct)
     {
         var isOffboarding = request.RequestType == RequestType.Offboarding;
         var subject = await BuildSubjectAsync(request, isOffboarding, ct);
-        var description = await BuildChildContentAsync(request, isOffboarding, includeAllJobCodes, ct);
+        var description = await buildDescription(isOffboarding);
 
         var payload = new
         {
@@ -65,7 +81,6 @@ public class FreshdeskService : IFreshdeskService
             group_id = groupId,
             priority = 1,
             status = 2,
-            parent_id = parentTicketId,
             tags = Array.Empty<string>()
         };
 
@@ -163,24 +178,48 @@ public class FreshdeskService : IFreshdeskService
         }
     }
 
-    private async Task<string> BuildChildContentAsync(Request request, bool isOffboarding, bool includeAllJobCodes, CancellationToken ct)
+    /// <summary>"RH - Horaires" (FreshdeskOptions.HorairesGroupId) — the payroll/scheduling
+    /// department's ticket, including the employee's full job-code history.</summary>
+    private async Task<string> BuildHorairesContentAsync(Request request, bool isOffboarding, CancellationToken ct)
     {
-        string key;
-        if (isOffboarding)
-        {
-            key = includeAllJobCodes ? TicketTemplateKeys.FreshdeskChildWithCodesOffboarding : TicketTemplateKeys.FreshdeskChildWithoutCodesOffboarding;
-        }
-        else
-        {
-            key = includeAllJobCodes ? TicketTemplateKeys.FreshdeskChildWithCodesOnboarding : TicketTemplateKeys.FreshdeskChildWithoutCodesOnboarding;
-        }
-        var template = await _templates.GetContentAsync(key, ct);
+        var key = isOffboarding ? TicketTemplateKeys.FreshdeskChildWithCodesOffboarding : TicketTemplateKeys.FreshdeskChildWithCodesOnboarding;
+        return await RenderFannedOutBlockAsync(request, isOffboarding, key, ct);
+    }
+
+    /// <summary>"RH - Redingote" (FreshdeskOptions.RedingoteGroupId) — the uniforms/équipement
+    /// department's ticket. No job-code history (that's Horaires' distinguishing field); includes
+    /// CommentairesRedingote instead.</summary>
+    private async Task<string> BuildRedingoteContentAsync(Request request, bool isOffboarding, CancellationToken ct)
+    {
+        var key = isOffboarding ? TicketTemplateKeys.FreshdeskChildWithoutCodesOffboarding : TicketTemplateKeys.FreshdeskChildWithoutCodesOnboarding;
+        return await RenderFannedOutBlockAsync(request, isOffboarding, key, ct);
+    }
+
+    /// <summary>"SAC - ISAC" (FreshdeskOptions.StationnementGroupId) — the parking department's
+    /// ticket, with the request's Stationnement selection and comment.</summary>
+    private async Task<string> BuildStationnementContentAsync(Request request, bool isOffboarding, CancellationToken ct)
+    {
+        var key = isOffboarding ? TicketTemplateKeys.FreshdeskStationnementOffboarding : TicketTemplateKeys.FreshdeskStationnementOnboarding;
+        return await RenderFannedOutBlockAsync(request, isOffboarding, key, ct);
+    }
+
+    /// <summary>Shared request-level field set for every fanned-out (non-main) ticket — covers
+    /// every field any of their templates can reference (see TicketTemplateDefaults'
+    /// OnboardingChildRequestFields/OffboardingChildRequestFields/*StationnementRequestFields).
+    /// Harmless to compute fields a given template doesn't use: TicketTemplateRenderer only reads
+    /// the keys its own saved content actually references.</summary>
+    private async Task<string> RenderFannedOutBlockAsync(Request request, bool isOffboarding, string templateKey, CancellationToken ct)
+    {
+        var template = await _templates.GetContentAsync(templateKey, ct);
 
         var requestValues = new Dictionary<string, string?>
         {
             ["RequestTypeLabel"] = request.RequestType.ToFrenchLabel(),
             ["DateEntreePrevue"] = !isOffboarding && request.OnboardingDetail?.DateEntreePrevue is { } entreeDate ? entreeDate.ToString("yyyy-MM-dd") : null,
-            ["DerniereJournee"] = isOffboarding && request.OffboardingDetail?.DerniereJournee is { } derniereDate ? derniereDate.ToString("yyyy-MM-dd") : null
+            ["DerniereJournee"] = isOffboarding && request.OffboardingDetail?.DerniereJournee is { } derniereDate ? derniereDate.ToString("yyyy-MM-dd") : null,
+            ["CommentairesRedingote"] = isOffboarding ? request.OffboardingDetail?.CommentairesRedingote : request.OnboardingDetail?.CommentairesRedingote,
+            ["Stationnement"] = request.AccessDetail?.Stationnement,
+            ["CommentairesStationnement"] = isOffboarding ? request.OffboardingDetail?.CommentairesStationnement : request.OnboardingDetail?.CommentairesStationnement
         };
 
         var employeeValuesList = new List<IReadOnlyDictionary<string, string?>>();

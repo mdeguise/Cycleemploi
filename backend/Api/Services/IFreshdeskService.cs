@@ -11,12 +11,21 @@ public interface IFreshdeskService
     /// submission).</summary>
     Task<long> CreateTicketAsync(Request request, string requesterEmail, CancellationToken ct);
 
-    /// <summary>Creates a Freshdesk "child" ticket (Freshdesk's Parent-child ticketing feature —
-    /// parent_id, association_type 1/2) in the given group, linked to the already-created main
-    /// ticket. Used to fan a submission out to other departments (e.g. payroll, IT provisioning)
-    /// that need a subset of the request's details without seeing the full RH ticket. Throws on any
-    /// failure — same best-effort contract as CreateTicketAsync.</summary>
-    Task<long> CreateChildTicketAsync(Request request, long parentTicketId, string requesterEmail, long groupId, bool includeAllJobCodes, CancellationToken ct);
+    /// <summary>Creates an independent Freshdesk ticket (no parent_id — a standalone ticket, not
+    /// Freshdesk's Parent-child ticketing feature) in "RH - Horaires" (FreshdeskOptions.
+    /// HorairesGroupId), including the employee's full job-code history — the payroll/scheduling
+    /// department's own fan-out of every submission. Correlated with the other fanned-out tickets
+    /// only by sharing the same subject text and request number, same as the main ticket. Throws on
+    /// any failure — same best-effort contract as CreateTicketAsync.</summary>
+    Task<long> CreateHorairesTicketAsync(Request request, string requesterEmail, CancellationToken ct);
+
+    /// <summary>Same fan-out pattern as CreateHorairesTicketAsync, to "RH - Redingote"
+    /// (FreshdeskOptions.RedingoteGroupId) — the uniforms/équipement department.</summary>
+    Task<long> CreateRedingoteTicketAsync(Request request, string requesterEmail, CancellationToken ct);
+
+    /// <summary>Same fan-out pattern as CreateHorairesTicketAsync, to "SAC - ISAC"
+    /// (FreshdeskOptions.StationnementGroupId) — the parking department.</summary>
+    Task<long> CreateStationnementTicketAsync(Request request, string requesterEmail, CancellationToken ct);
 
     /// <summary>Current state of an existing ticket. Unlike the Create methods this NEVER throws —
     /// it is called while rendering a list, where one unreachable ticket must not fail the whole

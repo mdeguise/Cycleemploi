@@ -9,8 +9,9 @@ public static class TicketKindLabels
     public static string For(TicketKind kind) => kind switch
     {
         TicketKind.Freshdesk => "Freshdesk — RH Général",
-        TicketKind.FreshdeskChildWithJobCodes => "Freshdesk — billet enfant (avec codes d'emploi)",
-        TicketKind.FreshdeskChildWithoutJobCodes => "Freshdesk — billet enfant (sans codes d'emploi)",
+        TicketKind.FreshdeskChildWithJobCodes => "Freshdesk — RH Horaires (avec codes d'emploi)",
+        TicketKind.FreshdeskChildWithoutJobCodes => "Freshdesk — RH Redingote",
+        TicketKind.FreshdeskStationnement => "Freshdesk — SAC ISAC (stationnement)",
         TicketKind.Tdx => "TDX — OneIT",
         TicketKind.D365Badge => "D365 — badge / alarme",
         TicketKind.D365Access => "TDX — accès D365",
