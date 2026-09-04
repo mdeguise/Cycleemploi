@@ -112,9 +112,13 @@ export interface ApplicationItem {
 export const APPLICATIONS: ApplicationItem[] = [
   { nom: 'Microsoft 365', editeur: 'Microsoft', description: 'Courriel Outlook, OneDrive, Word, Excel et Power Point' },
   { nom: 'Teams', editeur: 'Microsoft', description: 'Messagerie, réunions et collaboration' },
-  { nom: 'Dynamics 365', editeur: 'Microsoft', description: 'Applications de gestion des opérations et des processus d\'affaires' },
   { nom: 'Dynaway', editeur: 'Dynaway', description: 'Gestion des actifs et de la maintenance (EAM) — requiert automatiquement un accès D365.' },
 ];
+
+/** Dynamics 365 itself is requested via "Accès D365" in the Access section (SYSTEMES_ACCES,
+ * above) — that's the checkbox wired to the real D365 access-approval workflow (see backend's
+ * TryCreateD365AccessApprovalRequestAsync). It's deliberately not listed here too, so there's
+ * only one place to request it. */
 
 /** Selecting this application implicitly requires D365 access — see Step3Access, which locks
  * ACCES_D365 checked while this stays selected. */
