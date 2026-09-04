@@ -143,11 +143,45 @@ public static class TicketTemplateDefaults
         new("CommentairesRedingote", "Commentaires — uniformes et matériel à fournir", TicketFieldCategory.Request),
     ];
 
+    /// <summary>Redingote only — deliberately its own list rather than sharing
+    /// OnboardingChildRequestFields with Horaires, so Accès et comptes values show up as
+    /// selectable here without also cluttering the Horaires gabarit's field picker.</summary>
+    private static readonly IReadOnlyList<TicketTemplateField> OnboardingRedingoteRequestFields =
+    [
+        new("RequestTypeLabel", "Type de demande", TicketFieldCategory.Request),
+        new("DateEntreePrevue", "Date d'entrée prévue", TicketFieldCategory.Request),
+        new("SystemesAcces", "Systèmes et accès sélectionnés", TicketFieldCategory.Request),
+        new("ZonesBadge", "Zones ou édifices requis pour le badge", TicketFieldCategory.Request),
+        new("PosHebergement", "Systèmes POS et hébergement sélectionnés", TicketFieldCategory.Request),
+        new("Stationnement", "Stationnement requis", TicketFieldCategory.Request),
+        new("JustificationAcces", "Justification des accès demandés", TicketFieldCategory.Request),
+        new("CodeAlarmeDetails", "Précisions sur le code d'alarme", TicketFieldCategory.Request),
+        new("CommentairesRedingote", "Commentaires — uniformes et matériel à fournir", TicketFieldCategory.Request),
+    ];
+
+    private static readonly IReadOnlyList<TicketTemplateField> OffboardingRedingoteRequestFields =
+    [
+        new("RequestTypeLabel", "Type de demande", TicketFieldCategory.Request),
+        new("DerniereJournee", "Dernière journée de travail", TicketFieldCategory.Request),
+        new("SystemesAcces", "Systèmes et accès sélectionnés", TicketFieldCategory.Request),
+        new("ZonesBadge", "Zones ou édifices requis pour le badge", TicketFieldCategory.Request),
+        new("PosHebergement", "Systèmes POS et hébergement sélectionnés", TicketFieldCategory.Request),
+        new("Stationnement", "Stationnement requis", TicketFieldCategory.Request),
+        new("JustificationAcces", "Justification des accès demandés", TicketFieldCategory.Request),
+        new("CodeAlarmeDetails", "Précisions sur le code d'alarme", TicketFieldCategory.Request),
+        new("CommentairesRedingote", "Commentaires — uniformes et matériel à fournir", TicketFieldCategory.Request),
+    ];
+
     private static readonly IReadOnlyList<TicketTemplateField> OnboardingStationnementRequestFields =
     [
         new("RequestTypeLabel", "Type de demande", TicketFieldCategory.Request),
         new("DateEntreePrevue", "Date d'entrée prévue", TicketFieldCategory.Request),
+        new("SystemesAcces", "Systèmes et accès sélectionnés", TicketFieldCategory.Request),
+        new("ZonesBadge", "Zones ou édifices requis pour le badge", TicketFieldCategory.Request),
+        new("PosHebergement", "Systèmes POS et hébergement sélectionnés", TicketFieldCategory.Request),
         new("Stationnement", "Stationnement requis", TicketFieldCategory.Request),
+        new("JustificationAcces", "Justification des accès demandés", TicketFieldCategory.Request),
+        new("CodeAlarmeDetails", "Précisions sur le code d'alarme", TicketFieldCategory.Request),
         new("CommentairesStationnement", "Commentaires — stationnement", TicketFieldCategory.Request),
     ];
 
@@ -155,7 +189,12 @@ public static class TicketTemplateDefaults
     [
         new("RequestTypeLabel", "Type de demande", TicketFieldCategory.Request),
         new("DerniereJournee", "Dernière journée de travail", TicketFieldCategory.Request),
+        new("SystemesAcces", "Systèmes et accès sélectionnés", TicketFieldCategory.Request),
+        new("ZonesBadge", "Zones ou édifices requis pour le badge", TicketFieldCategory.Request),
+        new("PosHebergement", "Systèmes POS et hébergement sélectionnés", TicketFieldCategory.Request),
         new("Stationnement", "Stationnement requis", TicketFieldCategory.Request),
+        new("JustificationAcces", "Justification des accès demandés", TicketFieldCategory.Request),
+        new("CodeAlarmeDetails", "Précisions sur le code d'alarme", TicketFieldCategory.Request),
         new("CommentairesStationnement", "Commentaires — stationnement", TicketFieldCategory.Request),
     ];
 
@@ -276,7 +315,7 @@ public static class TicketTemplateDefaults
             "Freshdesk — RH Redingote (Intégration / Réactivation)",
             "Billet Freshdesk indépendant (pas un billet enfant Freshdesk — aucun lien parent_id) envoyé au groupe RH - Redingote (uniformes et matériel), pour une intégration ou une réactivation.",
             TicketTemplateShape.Block,
-            OnboardingChildRequestFields,
+            OnboardingRedingoteRequestFields,
             AllowsEmployeeFields: true,
             Block(
                 Field("Type de demande", "RequestTypeLabel"),
@@ -302,7 +341,7 @@ public static class TicketTemplateDefaults
             "Freshdesk — RH Redingote (Terminaison)",
             "Billet Freshdesk indépendant (pas un billet enfant Freshdesk — aucun lien parent_id) envoyé au groupe RH - Redingote (uniformes et matériel), pour un avis de terminaison ou mise à pied.",
             TicketTemplateShape.Block,
-            OffboardingChildRequestFields,
+            OffboardingRedingoteRequestFields,
             AllowsEmployeeFields: true,
             Block(
                 Field("Type de demande", "RequestTypeLabel"),

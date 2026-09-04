@@ -212,13 +212,19 @@ public class FreshdeskService : IFreshdeskService
     {
         var template = await _templates.GetContentAsync(templateKey, ct);
 
+        var access = request.AccessDetail;
         var requestValues = new Dictionary<string, string?>
         {
             ["RequestTypeLabel"] = request.RequestType.ToFrenchLabel(),
             ["DateEntreePrevue"] = !isOffboarding && request.OnboardingDetail?.DateEntreePrevue is { } entreeDate ? entreeDate.ToString("yyyy-MM-dd") : null,
             ["DerniereJournee"] = isOffboarding && request.OffboardingDetail?.DerniereJournee is { } derniereDate ? derniereDate.ToString("yyyy-MM-dd") : null,
             ["CommentairesRedingote"] = isOffboarding ? request.OffboardingDetail?.CommentairesRedingote : request.OnboardingDetail?.CommentairesRedingote,
-            ["Stationnement"] = request.AccessDetail?.Stationnement,
+            ["SystemesAcces"] = JoinOrNull(access?.Systemes.Select(x => x.Value)),
+            ["ZonesBadge"] = access?.BadgeZones,
+            ["PosHebergement"] = JoinOrNull(access?.PosHebergement.Select(x => x.Value)),
+            ["Stationnement"] = access?.Stationnement,
+            ["JustificationAcces"] = access?.Justification,
+            ["CodeAlarmeDetails"] = access?.CodeAlarmeDetails,
             ["CommentairesStationnement"] = isOffboarding ? request.OffboardingDetail?.CommentairesStationnement : request.OnboardingDetail?.CommentairesStationnement
         };
 
