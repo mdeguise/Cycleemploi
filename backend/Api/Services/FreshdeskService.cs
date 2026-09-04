@@ -113,6 +113,7 @@ public class FreshdeskService : IFreshdeskService
         {
             var template = await _templates.GetContentAsync(TicketTemplateKeys.FreshdeskMainOffboarding, ct);
             var d = request.OffboardingDetail;
+            var a = request.AccessDetail;
             var requestValues = new Dictionary<string, string?>
             {
                 ["RequestNumber"] = request.RequestNumber,
@@ -128,6 +129,12 @@ public class FreshdeskService : IFreshdeskService
                 ["DateRetourConnue"] = d?.DateRetourConnue,
                 ["DateRetourTravail"] = d?.DateRetourTravail is { } retourDate ? retourDate.ToString("yyyy-MM-dd") : null,
                 ["PreavisRecu"] = d?.PreavisRecu,
+                ["SystemesAcces"] = JoinOrNull(a?.Systemes.Select(s => s.Value)),
+                ["ZonesBadge"] = a?.BadgeZones,
+                ["PosHebergement"] = JoinOrNull(a?.PosHebergement.Select(p => p.Value)),
+                ["Stationnement"] = a?.Stationnement,
+                ["JustificationAcces"] = a?.Justification,
+                ["CodeAlarmeDetails"] = a?.CodeAlarmeDetails,
                 ["CommentairesIT"] = d?.CommentairesIT,
                 ["CommentairesStationnement"] = d?.CommentairesStationnement,
                 ["CommentairesPuceAcces"] = d?.CommentairesPuceAcces,
