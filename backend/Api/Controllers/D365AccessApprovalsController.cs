@@ -27,6 +27,15 @@ public class D365AccessApprovalsController : ControllerBase
     /// (see D365AccessApproval.AccessType) so the value can be sent straight through.</summary>
     private static readonly string[] AllowedAccessTypes = ["New Access", "Change Access", "Remove Access"];
 
+    /// <summary>The ad-hoc form's "Limite d'approbation" catalog — everyone gets StandardApprovalLimits;
+    /// this short allowlist (case-insensitive email match) gets ElevatedApprovalLimits instead, up to
+    /// the real TDX form's own highest tier. Re-validated here even though the frontend already only
+    /// shows the matching dropdown — a client can submit whatever it wants, so this is the actual
+    /// control, not the dropdown.</summary>
+    private static readonly string[] ElevatedApprovalLimitEmails = ["mbessette@tremblant.ca"];
+    private static readonly decimal[] StandardApprovalLimits = [0, 2000, 5000];
+    private static readonly decimal[] ElevatedApprovalLimits = [0, 2000, 5000, 25000, 50000, 100000, 500000, 1000000, 1500000];
+
     private readonly AppDbContext _db;
     private readonly WorkdayContext _workday;
     private readonly ID365ApproverService _approvers;
@@ -496,9 +505,17 @@ public class D365AccessApprovalsController : ControllerBase
         if (string.IsNullOrWhiteSpace(dto.WorkdayEmployeeId)) return BadRequest("L'employé est requis.");
         if (!AllowedAccessTypes.Contains(dto.AccessType)) return BadRequest("Le type d'accès est requis.");
         if (string.IsNullOrWhiteSpace(dto.JobTitleEnglish)) return BadRequest("Le titre du poste (anglais) est requis.");
-        if (dto.ApprovalLimit < 0) return BadRequest("La limite d'approbation ne peut pas être négative.");
         var invalidRoles = dto.Roles.Except(TdxD365RoleCheckboxes.All).ToList();
         if (invalidRoles.Count > 0) return BadRequest($"Rôle(s) inconnu(s) : {string.Join(", ", invalidRoles)}");
+
+        var requesterInfo = _ad.GetUserInfo(User.GetSamAccountName());
+        var allowedLimits = !string.IsNullOrWhiteSpace(requesterInfo.Email) && ElevatedApprovalLimitEmails.Contains(requesterInfo.Email, StringComparer.OrdinalIgnoreCase)
+            ? ElevatedApprovalLimits
+            : StandardApprovalLimits;
+        if (!allowedLimits.Contains(dto.ApprovalLimit))
+        {
+            return BadRequest($"Limite d'approbation invalide : {dto.ApprovalLimit} $. Valeurs permises : {string.Join(", ", allowedLimits)}.");
+        }
 
         var workdayInfo = await _workday.WorkdayDemographics
             .Where(w => w.EmployeeId == dto.WorkdayEmployeeId && w.PrimaryJob == true)
@@ -510,7 +527,6 @@ public class D365AccessApprovalsController : ControllerBase
             .FirstOrDefaultAsync(ct);
         if (workdayInfo is null) return BadRequest("Employé introuvable (ou son emploi n'est pas l'emploi principal).");
 
-        var requesterInfo = _ad.GetUserInfo(User.GetSamAccountName());
         var employeeName = $"{workdayInfo.PreferredFirstName ?? workdayInfo.FirstName} {workdayInfo.LastName}";
 
         var request = new Request
