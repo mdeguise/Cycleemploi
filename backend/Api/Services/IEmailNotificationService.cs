@@ -9,4 +9,9 @@ public interface IEmailNotificationService
     /// <summary>Sends to an arbitrary list of addresses — used for notifying matched D365 approvers,
     /// where the recipient is a real person, not the IT inbox.</summary>
     Task SendAsync(string subject, string body, IReadOnlyList<string> toAddresses, CancellationToken ct);
+
+    /// <summary>Same as the plain-text overload, but with an HTML alternative too — an email client
+    /// that renders HTML shows htmlBody; anything else (or "view plain text") falls back to
+    /// plainTextBody. Used for the requester confirmation email.</summary>
+    Task SendAsync(string subject, string plainTextBody, string htmlBody, IReadOnlyList<string> toAddresses, CancellationToken ct);
 }

@@ -1,6 +1,9 @@
+using System.Net;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using TremblantLifecycle.Api.Data;
+using TremblantLifecycle.Api.Models.Dtos;
 using TremblantLifecycle.Api.Models.Entities;
 
 namespace TremblantLifecycle.Api.Services;
@@ -105,13 +108,19 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         await TrySendRequesterConfirmationEmailAsync(request, ct);
     }
 
+    private record ConfirmationField(string Label, string Value);
+    private record ConfirmationSection(string Title, List<ConfirmationField> Fields);
+
     /// <summary>Confirms to the person who submitted the request that it went through, with every
-    /// field they entered — unlike every other email in this file, the recipient here is the
-    /// requester themselves, not IT or a D365 approver. Best-effort like the ticket integrations:
-    /// a failure here must never surface to the requester as a failed submission, since the
-    /// request itself is already committed by the time this runs. Deliberately excludes the
-    /// confidential RH comment (OnboardingConfidentialComment/ConfidentialComment) — that field is
-    /// kept out of the general request shape everywhere else in this codebase for the same reason.</summary>
+    /// field they entered plus the real ticket number each downstream system returned — unlike
+    /// every other email in this file, the recipient here is the requester themselves, not IT or a
+    /// D365 approver. Sent last in RunAllAsync, after every TryCreate*TicketAsync call, so the
+    /// RequestTicket rows queried below already reflect this submission's real outcomes. Best-effort
+    /// like the ticket integrations: a failure here must never surface to the requester as a failed
+    /// submission, since the request itself is already committed by the time this runs.
+    /// Deliberately excludes the confidential RH comment (OnboardingConfidentialComment/
+    /// ConfidentialComment) — that field is kept out of the general request shape everywhere else in
+    /// this codebase for the same reason.</summary>
     private async Task TrySendRequesterConfirmationEmailAsync(Request request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.RequesterEmail)) return;
@@ -119,9 +128,13 @@ public class TicketOrchestrationService : ITicketOrchestrationService
 
         try
         {
+            var tickets = await BuildTicketSummaryAsync(request, ct);
+            var sections = BuildConfirmationSections(request);
+
             var subject = $"[Cycle Emploi] Confirmation de soumission — demande #{request.RequestNumber}";
-            var body = BuildRequesterConfirmationBody(request);
-            await _email.SendAsync(subject, body, [request.RequesterEmail], ct);
+            var plainText = RenderPlainText(request, tickets, sections);
+            var html = RenderHtml(request, tickets, sections);
+            await _email.SendAsync(subject, plainText, html, [request.RequesterEmail], ct);
         }
         catch (Exception emailEx)
         {
@@ -129,9 +142,116 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         }
     }
 
-    private static string BuildRequesterConfirmationBody(Request request)
+    /// <summary>One row per RequestTicket already recorded for this request (Created shows the real
+    /// ticket number; Failed says so, pointing at Administration), plus a row for a still-Pending
+    /// D365 access approval — that one has no ticket yet, only once an approver completes the form
+    /// (see D365AccessApprovalsController.Complete).</summary>
+    private async Task<List<ConfirmationField>> BuildTicketSummaryAsync(Request request, CancellationToken ct)
+    {
+        var tickets = await _db.RequestTickets.AsNoTracking()
+            .Where(t => t.RequestId == request.RequestId)
+            .ToListAsync(ct);
+
+        var rows = tickets
+            .Select(t => new ConfirmationField(
+                TicketKindLabels.For(t.Kind),
+                t.Outcome == TicketOutcome.Created ? $"#{t.TicketNumber}" : "Échec — voir Administration > Demandes"))
+            .ToList();
+
+        var d365Access = await _db.D365AccessApprovals.AsNoTracking()
+            .FirstOrDefaultAsync(a => a.RequestId == request.RequestId, ct);
+        if (d365Access is { Status: D365ApprovalStatus.Pending })
+        {
+            rows.Add(new ConfirmationField("Accès D365", "En attente d'approbation — aucun billet TDX tant que le formulaire n'est pas complété"));
+        }
+
+        return rows;
+    }
+
+    private static List<ConfirmationSection> BuildConfirmationSections(Request request)
     {
         var isOffboarding = request.RequestType == RequestType.Offboarding;
+        var sections = new List<ConfirmationSection>();
+
+        var multipleEmployees = request.Employees.Count > 1;
+        var i = 0;
+        foreach (var employee in request.Employees)
+        {
+            i++;
+            var fields = new List<ConfirmationField> { new("Nom", employee.NameSnapshot) };
+            AddIfPresent(fields, "Poste", employee.PositionSnapshot);
+            AddIfPresent(fields, "Département", employee.DepartementSnapshot);
+            AddIfPresent(fields, "Gestionnaire", employee.GestionnaireSnapshot);
+            AddIfPresent(fields, "Type d'emploi", employee.TypeEmploiSnapshot);
+            sections.Add(new ConfirmationSection(multipleEmployees ? $"Employé {i}" : "Employé", fields));
+        }
+
+        if (isOffboarding)
+        {
+            var d = request.OffboardingDetail;
+            var details = new List<ConfirmationField>();
+            AddIfPresent(details, "Dernière journée", d?.DerniereJournee?.ToString("yyyy-MM-dd"));
+            AddIfPresent(details, "Indemnité de vacances", d?.IndemniteVacances);
+            AddIfPresent(details, "Raison de l'arrêt", d?.RaisonArret);
+            AddIfPresent(details, "Détails sur la raison", d?.DetailsRaison);
+            AddIfPresent(details, "Réembaucheriez-vous", d?.Reembaucheriez);
+            AddIfPresent(details, "Motif de non-admissibilité", d?.MotifNonAdmissibilite);
+            AddIfPresent(details, "Date de retour connue", d?.DateRetourConnue);
+            AddIfPresent(details, "Date de retour au travail", d?.DateRetourTravail?.ToString("yyyy-MM-dd"));
+            AddIfPresent(details, "Préavis reçu", d?.PreavisRecu);
+            sections.Add(new ConfirmationSection("Détails", details));
+
+            var comments = new List<ConfirmationField>();
+            AddIfPresent(comments, "Technologies de l'information", d?.CommentairesIT);
+            AddIfPresent(comments, "Stationnement", d?.CommentairesStationnement);
+            AddIfPresent(comments, "Carte ou puce d'accès", d?.CommentairesPuceAcces);
+            AddIfPresent(comments, "Uniformes et matériel à fournir", d?.CommentairesRedingote);
+            if (comments.Count > 0) sections.Add(new ConfirmationSection("Commentaires", comments));
+        }
+        else
+        {
+            var d = request.OnboardingDetail;
+            var details = new List<ConfirmationField>();
+            AddIfPresent(details, "Date d'entrée prévue", d?.DateEntreePrevue?.ToString("yyyy-MM-dd"));
+            AddIfPresent(details, "Règle de paye", d?.RegleDePaye);
+            AddIfPresent(details, "Commentaire règle de paye", d?.RegleDePayeCommentaire);
+            sections.Add(new ConfirmationSection("Détails", details));
+
+            var a = request.AccessDetail;
+            var access = new List<ConfirmationField>();
+            AddIfPresent(access, "Systèmes", JoinOrNull(a?.Systemes.Select(s => s.Value)));
+            AddIfPresent(access, "Zones ou édifices requis (badge)", a?.BadgeZones);
+            AddIfPresent(access, "Système POS et hébergement", JoinOrNull(a?.PosHebergement.Select(p => p.Value)));
+            AddIfPresent(access, "Stationnement requis", a?.Stationnement);
+            AddIfPresent(access, "Justification", a?.Justification);
+            AddIfPresent(access, "Précisions - code d'alarme", a?.CodeAlarmeDetails);
+            if (access.Count > 0) sections.Add(new ConfirmationSection("Accès et comptes", access));
+
+            var eq = request.EquipmentDetail;
+            var equipment = new List<ConfirmationField>();
+            AddIfPresent(equipment, "Équipement", JoinOrNull(eq?.Equipements.Select(x => x.Value)));
+            AddIfPresent(equipment, "Notes", eq?.Notes);
+            if (equipment.Count > 0) sections.Add(new ConfirmationSection("Équipement", equipment));
+
+            var app = request.ApplicationsDetail;
+            var applications = new List<ConfirmationField>();
+            AddIfPresent(applications, "Applications", JoinOrNull(app?.Applications.Select(x => x.Value)));
+            AddIfPresent(applications, "Autre logiciel requis", app?.AutreLogiciel);
+            if (applications.Count > 0) sections.Add(new ConfirmationSection("Applications", applications));
+
+            var comments = new List<ConfirmationField>();
+            AddIfPresent(comments, "Technologies de l'information", d?.CommentairesIT);
+            AddIfPresent(comments, "Stationnement", d?.CommentairesStationnement);
+            AddIfPresent(comments, "Carte ou puce d'accès", d?.CommentairesPuceAcces);
+            AddIfPresent(comments, "Uniformes et matériel à fournir", d?.CommentairesRedingote);
+            if (comments.Count > 0) sections.Add(new ConfirmationSection("Commentaires", comments));
+        }
+
+        return sections;
+    }
+
+    private static string RenderPlainText(Request request, List<ConfirmationField> tickets, List<ConfirmationSection> sections)
+    {
         var lines = new List<string>
         {
             $"Votre demande #{request.RequestNumber} ({request.RequestType.ToFrenchLabel()}) a bien été soumise.",
@@ -139,82 +259,83 @@ public class TicketOrchestrationService : ITicketOrchestrationService
             ""
         };
 
-        lines.Add("== Employé(s) ==");
-        foreach (var employee in request.Employees)
+        if (tickets.Count > 0)
         {
-            lines.Add($"Nom : {employee.NameSnapshot}");
-            AddIfPresent(lines, "Poste", employee.PositionSnapshot);
-            AddIfPresent(lines, "Département", employee.DepartementSnapshot);
-            AddIfPresent(lines, "Gestionnaire", employee.GestionnaireSnapshot);
-            AddIfPresent(lines, "Type d'emploi", employee.TypeEmploiSnapshot);
+            lines.Add("== Billets créés ==");
+            foreach (var t in tickets) lines.Add($"{t.Label} : {t.Value}");
             lines.Add("");
         }
 
-        if (isOffboarding)
+        foreach (var section in sections)
         {
-            var d = request.OffboardingDetail;
-            lines.Add("== Détails ==");
-            AddIfPresent(lines, "Dernière journée", d?.DerniereJournee?.ToString("yyyy-MM-dd"));
-            AddIfPresent(lines, "Indemnité de vacances", d?.IndemniteVacances);
-            AddIfPresent(lines, "Raison de l'arrêt", d?.RaisonArret);
-            AddIfPresent(lines, "Détails sur la raison", d?.DetailsRaison);
-            AddIfPresent(lines, "Réembaucheriez-vous", d?.Reembaucheriez);
-            AddIfPresent(lines, "Motif de non-admissibilité", d?.MotifNonAdmissibilite);
-            AddIfPresent(lines, "Date de retour connue", d?.DateRetourConnue);
-            AddIfPresent(lines, "Date de retour au travail", d?.DateRetourTravail?.ToString("yyyy-MM-dd"));
-            AddIfPresent(lines, "Préavis reçu", d?.PreavisRecu);
+            lines.Add($"== {section.Title} ==");
+            foreach (var f in section.Fields) lines.Add($"{f.Label} : {f.Value}");
             lines.Add("");
-
-            lines.Add("== Commentaires ==");
-            AddIfPresent(lines, "Technologies de l'information", d?.CommentairesIT);
-            AddIfPresent(lines, "Stationnement", d?.CommentairesStationnement);
-            AddIfPresent(lines, "Carte ou puce d'accès", d?.CommentairesPuceAcces);
-            AddIfPresent(lines, "Uniformes et matériel à fournir", d?.CommentairesRedingote);
-        }
-        else
-        {
-            var d = request.OnboardingDetail;
-            lines.Add("== Détails ==");
-            AddIfPresent(lines, "Date d'entrée prévue", d?.DateEntreePrevue?.ToString("yyyy-MM-dd"));
-            AddIfPresent(lines, "Règle de paye", d?.RegleDePaye);
-            AddIfPresent(lines, "Commentaire règle de paye", d?.RegleDePayeCommentaire);
-            lines.Add("");
-
-            var a = request.AccessDetail;
-            lines.Add("== Accès et comptes ==");
-            AddIfPresent(lines, "Systèmes", JoinOrNull(a?.Systemes.Select(s => s.Value)));
-            AddIfPresent(lines, "Zones ou édifices requis (badge)", a?.BadgeZones);
-            AddIfPresent(lines, "Système POS et hébergement", JoinOrNull(a?.PosHebergement.Select(p => p.Value)));
-            AddIfPresent(lines, "Stationnement requis", a?.Stationnement);
-            AddIfPresent(lines, "Justification", a?.Justification);
-            AddIfPresent(lines, "Précisions - code d'alarme", a?.CodeAlarmeDetails);
-            lines.Add("");
-
-            var eq = request.EquipmentDetail;
-            lines.Add("== Équipement ==");
-            AddIfPresent(lines, "Équipement", JoinOrNull(eq?.Equipements.Select(x => x.Value)));
-            AddIfPresent(lines, "Notes", eq?.Notes);
-            lines.Add("");
-
-            var app = request.ApplicationsDetail;
-            lines.Add("== Applications ==");
-            AddIfPresent(lines, "Applications", JoinOrNull(app?.Applications.Select(x => x.Value)));
-            AddIfPresent(lines, "Autre logiciel requis", app?.AutreLogiciel);
-            lines.Add("");
-
-            lines.Add("== Commentaires ==");
-            AddIfPresent(lines, "Technologies de l'information", d?.CommentairesIT);
-            AddIfPresent(lines, "Stationnement", d?.CommentairesStationnement);
-            AddIfPresent(lines, "Carte ou puce d'accès", d?.CommentairesPuceAcces);
-            AddIfPresent(lines, "Uniformes et matériel à fournir", d?.CommentairesRedingote);
         }
 
-        return string.Join("\n", lines);
+        return string.Join("\n", lines).TrimEnd('\n');
     }
 
-    private static void AddIfPresent(List<string> lines, string label, string? value)
+    private const string BrandRed = "#9c1c2e";
+
+    private static string RenderHtml(Request request, List<ConfirmationField> tickets, List<ConfirmationSection> sections)
     {
-        if (!string.IsNullOrWhiteSpace(value)) lines.Add($"{label} : {value}");
+        string Enc(string s) => WebUtility.HtmlEncode(s);
+
+        string RenderFieldRows(IEnumerable<ConfirmationField> fields, bool highlightValue = false)
+        {
+            var sb = new StringBuilder();
+            var alt = false;
+            foreach (var f in fields)
+            {
+                var bg = alt ? "#f7f4f2" : "#ffffff";
+                var valueStyle = highlightValue ? $"font-weight:600;color:{BrandRed};" : "color:#2b2b2b;";
+                sb.Append($"<tr style=\"background:{bg};\">")
+                  .Append($"<td style=\"padding:8px 12px;color:#6b6b6b;font-size:13px;white-space:nowrap;vertical-align:top;\">{Enc(f.Label)}</td>")
+                  .Append($"<td style=\"padding:8px 12px;font-size:13px;{valueStyle}\">{Enc(f.Value)}</td>")
+                  .Append("</tr>");
+                alt = !alt;
+            }
+            return sb.ToString();
+        }
+
+        string RenderSectionTable(string title, IEnumerable<ConfirmationField> fields, bool highlightValue = false) =>
+            $"""
+             <h3 style="margin:24px 0 8px;font-size:14px;color:{BrandRed};border-bottom:2px solid {BrandRed};padding-bottom:6px;">{Enc(title)}</h3>
+             <table style="width:100%;border-collapse:collapse;border:1px solid #e5dfdc;">{RenderFieldRows(fields, highlightValue)}</table>
+             """;
+
+        var html = new StringBuilder();
+        html.Append($"""
+            <div style="font-family:Arial,Helvetica,sans-serif;max-width:640px;margin:0 auto;background:#ffffff;">
+              <div style="background:{BrandRed};color:#ffffff;padding:18px 24px;border-radius:6px 6px 0 0;">
+                <div style="font-size:12px;letter-spacing:1px;opacity:0.85;">TREMBLANT — CYCLE EMPLOI</div>
+                <div style="font-size:18px;font-weight:700;margin-top:4px;">Confirmation de soumission</div>
+              </div>
+              <div style="border:1px solid #e5dfdc;border-top:none;border-radius:0 0 6px 6px;padding:20px 24px 28px;">
+                <p style="font-size:14px;margin:0 0 4px;">
+                  Votre demande <strong>#{Enc(request.RequestNumber)}</strong> ({Enc(request.RequestType.ToFrenchLabel())}) a bien été soumise.
+                </p>
+                <p style="font-size:13px;color:#6b6b6b;margin:0;">Demandé par : {Enc(request.CreatedByDisplayName)}</p>
+            """);
+
+        if (tickets.Count > 0)
+        {
+            html.Append(RenderSectionTable("Billets créés", tickets, highlightValue: true));
+        }
+
+        foreach (var section in sections)
+        {
+            html.Append(RenderSectionTable(section.Title, section.Fields));
+        }
+
+        html.Append("</div></div>");
+        return html.ToString();
+    }
+
+    private static void AddIfPresent(List<ConfirmationField> fields, string label, string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value)) fields.Add(new ConfirmationField(label, value));
     }
 
     private static string? JoinOrNull(IEnumerable<string>? values)

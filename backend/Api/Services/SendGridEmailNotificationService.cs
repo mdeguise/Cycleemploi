@@ -18,11 +18,17 @@ public class SendGridEmailNotificationService : IEmailNotificationService
     public Task SendAsync(string subject, string body, CancellationToken ct) =>
         SendAsync(subject, body, [_options.ToAddress], ct);
 
-    public async Task SendAsync(string subject, string body, IReadOnlyList<string> toAddresses, CancellationToken ct)
+    public Task SendAsync(string subject, string body, IReadOnlyList<string> toAddresses, CancellationToken ct) =>
+        SendCoreAsync(subject, body, htmlBody: null, toAddresses, ct);
+
+    public Task SendAsync(string subject, string plainTextBody, string htmlBody, IReadOnlyList<string> toAddresses, CancellationToken ct) =>
+        SendCoreAsync(subject, plainTextBody, htmlBody, toAddresses, ct);
+
+    private async Task SendCoreAsync(string subject, string plainTextBody, string? htmlBody, IReadOnlyList<string> toAddresses, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(_options.ApiKey))
         {
-            _logger.LogWarning("SendGrid API key not configured — skipping email to {ToAddresses}. Subject: {Subject}\n{Body}", string.Join(", ", toAddresses), subject, body);
+            _logger.LogWarning("SendGrid API key not configured — skipping email to {ToAddresses}. Subject: {Subject}\n{Body}", string.Join(", ", toAddresses), subject, plainTextBody);
             return;
         }
         if (toAddresses.Count == 0)
@@ -36,8 +42,8 @@ public class SendGridEmailNotificationService : IEmailNotificationService
             new EmailAddress(_options.FromAddress),
             toAddresses.Select(a => new EmailAddress(a)).ToList(),
             subject,
-            body,
-            htmlContent: null);
+            plainTextBody,
+            htmlContent: htmlBody);
 
         var response = await client.SendEmailAsync(message, ct);
         if (!response.IsSuccessStatusCode)
