@@ -27,6 +27,13 @@ public interface ITdxService
     /// <returns>The created TDX ticket's numeric ID.</returns>
     Task<int> CreateHelpTicketAsync(string requesterName, string requesterEmail, string description, CancellationToken ct);
 
+    /// <summary>Ad-hoc "Quick Incident" ticket (same FormID/AccountID/ResponsibleGroupID as
+    /// CreateTicketAsync — "T - IT Operations") asking IT to re-enable a disabled AD account. Used
+    /// by the Comptes AD screen's "Réactiver" button — a direct user action awaiting a result,
+    /// unlike the best-effort onboarding/offboarding integrations.</summary>
+    /// <returns>The created TDX ticket's numeric ID.</returns>
+    Task<int> CreateAccountReactivationTicketAsync(string sam, string displayName, string requesterName, string requesterEmail, CancellationToken ct);
+
     /// <summary>Current state of an existing TDX ticket. NEVER throws — called while rendering a
     /// list, where one unreachable ticket must not fail the page. Failure returns Unknown.</summary>
     Task<LiveTicketStatus> GetTicketStatusAsync(int ticketId, CancellationToken ct);

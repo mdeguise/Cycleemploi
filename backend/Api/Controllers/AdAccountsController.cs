@@ -26,11 +26,15 @@ public class AdAccountsController : ControllerBase
 {
     private readonly IAppUserService _appUsers;
     private readonly ProcessesContext _processes;
+    private readonly IAdDirectoryService _ad;
+    private readonly ITdxService _tdx;
 
-    public AdAccountsController(IAppUserService appUsers, ProcessesContext processes)
+    public AdAccountsController(IAppUserService appUsers, ProcessesContext processes, IAdDirectoryService ad, ITdxService tdx)
     {
         _appUsers = appUsers;
         _processes = processes;
+        _ad = ad;
+        _tdx = tdx;
     }
 
     [HttpGet]
@@ -53,5 +57,37 @@ public class AdAccountsController : ControllerBase
             .ToListAsync(ct);
 
         return Ok(accounts);
+    }
+
+    /// <summary>Creates a real TDX ticket asking IT Operations to re-enable the given account —
+    /// a direct user action awaiting a result, so failures are surfaced to the caller rather than
+    /// swallowed/emailed, same pattern as AuthController.CreateHelpTicket.</summary>
+    [HttpPost("{sam}/reactivate-ticket")]
+    public async Task<ActionResult<ReactivateAccountTicketResultDto>> CreateReactivationTicket(string sam, [FromBody] ReactivateAccountTicketDto dto, CancellationToken ct)
+    {
+        if (!await _appUsers.IsAdminAsync(User.GetObjectId(), ct)) return Forbid();
+        if (string.IsNullOrWhiteSpace(sam)) return BadRequest("Le compte est requis.");
+
+        var requesterSam = User.GetSamAccountName();
+        var requesterInfo = _ad.GetUserInfo(requesterSam);
+        if (string.IsNullOrWhiteSpace(requesterInfo.Email))
+        {
+            return Problem("Impossible de déterminer votre adresse courriel.", statusCode: StatusCodes.Status500InternalServerError);
+        }
+
+        try
+        {
+            var ticketId = await _tdx.CreateAccountReactivationTicketAsync(
+                sam,
+                string.IsNullOrWhiteSpace(dto.DisplayName) ? sam : dto.DisplayName,
+                requesterInfo.DisplayName ?? requesterSam,
+                requesterInfo.Email,
+                ct);
+            return Ok(new ReactivateAccountTicketResultDto { TicketId = ticketId });
+        }
+        catch (TdxTicketException ex)
+        {
+            return Problem(ex.Message, statusCode: StatusCodes.Status502BadGateway);
+        }
     }
 }

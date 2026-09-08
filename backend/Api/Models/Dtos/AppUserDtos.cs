@@ -56,3 +56,16 @@ public class AdAccountStatusDto
     public string? Email { get; set; }
     public string? EmployeeId { get; set; }
 }
+
+/// <summary>The account's display name, sent along with the "Réactiver" button click so the
+/// resulting TDX ticket reads with a real name rather than just the bare Sam — the caller already
+/// has it from the row it clicked, no need to re-query.</summary>
+public class ReactivateAccountTicketDto
+{
+    public string? DisplayName { get; set; }
+}
+
+public class ReactivateAccountTicketResultDto
+{
+    public int TicketId { get; set; }
+}

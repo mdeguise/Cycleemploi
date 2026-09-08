@@ -249,6 +249,32 @@ public class TdxService : ITdxService
         return await PostTicketAsync(payload, token, ct);
     }
 
+    public async Task<int> CreateAccountReactivationTicketAsync(string sam, string displayName, string requesterName, string requesterEmail, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(_options.Username) || string.IsNullOrWhiteSpace(_options.Password))
+        {
+            throw new TdxTicketException("TDX username/password not configured.");
+        }
+
+        var token = await GetTokenAsync(ct);
+        var requesterUid = await LookupRequesterUidAsync(requesterEmail, token, ct);
+
+        var payload = new
+        {
+            FormID = _options.FormId,
+            Title = $"Réactiver le compte {sam}",
+            Description = $"Réactivation demandée pour le compte AD {displayName} ({sam}), depuis l'écran Comptes AD.",
+            RequestorName = requesterName,
+            RequestorEmail = requesterEmail,
+            RequestorUid = requesterUid,
+            AccountID = _options.AccountId,
+            ResponsibleGroupID = _options.ResponsibleGroupId,
+            ResponsibleGroupName = _options.ResponsibleGroupName
+        };
+
+        return await PostTicketAsync(payload, token, ct);
+    }
+
     public async Task<string?> TryLookupPersonUidAsync(string email, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(_options.Username) || string.IsNullOrWhiteSpace(_options.Password))
