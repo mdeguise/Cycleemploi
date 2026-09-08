@@ -252,3 +252,28 @@ public class SubmitAdHocD365AccessResultDto
     public int RequestId { get; set; }
     public string RequestNumber { get; set; } = null!;
 }
+
+/// <summary>The onboarding/réactivation wizard's own "D365 et Dynaway" step — same fields as
+/// SubmitAdHocD365AccessDto, minus WorkdayEmployeeId (the wizard already knows the employee from
+/// its own Employé step) and NeedsDynaway (the wizard's Dynaway checkbox already lives in
+/// SubmitRequestDto.Applications; TryCreateD365AccessApprovalRequestAsync derives it from there,
+/// same as it always has). Present on SubmitRequestDto only when "Accès D365" is one of the
+/// selected Systemes — see RequestsController.Create's validation.</summary>
+public class D365WizardDetailDto
+{
+    /// <summary>Must be one of D365AccessApprovalsController.AllowedAccessTypes.</summary>
+    public string AccessType { get; set; } = null!;
+
+    public string JobTitleEnglish { get; set; } = null!;
+    public decimal ApprovalLimit { get; set; }
+    public bool LevyEmployee { get; set; }
+    public string? ApAccessDetails { get; set; }
+    public string? AdditionalLegalEntities { get; set; }
+    public string? DefaultShippingAddress { get; set; }
+    public string? Comments { get; set; }
+    public List<string> Roles { get; set; } = [];
+
+    /// <summary>Defaults to the employee's own Workday Cost_Center when left blank — same
+    /// override-or-default pattern as SubmitAdHocD365AccessDto.DepartmentNumber.</summary>
+    public string? DepartmentNumber { get; set; }
+}

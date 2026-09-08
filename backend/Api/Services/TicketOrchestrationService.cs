@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using TremblantLifecycle.Api.Controllers;
 using TremblantLifecycle.Api.Data;
 using TremblantLifecycle.Api.Models.Dtos;
 using TremblantLifecycle.Api.Models.Entities;
@@ -15,8 +16,9 @@ public interface ITicketOrchestrationService
 {
     /// <summary>Fires every downstream integration for a freshly submitted request. Best-effort by
     /// design: the submission is already committed by the time this runs and must never be failed
-    /// by a downstream system being unavailable.</summary>
-    Task RunAllAsync(Request request, AdUserInfo requester, CancellationToken ct);
+    /// by a downstream system being unavailable. d365Detail carries the wizard's own "D365 et
+    /// Dynaway" step fields when "Accès D365" was selected — see RequestsController.Create.</summary>
+    Task RunAllAsync(Request request, AdUserInfo requester, D365WizardDetailDto? d365Detail, CancellationToken ct);
 
     /// <summary>Re-runs the ONE integration a RequestTicket row represents. Used by the
     /// Administration screen's Réessayer button.</summary>
@@ -102,14 +104,14 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         _logger = logger;
     }
 
-    public async Task RunAllAsync(Request request, AdUserInfo requester, CancellationToken ct)
+    public async Task RunAllAsync(Request request, AdUserInfo requester, D365WizardDetailDto? d365Detail, CancellationToken ct)
     {
         // Freshdesk runs first so its ticket id (when it succeeded) can be included in the D365
         // webhook payload for cross-referencing.
         var freshdeskTicketId = await TryCreateFreshdeskTicketAsync(request, requester, ct);
         await TryCreateD365BadgeTicketAsync(request, freshdeskTicketId, ct);
         await TryCreateTdxTicketAsync(request, requester, ct);
-        await TryCreateD365AccessApprovalRequestAsync(request, ct);
+        await TryCreateD365AccessApprovalRequestAsync(request, d365Detail, ct);
         await TrySendRequesterConfirmationEmailAsync(request, ct);
     }
 
@@ -742,10 +744,17 @@ public class TicketOrchestrationService : ITicketOrchestrationService
     /// Onboarding/Réactivation only, for the primary employee, same gating pattern as the
     /// badge/alarm D365 integration. Replaces the old design (an admin pre-fills a per-job-code
     /// template before anyone needs it — in practice that table shipped and stayed completely
-    /// empty). Instead, a matched D365Approver is emailed a link to a prepopulated French form; no
-    /// TDX call happens here at all, only once they complete it — see CreateD365AccessTicketAsync
-    /// and D365AccessApprovalsController.Complete.</summary>
-    private async Task TryCreateD365AccessApprovalRequestAsync(Request request, CancellationToken ct)
+    /// empty). A matched D365Approver is emailed a link to review the request; no TDX call happens
+    /// here at all, only once they complete it — see CreateD365AccessTicketAsync and
+    /// D365AccessApprovalsController.Complete.
+    ///
+    /// d365Detail carries the wizard's own "D365 et Dynaway" step fields (access type, roles,
+    /// approval limit, etc. — see RequestsController.Create's validation, which requires it
+    /// whenever "Accès D365" is selected). When present, the approval is created already fully
+    /// filled out — same shape SubmitAdHoc produces for the standalone D365AccessRequest app — so
+    /// the matched approver's job is to review and press "Envoyer", not fill in blanks. Null is
+    /// only a defensive fallback (old clients, if any ever call this without the step).</summary>
+    private async Task TryCreateD365AccessApprovalRequestAsync(Request request, D365WizardDetailDto? d365Detail, CancellationToken ct)
     {
         if (request.RequestType == RequestType.Offboarding) return;
 
@@ -762,21 +771,52 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         var applications = (request.ApplicationsDetail?.Applications.Select(a => a.Value) ?? []).ToList();
         var dynawaySelected = applications.Contains(DynawayApplicationValue);
 
+        var workdayInfo = await _workday.WorkdayDemographics
+            .Where(w => w.EmployeeId == employee.WorkdayEmployeeId && w.PrimaryJob == true)
+            .Select(w => new { w.PositionTitle, w.CostCenter })
+            .FirstOrDefaultAsync(ct);
+        var positionTitle = workdayInfo?.PositionTitle;
+
+        // Same Dynaway-comment stitching as SubmitAdHoc, just fed from d365Detail.Comments (the
+        // requester's free text plus the frontend's own locked "(Asset Management) with Dynaway
+        // Mobile" tag) instead of dto.Comments.
+        var comments = string.IsNullOrWhiteSpace(d365Detail?.Comments) ? null : d365Detail.Comments.Trim();
+        if (dynawaySelected)
+        {
+            comments = comments is null ? DynawayCommentDefault : $"{DynawayCommentDefault}\n{comments}";
+        }
+
         var approval = new D365AccessApproval
         {
             RequestId = request.RequestId,
             RequestEmployeeId = employee.RequestEmployeeId,
             Status = D365ApprovalStatus.Pending,
-            Comments = dynawaySelected ? DynawayCommentDefault : null,
+            AccessType = d365Detail?.AccessType,
+            JobTitleEnglish = d365Detail?.JobTitleEnglish,
+            LegalEntity = d365Detail is null ? null : D365AccessApprovalsController.FixedLegalEntity,
+            DepartmentNumber = string.IsNullOrWhiteSpace(d365Detail?.DepartmentNumber) ? workdayInfo?.CostCenter : d365Detail.DepartmentNumber.Trim(),
+            ApprovalLimit = d365Detail?.ApprovalLimit,
+            LevyEmployee = d365Detail?.LevyEmployee,
+            ApAccessDetails = string.IsNullOrWhiteSpace(d365Detail?.ApAccessDetails) ? null : d365Detail.ApAccessDetails.Trim(),
+            AdditionalLegalEntities = string.IsNullOrWhiteSpace(d365Detail?.AdditionalLegalEntities) ? null : d365Detail.AdditionalLegalEntities.Trim(),
+            DefaultShippingAddress = string.IsNullOrWhiteSpace(d365Detail?.DefaultShippingAddress) ? null : d365Detail.DefaultShippingAddress.Trim(),
+            Comments = comments,
             CreatedAt = DateTime.UtcNow
         };
+        foreach (var role in (d365Detail?.Roles ?? []).Distinct())
+        {
+            approval.Roles.Add(new D365AccessApprovalRole { Role = role });
+        }
         _db.D365AccessApprovals.Add(approval);
         await _db.SaveChangesAsync(ct);
 
-        var positionTitle = await _workday.WorkdayDemographics
-            .Where(w => w.EmployeeId == employee.WorkdayEmployeeId && w.PrimaryJob == true)
-            .Select(w => w.PositionTitle)
-            .FirstOrDefaultAsync(ct);
+        if (d365Detail is not null)
+        {
+            // Already fully filled out by the requester — same wording NotifyD365ApproversOfAdHocRequestAsync
+            // uses for the standalone D365AccessRequest app's own ad-hoc submissions.
+            await NotifyD365ApproversOfAdHocRequestAsync(request, approval, positionTitle, ct);
+            return;
+        }
 
         var approvers = await _d365Approvers.MatchingAsync(positionTitle, ct);
         var recipients = approvers.Where(a => !string.IsNullOrWhiteSpace(a.Email)).Select(a => a.Email!).ToList();

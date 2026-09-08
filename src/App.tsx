@@ -11,6 +11,7 @@ import { SummarySidebar } from './components/SummarySidebar';
 import { Step1Employee } from './steps/Step1Employee';
 import { Step2Position } from './steps/Step2Position';
 import { Step3Access } from './steps/Step3Access';
+import { StepD365Dynaway } from './steps/StepD365Dynaway';
 import { Step4Equipment } from './steps/Step4Equipment';
 import { StepCommentsOnboarding } from './steps/StepCommentsOnboarding';
 import { Step6Review } from './steps/Step6Review';
@@ -35,6 +36,7 @@ const ONBOARDING_STEP_COMPONENTS = [
   Step1Employee,
   Step2Position,
   Step3Access,
+  StepD365Dynaway,
   Step4Equipment,
   StepCommentsOnboarding,
   Step6Review,
@@ -271,7 +273,7 @@ function AuthenticatedApp() {
         <Route
           path="/*"
           element={
-            <WizardProvider demandePar={me.displayName}>
+            <WizardProvider demandePar={me.displayName} meEmail={me.email ?? null}>
               <WizardBody />
             </WizardProvider>
           }

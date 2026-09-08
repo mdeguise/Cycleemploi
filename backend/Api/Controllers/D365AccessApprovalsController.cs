@@ -20,21 +20,25 @@ namespace TremblantLifecycle.Api.Controllers;
 public class D365AccessApprovalsController : ControllerBase
 {
     /// <summary>Every D365 access request uses the same D365 F&amp;O legal entity — set here, never
-    /// an approver input.</summary>
-    private const string FixedLegalEntity = "6201";
+    /// an approver input. Internal so RequestsController/TicketOrchestrationService can stamp it on
+    /// wizard-driven approvals too, without a second literal "6201" to drift out of sync.</summary>
+    internal const string FixedLegalEntity = "6201";
 
     /// <summary>The real TDX form's own wording for its "Access Type" dropdown — matched exactly
-    /// (see D365AccessApproval.AccessType) so the value can be sent straight through.</summary>
-    private static readonly string[] AllowedAccessTypes = ["New Access", "Change Access", "Remove Access"];
+    /// (see D365AccessApproval.AccessType) so the value can be sent straight through. Internal so
+    /// RequestsController can validate the wizard's own "D365 et Dynaway" step against the same
+    /// catalog.</summary>
+    internal static readonly string[] AllowedAccessTypes = ["New Access", "Change Access", "Remove Access"];
 
     /// <summary>The ad-hoc form's "Limite d'approbation" catalog — everyone gets StandardApprovalLimits;
     /// this short allowlist (case-insensitive email match) gets ElevatedApprovalLimits instead, up to
     /// the real TDX form's own highest tier. Re-validated here even though the frontend already only
     /// shows the matching dropdown — a client can submit whatever it wants, so this is the actual
-    /// control, not the dropdown.</summary>
-    private static readonly string[] ElevatedApprovalLimitEmails = ["mbessette@tremblant.ca"];
-    private static readonly decimal[] StandardApprovalLimits = [0, 2000, 5000];
-    private static readonly decimal[] ElevatedApprovalLimits = [0, 2000, 5000, 25000, 50000, 100000, 500000, 1000000, 1500000];
+    /// control, not the dropdown. Internal so RequestsController can apply the same validation to the
+    /// wizard's own "D365 et Dynaway" step.</summary>
+    internal static readonly string[] ElevatedApprovalLimitEmails = ["mbessette@tremblant.ca"];
+    internal static readonly decimal[] StandardApprovalLimits = [0, 2000, 5000];
+    internal static readonly decimal[] ElevatedApprovalLimits = [0, 2000, 5000, 25000, 50000, 100000, 500000, 1000000, 1500000];
 
     private readonly AppDbContext _db;
     private readonly WorkdayContext _workday;

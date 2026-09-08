@@ -169,7 +169,7 @@ public class RequestsController : ControllerBase
         // Server-side re-validation mirroring WizardContext.validateStep on the frontend — client
         // validation must never be trusted alone. Runs before the entity ever touches _db, so a
         // failure here leaves nothing behind.
-        var errors = await ValidateForSubmitAsync(request, ct);
+        var errors = await ValidateForSubmitAsync(request, dto, requester, ct);
         if (errors.Count > 0)
         {
             return BadRequest(new { errors });
@@ -191,7 +191,7 @@ public class RequestsController : ControllerBase
         // fail a submission the requester already completed — a failure here notifies IT support by
         // email instead, so a ticket can be created manually. Freshdesk runs first so its ticket id
         // (if it succeeded) can be included in the D365 webhook payload for cross-referencing.
-        await _orchestration.RunAllAsync(request, requester, ct);
+        await _orchestration.RunAllAsync(request, requester, dto.D365Detail, ct);
 
         return Ok(MapToDto(request));
     }
@@ -217,13 +217,49 @@ public class RequestsController : ControllerBase
         return Ok(dto);
     }
 
-    private async Task<List<string>> ValidateForSubmitAsync(Request request, CancellationToken ct)
+    private async Task<List<string>> ValidateForSubmitAsync(Request request, SubmitRequestDto dto, AdUserInfo requester, CancellationToken ct)
     {
         var errors = new List<string>();
 
         if (request.Employees.Count == 0)
         {
             errors.Add("At least one employee is required.");
+        }
+
+        // Mirrors D365AccessApprovalsController.SubmitAdHoc's own validation — the wizard's "D365 et
+        // Dynaway" step is a second entry point into the exact same D365AccessApproval fields, so it
+        // must be gated by the exact same rules. The frontend only ever shows the matching catalogs,
+        // but a client can submit whatever it wants — this is the actual control, not the dropdowns.
+        if (dto.SystemesAcces.Contains(AccesD365SystemeValue))
+        {
+            if (dto.D365Detail is null)
+            {
+                errors.Add("D365Detail is required when Accès D365 is selected.");
+            }
+            else
+            {
+                if (!D365AccessApprovalsController.AllowedAccessTypes.Contains(dto.D365Detail.AccessType))
+                {
+                    errors.Add("Le type d'accès D365 est requis.");
+                }
+                if (string.IsNullOrWhiteSpace(dto.D365Detail.JobTitleEnglish))
+                {
+                    errors.Add("Le titre du poste (anglais) est requis pour l'accès D365.");
+                }
+                var invalidRoles = dto.D365Detail.Roles.Except(TdxD365RoleCheckboxes.All).ToList();
+                if (invalidRoles.Count > 0)
+                {
+                    errors.Add($"Rôle(s) D365 inconnu(s) : {string.Join(", ", invalidRoles)}");
+                }
+                var allowedLimits = !string.IsNullOrWhiteSpace(requester.Email) &&
+                    D365AccessApprovalsController.ElevatedApprovalLimitEmails.Contains(requester.Email, StringComparer.OrdinalIgnoreCase)
+                    ? D365AccessApprovalsController.ElevatedApprovalLimits
+                    : D365AccessApprovalsController.StandardApprovalLimits;
+                if (!allowedLimits.Contains(dto.D365Detail.ApprovalLimit))
+                {
+                    errors.Add($"Limite d'approbation D365 invalide : {dto.D365Detail.ApprovalLimit} $.");
+                }
+            }
         }
 
         if (request.RequestType is RequestType.Onboarding or RequestType.Reactivation)

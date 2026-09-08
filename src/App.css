@@ -381,6 +381,20 @@
   margin-top: 6px;
 }
 
+.locked-comment-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--tremblant-red-light);
+  border: 1px solid var(--tremblant-red-border);
+  border-radius: 4px;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+}
+
 .field input[type="text"],
 .field input[type="email"],
 .field input[type="tel"],

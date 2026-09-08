@@ -32,6 +32,7 @@ import type {
   CancelD365AccessApprovalDto,
   CompleteD365AccessApprovalDto,
   CompleteD365AccessApprovalResultDto,
+  D365AdHocPrefillDto,
 } from './types';
 
 export function createApi(client: ApiClient) {
@@ -95,6 +96,15 @@ export function createApi(client: ApiClient) {
         client.post<CompleteD365AccessApprovalResultDto>(`/api/d365-access-approvals/${requestId}/complete`, dto),
       cancel: (requestId: number, dto: CancelD365AccessApprovalDto) =>
         client.post<void>(`/api/d365-access-approvals/${requestId}/cancel`, dto),
+    },
+    /** Same "adhoc/*" endpoints the standalone D365AccessRequest app uses — reused here by the
+     * wizard's own "D365 et Dynaway" step (StepD365Dynaway), open to any authenticated employee. */
+    d365AdHoc: {
+      prefill: (workdayEmployeeId: string) =>
+        client.get<D365AdHocPrefillDto>(`/api/d365-access-approvals/adhoc/prefill?workdayEmployeeId=${encodeURIComponent(workdayEmployeeId)}`),
+      costCenters: () => client.get<string[]>('/api/d365-access-approvals/adhoc/cost-centers'),
+      adSearch: (q: string) =>
+        client.get<AdAccountDto[]>(`/api/d365-access-approvals/adhoc/ad-search?q=${encodeURIComponent(q)}`),
     },
     ticketTemplates: {
       list: () => client.get<TicketTemplateDto[]>('/api/ticket-templates'),

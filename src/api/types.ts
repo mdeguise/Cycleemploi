@@ -125,10 +125,27 @@ export interface RequestDto {
   commentairesRH?: string | null;
 }
 
+/** Mirrors backend D365WizardDetailDto — the wizard's own "D365 et Dynaway" step fields, sent as
+ * SubmitRequestDto.d365Detail only when systemesAcces includes "Accès D365". */
+export interface D365WizardDetailDto {
+  accessType: string;
+  jobTitleEnglish: string;
+  approvalLimit: number;
+  levyEmployee: boolean;
+  apAccessDetails?: string | null;
+  additionalLegalEntities?: string | null;
+  defaultShippingAddress?: string | null;
+  comments?: string | null;
+  roles: string[];
+  departmentNumber?: string | null;
+}
+
 /** POST /api/requests body — the ENTIRE request, assembled across every wizard step and sent in
  * one shot at final submission. No partial-save state: nothing reaches the server until this
  * single call, which creates and submits the request atomically. */
-export type SubmitRequestDto = Omit<RequestDto, 'requestId' | 'requestNumber' | 'status' | 'demandePar' | 'createdAt'>;
+export type SubmitRequestDto = Omit<RequestDto, 'requestId' | 'requestNumber' | 'status' | 'demandePar' | 'createdAt'> & {
+  d365Detail?: D365WizardDetailDto | null;
+};
 
 export interface D365SecurityRoleMappingDto {
   id: number;
@@ -273,6 +290,25 @@ export interface CompleteD365AccessApprovalResultDto {
 
 export interface CancelD365AccessApprovalDto {
   reason?: string | null;
+}
+
+/** GET /api/d365-access-approvals/adhoc/prefill — same endpoint the standalone D365AccessRequest
+ * app uses, reused here by the wizard's own "D365 et Dynaway" step once the employee is already
+ * known from Step1Employee. */
+export interface D365AdHocPrefillDto {
+  workdayEmployeeId: string;
+  employeeName: string;
+  employeeEmail?: string | null;
+  managerName?: string | null;
+  positionTitle?: string | null;
+  jobCode?: string | null;
+  departement?: string | null;
+  legalEntity: string;
+  departmentNumber?: string | null;
+  jobTitleEnglishSuggestion?: string | null;
+  roleCatalog: string[];
+  peers: D365PeerRoleDto[];
+  accessTypeCatalog: string[];
 }
 
 // --- Reconciliation / "Écarts" (DiscrepanciesController) ---

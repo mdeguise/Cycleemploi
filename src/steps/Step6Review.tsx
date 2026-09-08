@@ -9,15 +9,16 @@ import {
   LockIcon,
   LaptopIcon,
   AppsIcon,
+  GridIcon,
   ShieldIcon,
   ShirtIcon,
 } from '../components/icons';
-import { REGLE_DE_PAYE_AUTRE, ACCES_BADGE, BESOIN_CODE_ALARME, STATIONNEMENT_REQUIS } from '../data/catalogs';
+import { REGLE_DE_PAYE_AUTRE, ACCES_BADGE, BESOIN_CODE_ALARME, STATIONNEMENT_REQUIS, ACCES_D365, DYNAWAY } from '../data/catalogs';
 import { formatDateFr } from '../utils/formatDate';
 
 export function Step6Review() {
   const { request, goToStep, submitRequest } = useWizard();
-  const { employee: e, access: a, equipment: eq, applications: apps, comments: c } = request;
+  const { employee: e, access: a, equipment: eq, applications: apps, d365: d, comments: c } = request;
   const selected = e.employee;
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -184,12 +185,65 @@ export function Step6Review() {
         </div>
       </div>
 
+      {a.systemes.includes(ACCES_D365) && (
+        <div className="review-section">
+          <div className="review-section__header">
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <GridIcon style={{ width: 15, height: 15 }} /> D365 et Dynaway
+            </span>
+            <span className="review-section__edit" onClick={() => goToStep(3)}>
+              Modifier
+            </span>
+          </div>
+          <div className="review-section__body">
+            <div>
+              <div className="review-item__label">Dynaway</div>
+              <div className="review-item__value">{apps.applications.includes(DYNAWAY) ? 'Oui' : 'Non'}</div>
+            </div>
+            <div>
+              <div className="review-item__label">Access Type</div>
+              <div className="review-item__value">{d.accessType || '—'}</div>
+            </div>
+            <div>
+              <div className="review-item__label">Titre du poste (anglais)</div>
+              <div className="review-item__value">{d.jobTitleEnglish || '—'}</div>
+            </div>
+            <div>
+              <div className="review-item__label">Limite d'approbation</div>
+              <div className="review-item__value">{d.approvalLimit === '0' || !d.approvalLimit ? 'Aucune' : `${Number(d.approvalLimit).toLocaleString('fr-CA')} $`}</div>
+            </div>
+            <div>
+              <div className="review-item__label">Numéro de département</div>
+              <div className="review-item__value">{d.departmentNumber || '—'}</div>
+            </div>
+            <div>
+              <div className="review-item__label">Nom du gestionnaire</div>
+              <div className="review-item__value">{selected?.gestionnaire || '—'}</div>
+            </div>
+            <div>
+              <div className="review-item__label">Rôles D365</div>
+              <div className="review-tag-list">
+                {d.roles.length ? (
+                  d.roles.map((role) => (
+                    <span key={role} className="review-tag">
+                      {role}
+                    </span>
+                  ))
+                ) : (
+                  <span className="review-item__value">Aucun rôle sélectionné</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="review-section">
         <div className="review-section__header">
           <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <LaptopIcon style={{ width: 15, height: 15 }} /> Équipement
           </span>
-          <span className="review-section__edit" onClick={() => goToStep(3)}>
+          <span className="review-section__edit" onClick={() => goToStep(4)}>
             Modifier
           </span>
         </div>
@@ -221,12 +275,14 @@ export function Step6Review() {
           <div>
             <div className="review-item__label">Applications sélectionnées</div>
             <div className="review-tag-list">
-              {apps.applications.length ? (
-                apps.applications.map((value) => (
-                  <span key={value} className="review-tag">
-                    {nameFor(value)}
-                  </span>
-                ))
+              {apps.applications.filter((value) => value !== DYNAWAY).length ? (
+                apps.applications
+                  .filter((value) => value !== DYNAWAY)
+                  .map((value) => (
+                    <span key={value} className="review-tag">
+                      {nameFor(value)}
+                    </span>
+                  ))
               ) : (
                 <span className="review-item__value">Aucune application sélectionnée</span>
               )}
@@ -244,7 +300,7 @@ export function Step6Review() {
           <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <ShieldIcon style={{ width: 15, height: 15 }} /> Commentaires et suivis
           </span>
-          <span className="review-section__edit" onClick={() => goToStep(4)}>
+          <span className="review-section__edit" onClick={() => goToStep(5)}>
             Modifier
           </span>
         </div>

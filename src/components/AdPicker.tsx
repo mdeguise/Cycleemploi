@@ -44,15 +44,15 @@ export function usePicker(search: (q: string) => Promise<AdAccountDto[]>) {
   return { query, setQuery, hits, isSearching, picked, setPicked, reset };
 }
 
-export function PickerField({ picker }: { picker: ReturnType<typeof usePicker> }) {
+export function PickerField({ picker, label = 'Rechercher un compte (Active Directory)' }: { picker: ReturnType<typeof usePicker>; label?: string }) {
   const { query, setQuery, hits, isSearching, picked, setPicked } = picker;
   return (
     <div className="field">
-      <label className="field__label">Rechercher un compte (Active Directory)</label>
+      <label className="field__label">{label}</label>
       <div className="field__input-wrap">
         <input
           type="text"
-          value={picked ? `${picked.displayName} (${picked.sam})` : query}
+          value={picked ? (picked.sam ? `${picked.displayName} (${picked.sam})` : picked.displayName) : query}
           onChange={(ev) => {
             setPicked(null);
             setQuery(ev.target.value);

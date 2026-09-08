@@ -15,14 +15,18 @@ import {
   APPLICATIONS,
 } from '../data/catalogs';
 
+// Accès D365 and Dynaway have their own dedicated step (StepD365Dynaway) right after this one —
+// asking there whether D365/Dynaway is needed, and if so collecting the full detail form, rather
+// than being one checkbox among many here.
+const SYSTEMES_ACCES_HERE = SYSTEMES_ACCES.filter((sys) => sys.nom !== ACCES_D365);
+const APPLICATIONS_HERE = APPLICATIONS.filter((app) => app.nom !== DYNAWAY);
+
 export function Step3Access() {
   const { request, setRequest } = useWizard();
   const a = request.access;
   const apps = request.applications;
-  const dynawaySelected = apps.applications.includes(DYNAWAY);
 
   const toggleSysteme = (id: string) => {
-    if (id === ACCES_D365 && dynawaySelected) return; // locked — see Applications section below
     setRequest((prev) => {
       const set = new Set(prev.access.systemes);
       if (set.has(id)) set.delete(id);
@@ -61,20 +65,7 @@ export function Step3Access() {
       const set = new Set(prev.applications.applications);
       if (set.has(id)) set.delete(id);
       else set.add(id);
-      const nowSelected = set.has(id);
-
-      // Dynaway implicitly requires D365 access — selecting it auto-checks Accès D365 above,
-      // which locks that checkbox while Dynaway stays selected.
-      const accessSystemes = new Set(prev.access.systemes);
-      if (id === DYNAWAY && nowSelected) {
-        accessSystemes.add(ACCES_D365);
-      }
-
-      return {
-        ...prev,
-        applications: { ...prev.applications, applications: Array.from(set) },
-        access: { ...prev.access, systemes: Array.from(accessSystemes) },
-      };
+      return { ...prev, applications: { ...prev.applications, applications: Array.from(set) } };
     });
   };
 
@@ -107,19 +98,13 @@ export function Step3Access() {
       <div className="step-two-col">
         <div className="step-two-col__col">
           <div className="choice-list">
-            {SYSTEMES_ACCES.map((sys) => (
+            {SYSTEMES_ACCES_HERE.map((sys) => (
               <Fragment key={sys.nom}>
                 <ChoiceCard
                   title={sys.nom}
                   description={sys.description}
                   selected={a.systemes.includes(sys.nom)}
                   onToggle={() => toggleSysteme(sys.nom)}
-                  disabled={sys.nom === ACCES_D365 && dynawaySelected}
-                  disabledHint={
-                    sys.nom === ACCES_D365 && dynawaySelected
-                      ? 'Requis automatiquement — Dynaway est sélectionné dans Applications.'
-                      : undefined
-                  }
                 />
                 {sys.nom === ACCES_BADGE && a.systemes.includes(ACCES_BADGE) && (
                   <Field label="Zones ou édifices requis">
@@ -184,7 +169,7 @@ export function Step3Access() {
         <div className="step-two-col__col">
           <SectionTitle icon={<AppsIcon style={{ width: 16, height: 16 }} />}>Applications et licences</SectionTitle>
           <div className="choice-list">
-            {APPLICATIONS.map((app) => (
+            {APPLICATIONS_HERE.map((app) => (
               <ChoiceCard
                 key={app.nom}
                 title={app.nom}

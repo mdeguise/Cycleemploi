@@ -109,6 +109,12 @@ public class SubmitRequestDto
     /// normal form entry; whether it can be READ BACK later is a separate check
     /// (RequestAuthorizationService), not enforced here.</summary>
     public string? CommentairesRH { get; set; }
+
+    /// <summary>Filled in by the wizard's own "D365 et Dynaway" step when SystemesAcces includes
+    /// "Accès D365" — see D365WizardDetailDto and RequestsController.Create's validation. Null for
+    /// Offboarding (that step never runs) and for any Onboarding/Réactivation request that doesn't
+    /// need D365 access at all.</summary>
+    public D365WizardDetailDto? D365Detail { get; set; }
 }
 
 public class MeDto

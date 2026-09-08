@@ -121,9 +121,15 @@ export const APPLICATIONS: ApplicationItem[] = [
  * TryCreateD365AccessApprovalRequestAsync). It's deliberately not listed here too, so there's
  * only one place to request it. */
 
-/** Selecting this application implicitly requires D365 access — see Step3Access, which locks
+/** Selecting this application implicitly requires D365 access — see StepD365Dynaway, which locks
  * ACCES_D365 checked while this stays selected. */
 export const DYNAWAY = 'Dynaway';
+
+/** Shown as a locked line above StepD365Dynaway's "Détails additionnels ou commentaires" whenever
+ * Dynaway is selected — kept outside the editable textarea so the user has no way to erase it;
+ * stitched onto the user's own text only at submit time (see WizardContext.toSubmitDto). Same tag
+ * the standalone D365AccessRequest app locks into its own comments field. */
+export const DYNAWAY_COMMENT_TAG = '(Asset Management) with Dynaway Mobile';
 
 export const OUI_NON = ['Oui', 'Non'];
 

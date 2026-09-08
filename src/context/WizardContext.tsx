@@ -1,6 +1,6 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 import { createEmptyRequest, TYPE_DEMANDE_TERMINAISON, type OnboardingRequest, type TypeDemande } from '../types';
-import { REGLE_DE_PAYE_AUTRE, PAY_GROUP_NON_UNION } from '../data/catalogs';
+import { REGLE_DE_PAYE_AUTRE, PAY_GROUP_NON_UNION, ACCES_D365, DYNAWAY, DYNAWAY_COMMENT_TAG } from '../data/catalogs';
 import { useApi } from '../api/ApiContext';
 import type { RequestTypeApi, SubmitRequestDto } from '../api/types';
 
@@ -15,9 +15,10 @@ export const ONBOARDING_STEPS: StepDescriptor[] = [
   { key: 'employee', numero: 1, titre: 'Employé', sousTitre: "Sélection de l'employé" },
   { key: 'position', numero: 2, titre: 'Poste et département', sousTitre: 'Détails du poste' },
   { key: 'access', numero: 3, titre: 'Accès et comptes', sousTitre: 'Systèmes, accès et applications requis' },
-  { key: 'equipment', numero: 4, titre: 'Équipement', sousTitre: 'Matériel requis' },
-  { key: 'comments', numero: 5, titre: 'Commentaires et suivis', sousTitre: 'RH, TI, stationnement, matériel' },
-  { key: 'review', numero: 6, titre: 'Révision et soumission', sousTitre: 'Vérifier et envoyer' },
+  { key: 'd365', numero: 4, titre: 'D365 et Dynaway', sousTitre: 'Accès Dynamics 365 et gestion des actifs' },
+  { key: 'equipment', numero: 5, titre: 'Équipement', sousTitre: 'Matériel requis' },
+  { key: 'comments', numero: 6, titre: 'Commentaires et suivis', sousTitre: 'RH, TI, stationnement, matériel' },
+  { key: 'review', numero: 7, titre: 'Révision et soumission', sousTitre: 'Vérifier et envoyer' },
 ];
 
 export const OFFBOARDING_STEPS: StepDescriptor[] = [
@@ -43,6 +44,11 @@ function toRequestTypeApi(typeDemande: TypeDemande): RequestTypeApi {
  * to src/api if a second caller ever needs it. */
 function toSubmitDto(request: OnboardingRequest): SubmitRequestDto {
   const isOffboarding = request.typeDemande === TYPE_DEMANDE_TERMINAISON;
+  const needsD365 = !isOffboarding && request.access.systemes.includes(ACCES_D365);
+  const dynawaySelected = !isOffboarding && request.applications.applications.includes(DYNAWAY);
+  const d365Comments = dynawaySelected
+    ? [DYNAWAY_COMMENT_TAG, request.d365.comments.trim()].filter(Boolean).join('\n')
+    : request.d365.comments.trim();
   return {
     requestType: toRequestTypeApi(request.typeDemande),
     employees: isOffboarding
@@ -103,12 +109,27 @@ function toSubmitDto(request: OnboardingRequest): SubmitRequestDto {
     dateRetourTravail: request.offboarding.dateRetourTravail || null,
     preavisRecu: request.offboarding.preavisRecu || null,
     motifNonAdmissibilite: request.offboarding.motifNonAdmissibilite || null,
+    d365Detail: needsD365
+      ? {
+          accessType: request.d365.accessType,
+          jobTitleEnglish: request.d365.jobTitleEnglish.trim(),
+          approvalLimit: Number(request.d365.approvalLimit),
+          levyEmployee: request.d365.levyEmployee,
+          apAccessDetails: request.d365.apAccessDetails.trim() || null,
+          additionalLegalEntities: request.d365.additionalLegalEntities.trim() || null,
+          defaultShippingAddress: request.d365.defaultShippingAddress.trim() || null,
+          comments: d365Comments || null,
+          roles: request.d365.roles,
+          departmentNumber: request.d365.departmentNumber.trim() || null,
+        }
+      : null,
   };
 }
 
 interface WizardContextValue {
   request: OnboardingRequest;
   setRequest: React.Dispatch<React.SetStateAction<OnboardingRequest>>;
+  meEmail: string | null;
   currentStep: number;
   setCurrentStep: (step: number) => void;
   furthestStep: number;
@@ -150,12 +171,28 @@ function validateStep(step: number, request: OnboardingRequest): boolean {
         (e.regleDePaye && (e.regleDePaye !== REGLE_DE_PAYE_AUTRE || Boolean(e.regleDePayeCommentaire)));
       return Boolean(request.typeDemande && e.employee && e.dateEntreePrevue && regleValid);
     }
+    case 3: {
+      // StepD365Dynaway — nothing to require when neither Accès D365 nor Dynaway is selected;
+      // otherwise the same minimum SubmitAdHoc itself requires (see D365AccessApprovalsController).
+      if (!request.access.systemes.includes(ACCES_D365)) return true;
+      const d = request.d365;
+      return Boolean(d.accessType && d.jobTitleEnglish.trim());
+    }
     default:
       return true;
   }
 }
 
-export function WizardProvider({ children, demandePar }: { children: ReactNode; demandePar: string }) {
+export function WizardProvider({
+  children,
+  demandePar,
+  meEmail,
+}: {
+  children: ReactNode;
+  demandePar: string;
+  /** For StepD365Dynaway's approval-limit catalog — see D365AccessApprovalsController.ElevatedApprovalLimitEmails. */
+  meEmail: string | null;
+}) {
   const api = useApi();
   const [request, setRequest] = useState<OnboardingRequest>(() => createEmptyRequest(demandePar));
   const [currentStep, setCurrentStep] = useState(0);
@@ -195,6 +232,7 @@ export function WizardProvider({ children, demandePar }: { children: ReactNode; 
   const value: WizardContextValue = {
     request,
     setRequest,
+    meEmail,
     currentStep,
     setCurrentStep,
     furthestStep,

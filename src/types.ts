@@ -48,6 +48,23 @@ export interface ApplicationsInfo {
   autreLogiciel: string;
 }
 
+/** The wizard's own "D365 et Dynaway" step — same fields the standalone D365AccessRequest app
+ * collects, minus the employee picker (already known from Step1Employee) and NeedsDynaway (that
+ * checkbox lives in ApplicationsInfo.applications, same as it always has — see StepD365Dynaway).
+ * Only sent to the server (as D365Detail) when access.systemes includes ACCES_D365. */
+export interface D365DetailInfo {
+  accessType: string;
+  jobTitleEnglish: string;
+  approvalLimit: string;
+  levyEmployee: boolean;
+  apAccessDetails: string;
+  additionalLegalEntities: string;
+  defaultShippingAddress: string;
+  comments: string;
+  roles: string[];
+  departmentNumber: string;
+}
+
 /** "Commentaires et suivis" for Onboarding/Réactivation — mirrors OffboardingInfo's per-department
  * comment fields (see Step3DepartmentComments.tsx / Step6DepartmentComments.tsx). commentairesRH is
  * confidentiality-gated the same way as offboarding's — see RequestAuthorizationService. */
@@ -91,6 +108,7 @@ export interface OnboardingRequest {
   access: AccessInfo;
   equipment: EquipmentInfo;
   applications: ApplicationsInfo;
+  d365: D365DetailInfo;
   comments: CommentsInfo;
   offboarding: OffboardingInfo;
 }
@@ -124,6 +142,18 @@ export function createEmptyRequest(demandePar: string): OnboardingRequest {
     applications: {
       applications: [],
       autreLogiciel: '',
+    },
+    d365: {
+      accessType: '',
+      jobTitleEnglish: '',
+      approvalLimit: '0',
+      levyEmployee: false,
+      apAccessDetails: '',
+      additionalLegalEntities: '',
+      defaultShippingAddress: '',
+      comments: '',
+      roles: [],
+      departmentNumber: '',
     },
     comments: {
       commentairesRH: '',
