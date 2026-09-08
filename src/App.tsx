@@ -53,6 +53,13 @@ function AdminLayout({ title, me, children }: { title: string; me: MeDto; childr
           <div className="app-header__title">{title}</div>
         </div>
         <div style={{ display: 'flex', gap: 16 }}>
+          <a
+            href="https://m365.cloud.microsoft/m365apps/1c4340de-2a85-40e5-8eb0-4f295368978b?auth=2&home=1&origindomain=microsoft365&client-request-id=6e63936f-b713-4fb2-b714-8212400690b3"
+            target="_blank"
+            rel="noreferrer"
+          >
+            POWERBI
+          </a>
           {me.adminRole && <Link to="/admin/requests">Demandes</Link>}
           <Link to="/admin/d365-roles">Rôles D365 par code d'emploi</Link>
           <Link to="/admin/d365-user-roles">Correction des rôles D365</Link>
