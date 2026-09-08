@@ -67,7 +67,12 @@ public class TicketOrchestrationService : ITicketOrchestrationService
     /// frontend (see Step3Access.tsx), so the D365 access approval it creates below is pre-commented
     /// with why — the approver has no other way to know it came from Dynaway, not a manual request.</summary>
     private const string DynawayApplicationValue = "Dynaway";
-    private const string DynawayCommentDefault = "Pour Dynaway Mobile Access";
+
+    /// <summary>Internal (not private) so D365AccessApprovalsController.SubmitAdHoc can prepend the
+    /// same wording when its own "Besoin de gestion des actifs (Asset Management) avec Dynaway"
+    /// checkbox is ticked — same reasoning as the onboarding wizard's Dynaway checkbox, just a
+    /// second, independent trigger for the same fixed comment.</summary>
+    internal const string DynawayCommentDefault = "Pour Dynaway Mobile Access";
 
     public TicketOrchestrationService(
         AppDbContext db,

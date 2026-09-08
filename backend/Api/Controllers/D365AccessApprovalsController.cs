@@ -443,6 +443,43 @@ public class D365AccessApprovalsController : ControllerBase
         });
     }
 
+    /// <summary>Every distinct Workday Cost_Center currently in use — powers the ad-hoc form's
+    /// "Numéro de département" dropdown, so a requester can pick a department other than the
+    /// employee's own (AdHocPrefill's DepartmentNumber is only the default). Same "distinct,
+    /// non-blank, sorted" shape as any other Workday-derived catalog in this app.</summary>
+    [HttpGet("adhoc/cost-centers")]
+    public async Task<ActionResult<List<string>>> AdHocCostCenters(CancellationToken ct)
+    {
+        var costCenters = await _workday.WorkdayDemographics
+            .Where(w => w.CostCenter != null && w.CostCenter != "")
+            .Select(w => w.CostCenter!)
+            .Distinct()
+            .OrderBy(c => c)
+            .ToListAsync(ct);
+
+        return Ok(costCenters);
+    }
+
+    /// <summary>AD people search for the ad-hoc form's "Nom du gestionnaire" picker — same
+    /// SearchAccounts call as every other "add a user" picker in this app family
+    /// (AppUsersController/D365ApproversController/D365ViewersController's own ad-search actions),
+    /// but open to any authenticated employee rather than admin-gated, matching this controller's
+    /// other adhoc/* actions: submitting a request has never required being a D365Approver, and
+    /// picking who it should route to shouldn't either.</summary>
+    [HttpGet("adhoc/ad-search")]
+    public ActionResult<List<AdAccountDto>> AdHocAdSearch([FromQuery] string q)
+    {
+        if (string.IsNullOrWhiteSpace(q) || q.Trim().Length < 2) return Ok(new List<AdAccountDto>());
+
+        var hits = _ad.SearchAccounts(q.Trim(), 15);
+        return Ok(hits.Select(a => new AdAccountDto
+        {
+            Sam = a.Sam,
+            DisplayName = a.Cn ?? a.Sam,
+            Email = a.Email
+        }).ToList());
+    }
+
     /// <summary>Submits a brand-new, fully-filled-out D365 access request for an employee who never
     /// went through the onboarding/réactivation wizard — see SubmitAdHocD365AccessDto's doc comment.
     /// Creates a minimal Request (RequestType.D365AccessOnly — no OnboardingDetail/AccessDetail/etc,
@@ -488,6 +525,12 @@ public class D365AccessApprovalsController : ControllerBase
             SubmittedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
+        // Both default to the employee's own Workday values (same as before this DTO carried them
+        // at all) but the requester may have picked a different cost center / AD account on the
+        // ad-hoc form — see SubmitAdHocD365AccessDto's doc comments.
+        var managerName = string.IsNullOrWhiteSpace(dto.ManagerName) ? workdayInfo.Manager : dto.ManagerName.Trim();
+        var departmentNumber = string.IsNullOrWhiteSpace(dto.DepartmentNumber) ? workdayInfo.CostCenter : dto.DepartmentNumber.Trim();
+
         request.Employees.Add(new RequestEmployee
         {
             WorkdayEmployeeId = dto.WorkdayEmployeeId,
@@ -496,11 +539,17 @@ public class D365AccessApprovalsController : ControllerBase
             DepartementSnapshot = workdayInfo.JobFamilyGroup,
             CodeEmploiSnapshot = workdayInfo.JobCode,
             TypeEmploiSnapshot = workdayInfo.TimeType != null && workdayInfo.WorkerType != null ? $"{workdayInfo.TimeType} — {workdayInfo.WorkerType}" : workdayInfo.TimeType,
-            GestionnaireSnapshot = workdayInfo.Manager,
+            GestionnaireSnapshot = managerName,
             IsPrimary = true
         });
         _db.Requests.Add(request);
         await _db.SaveChangesAsync(ct);
+
+        var comments = string.IsNullOrWhiteSpace(dto.Comments) ? null : dto.Comments.Trim();
+        if (dto.NeedsDynaway)
+        {
+            comments = comments is null ? TicketOrchestrationService.DynawayCommentDefault : $"{TicketOrchestrationService.DynawayCommentDefault}\n{comments}";
+        }
 
         var approval = new D365AccessApproval
         {
@@ -510,13 +559,13 @@ public class D365AccessApprovalsController : ControllerBase
             AccessType = dto.AccessType,
             JobTitleEnglish = dto.JobTitleEnglish.Trim(),
             LegalEntity = FixedLegalEntity,
-            DepartmentNumber = workdayInfo.CostCenter,
+            DepartmentNumber = departmentNumber,
             ApprovalLimit = dto.ApprovalLimit,
             LevyEmployee = dto.LevyEmployee,
             ApAccessDetails = string.IsNullOrWhiteSpace(dto.ApAccessDetails) ? null : dto.ApAccessDetails.Trim(),
             AdditionalLegalEntities = string.IsNullOrWhiteSpace(dto.AdditionalLegalEntities) ? null : dto.AdditionalLegalEntities.Trim(),
             DefaultShippingAddress = string.IsNullOrWhiteSpace(dto.DefaultShippingAddress) ? null : dto.DefaultShippingAddress.Trim(),
-            Comments = string.IsNullOrWhiteSpace(dto.Comments) ? null : dto.Comments.Trim(),
+            Comments = comments,
             CreatedAt = DateTime.UtcNow
         };
         foreach (var role in dto.Roles.Distinct())

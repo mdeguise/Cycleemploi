@@ -192,8 +192,9 @@ public class D365AdHocPrefillDto
     /// <summary>Fixed at "6201" for every request — shown for transparency, never an editable input.</summary>
     public string LegalEntity { get; set; } = null!;
 
-    /// <summary>The employee's Workday Cost_Center, verbatim — shown for transparency, never an
-    /// editable input.</summary>
+    /// <summary>The employee's Workday Cost_Center — the requester's starting point, but they may
+    /// pick a different one from AdHocCostCenters (e.g. requesting D365 access scoped to a
+    /// different department than the employee's own).</summary>
     public string? DepartmentNumber { get; set; }
 
     /// <summary>"{Job_Profile} - {Position_Title}" starting point for Job Title (English) — see
@@ -229,6 +230,21 @@ public class SubmitAdHocD365AccessDto
     public string? DefaultShippingAddress { get; set; }
     public string? Comments { get; set; }
     public List<string> Roles { get; set; } = [];
+
+    /// <summary>Defaults to the employee's own Workday Cost_Center (see AdHocPrefill) when left
+    /// blank — the requester picks from AdHocCostCenters (a dropdown of every distinct Cost_Center
+    /// in Workday) only to override it.</summary>
+    public string? DepartmentNumber { get; set; }
+
+    /// <summary>Defaults to the employee's own Workday Manager when left blank — the requester
+    /// picks a real AD account (AdHocAdSearch) only to override it, e.g. when the approval should
+    /// route to someone other than the employee's literal Workday manager.</summary>
+    public string? ManagerName { get; set; }
+
+    /// <summary>"Besoin de gestion des actifs (Asset Management) avec Dynaway" checkbox — when
+    /// true, TicketOrchestrationService.DynawayCommentDefault is prepended to Comments, same fixed
+    /// wording the onboarding wizard's own Dynaway checkbox produces.</summary>
+    public bool NeedsDynaway { get; set; }
 }
 
 public class SubmitAdHocD365AccessResultDto
