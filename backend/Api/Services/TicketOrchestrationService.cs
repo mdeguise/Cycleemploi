@@ -102,6 +102,125 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         await TryCreateD365BadgeTicketAsync(request, freshdeskTicketId, ct);
         await TryCreateTdxTicketAsync(request, requester, ct);
         await TryCreateD365AccessApprovalRequestAsync(request, ct);
+        await TrySendRequesterConfirmationEmailAsync(request, ct);
+    }
+
+    /// <summary>Confirms to the person who submitted the request that it went through, with every
+    /// field they entered — unlike every other email in this file, the recipient here is the
+    /// requester themselves, not IT or a D365 approver. Best-effort like the ticket integrations:
+    /// a failure here must never surface to the requester as a failed submission, since the
+    /// request itself is already committed by the time this runs. Deliberately excludes the
+    /// confidential RH comment (OnboardingConfidentialComment/ConfidentialComment) — that field is
+    /// kept out of the general request shape everywhere else in this codebase for the same reason.</summary>
+    private async Task TrySendRequesterConfirmationEmailAsync(Request request, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.RequesterEmail)) return;
+        if (request.RequestType == RequestType.D365AccessOnly) return;
+
+        try
+        {
+            var subject = $"[Cycle Emploi] Confirmation de soumission — demande #{request.RequestNumber}";
+            var body = BuildRequesterConfirmationBody(request);
+            await _email.SendAsync(subject, body, [request.RequesterEmail], ct);
+        }
+        catch (Exception emailEx)
+        {
+            _logger.LogError(emailEx, "Failed to send the requester confirmation email for request {RequestNumber}", request.RequestNumber);
+        }
+    }
+
+    private static string BuildRequesterConfirmationBody(Request request)
+    {
+        var isOffboarding = request.RequestType == RequestType.Offboarding;
+        var lines = new List<string>
+        {
+            $"Votre demande #{request.RequestNumber} ({request.RequestType.ToFrenchLabel()}) a bien été soumise.",
+            $"Demandé par : {request.CreatedByDisplayName}",
+            ""
+        };
+
+        lines.Add("== Employé(s) ==");
+        foreach (var employee in request.Employees)
+        {
+            lines.Add($"Nom : {employee.NameSnapshot}");
+            AddIfPresent(lines, "Poste", employee.PositionSnapshot);
+            AddIfPresent(lines, "Département", employee.DepartementSnapshot);
+            AddIfPresent(lines, "Gestionnaire", employee.GestionnaireSnapshot);
+            AddIfPresent(lines, "Type d'emploi", employee.TypeEmploiSnapshot);
+            lines.Add("");
+        }
+
+        if (isOffboarding)
+        {
+            var d = request.OffboardingDetail;
+            lines.Add("== Détails ==");
+            AddIfPresent(lines, "Dernière journée", d?.DerniereJournee?.ToString("yyyy-MM-dd"));
+            AddIfPresent(lines, "Indemnité de vacances", d?.IndemniteVacances);
+            AddIfPresent(lines, "Raison de l'arrêt", d?.RaisonArret);
+            AddIfPresent(lines, "Détails sur la raison", d?.DetailsRaison);
+            AddIfPresent(lines, "Réembaucheriez-vous", d?.Reembaucheriez);
+            AddIfPresent(lines, "Motif de non-admissibilité", d?.MotifNonAdmissibilite);
+            AddIfPresent(lines, "Date de retour connue", d?.DateRetourConnue);
+            AddIfPresent(lines, "Date de retour au travail", d?.DateRetourTravail?.ToString("yyyy-MM-dd"));
+            AddIfPresent(lines, "Préavis reçu", d?.PreavisRecu);
+            lines.Add("");
+
+            lines.Add("== Commentaires ==");
+            AddIfPresent(lines, "Technologies de l'information", d?.CommentairesIT);
+            AddIfPresent(lines, "Stationnement", d?.CommentairesStationnement);
+            AddIfPresent(lines, "Carte ou puce d'accès", d?.CommentairesPuceAcces);
+            AddIfPresent(lines, "Uniformes et matériel à fournir", d?.CommentairesRedingote);
+        }
+        else
+        {
+            var d = request.OnboardingDetail;
+            lines.Add("== Détails ==");
+            AddIfPresent(lines, "Date d'entrée prévue", d?.DateEntreePrevue?.ToString("yyyy-MM-dd"));
+            AddIfPresent(lines, "Règle de paye", d?.RegleDePaye);
+            AddIfPresent(lines, "Commentaire règle de paye", d?.RegleDePayeCommentaire);
+            lines.Add("");
+
+            var a = request.AccessDetail;
+            lines.Add("== Accès et comptes ==");
+            AddIfPresent(lines, "Systèmes", JoinOrNull(a?.Systemes.Select(s => s.Value)));
+            AddIfPresent(lines, "Zones ou édifices requis (badge)", a?.BadgeZones);
+            AddIfPresent(lines, "Système POS et hébergement", JoinOrNull(a?.PosHebergement.Select(p => p.Value)));
+            AddIfPresent(lines, "Stationnement requis", a?.Stationnement);
+            AddIfPresent(lines, "Justification", a?.Justification);
+            AddIfPresent(lines, "Précisions - code d'alarme", a?.CodeAlarmeDetails);
+            lines.Add("");
+
+            var eq = request.EquipmentDetail;
+            lines.Add("== Équipement ==");
+            AddIfPresent(lines, "Équipement", JoinOrNull(eq?.Equipements.Select(x => x.Value)));
+            AddIfPresent(lines, "Notes", eq?.Notes);
+            lines.Add("");
+
+            var app = request.ApplicationsDetail;
+            lines.Add("== Applications ==");
+            AddIfPresent(lines, "Applications", JoinOrNull(app?.Applications.Select(x => x.Value)));
+            AddIfPresent(lines, "Autre logiciel requis", app?.AutreLogiciel);
+            lines.Add("");
+
+            lines.Add("== Commentaires ==");
+            AddIfPresent(lines, "Technologies de l'information", d?.CommentairesIT);
+            AddIfPresent(lines, "Stationnement", d?.CommentairesStationnement);
+            AddIfPresent(lines, "Carte ou puce d'accès", d?.CommentairesPuceAcces);
+            AddIfPresent(lines, "Uniformes et matériel à fournir", d?.CommentairesRedingote);
+        }
+
+        return string.Join("\n", lines);
+    }
+
+    private static void AddIfPresent(List<string> lines, string label, string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value)) lines.Add($"{label} : {value}");
+    }
+
+    private static string? JoinOrNull(IEnumerable<string>? values)
+    {
+        var list = values?.ToList();
+        return list is null || list.Count == 0 ? null : string.Join(", ", list);
     }
 
 
