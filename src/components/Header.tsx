@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { useApi } from '../api/ApiContext';
 import { useWizard } from '../context/WizardContext';
-import { AppsIcon, CalendarIcon, UserIcon } from './icons';
+import { CalendarIcon, UserIcon } from './icons';
 import { formatDateFr } from '../utils/formatDate';
 import tremblantLogo from '../assets/logo-tremblant.png';
 import { TYPE_DEMANDE_TERMINAISON } from '../types';
@@ -28,16 +28,6 @@ export function Header() {
       </div>
 
       <div className="app-header__meta">
-        <a
-          href="https://m365.cloud.microsoft/m365apps/1c4340de-2a85-40e5-8eb0-4f295368978b?auth=2&home=1&origindomain=microsoft365&client-request-id=6e63936f-b713-4fb2-b714-8212400690b3"
-          target="_blank"
-          rel="noreferrer"
-          className="btn btn-secondary"
-          style={{ whiteSpace: 'nowrap', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}
-        >
-          <AppsIcon style={{ width: 14, height: 14 }} />
-          POWERBI
-        </a>
         <div className="meta-block">
           <CalendarIcon className="meta-block__icon" />
           <div>
