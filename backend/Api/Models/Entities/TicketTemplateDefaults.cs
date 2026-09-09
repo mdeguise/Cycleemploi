@@ -407,7 +407,7 @@ public static class TicketTemplateDefaults
         new(
             TicketTemplateKeys.TdxDescriptionOnboarding,
             "TDX — Description du billet, équipe IT Operations (Intégration / Réactivation)",
-            "Description (texte simple, non HTML) du billet TDX \"Quick Incident\" (application OneIT, groupe T - IT Operations) pour une intégration ou une réactivation.",
+            "Description (HTML — <b>, <br>, <h4> sont rendus) du billet TDX \"Quick Incident\" (application OneIT, groupe T - IT Operations) pour une intégration ou une réactivation.",
             TicketTemplateShape.Inline,
             TdxDescriptionRequestFields,
             AllowsEmployeeFields: true,
@@ -416,7 +416,7 @@ public static class TicketTemplateDefaults
         new(
             TicketTemplateKeys.TdxDescriptionOffboarding,
             "TDX — Description du billet, équipe IT Operations (Terminaison)",
-            "Description (texte simple, non HTML) du billet TDX \"Quick Incident\" (application OneIT, groupe T - IT Operations) pour un avis de terminaison ou mise à pied.",
+            "Description (HTML — <b>, <br>, <h4> sont rendus) du billet TDX \"Quick Incident\" (application OneIT, groupe T - IT Operations) pour un avis de terminaison ou mise à pied.",
             TicketTemplateShape.Inline,
             TdxDescriptionRequestFields,
             AllowsEmployeeFields: true,

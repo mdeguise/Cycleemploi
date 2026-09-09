@@ -107,6 +107,10 @@ public class TdxService : ITdxService
             FormID = _options.FormId,
             Title = title,
             Description = description,
+            // The onboarding/réactivation/termination description template now carries real HTML
+            // (<b>/<br>/<h4>, same approach as the D365 Access ticket's table below) instead of the
+            // plain-text "\n" it used to — this tells TDX to render it, not escape it.
+            IsRichHtml = true,
             RequestorName = requesterName,
             RequestorEmail = requesterEmail,
             RequestorUid = requesterUid,
