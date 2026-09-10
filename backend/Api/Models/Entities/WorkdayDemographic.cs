@@ -49,7 +49,13 @@ public class WorkdayDemographic
     public string? EmploymentStatus { get; set; }
 
     public string? TerminationReason { get; set; }
-    public DateTime? TerminationDate { get; set; }
+
+    /// <summary>Confirmed against real data as nvarchar, NOT a native date column (unlike HireDate/
+    /// SeniorityDate) — modelling it as DateTime? never threw for an active employee (the column is
+    /// always null for them), but reading a real Terminated row's non-null string value throws
+    /// InvalidCastException the moment the entity is materialized. Same class of bug as PrimaryJob
+    /// above, just only exposed once Réactivation search started returning Terminated employees.</summary>
+    public string? TerminationDate { get; set; }
     public string? WorkEmail { get; set; }
     public string? Email { get; set; }
 
