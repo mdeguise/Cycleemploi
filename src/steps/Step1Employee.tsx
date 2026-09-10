@@ -165,7 +165,7 @@ export function Step1Employee() {
         </Field>
       </div>
 
-      {!isTermination && (
+      {!isTermination && !isReactivation && (
         <div className="workday-notice">
           <InfoIcon className="workday-notice__icon" />
           <ul>
@@ -177,6 +177,18 @@ export function Step1Employee() {
             <li>
               Si l'employé n'apparaît pas dans la liste déroulante, veuillez contacter votre partenaire d'affaires RH
               afin de faire activer le dossier de l'employé dans Workday.
+            </li>
+          </ul>
+        </div>
+      )}
+
+      {isReactivation && (
+        <div className="workday-notice">
+          <InfoIcon className="workday-notice__icon" />
+          <ul>
+            <li>
+              Les employés dont le dossier Workday indique une fin d'emploi (terminaison ou mise à pied) apparaîtront
+              également dans la liste ci-dessous, en plus des employés actifs.
             </li>
           </ul>
         </div>
