@@ -31,13 +31,14 @@ function toSnapshot(e: EmployeeDto): EmployeeSnapshot {
 }
 
 /** Live search against /api/employees/search (WorkdayDemographic), debounced. Shared by both the
- * onboarding single-select and offboarding multi-select branches below. */
-function useEmployeeSearch(query: string) {
+ * onboarding single-select and offboarding multi-select branches below. Réactivation searches for
+ * people who have already left, so it's the one caller that must include Terminated employees. */
+function useEmployeeSearch(query: string, includeTerminated: boolean) {
   const api = useApi();
   const debounced = useDebouncedValue(query.trim(), 300);
   return useQuery({
-    queryKey: ['employees', 'search', debounced],
-    queryFn: () => api.employees.search(debounced),
+    queryKey: ['employees', 'search', debounced, includeTerminated],
+    queryFn: () => api.employees.search(debounced, includeTerminated),
     enabled: debounced.length >= 2,
   });
 }
@@ -46,9 +47,10 @@ export function Step1Employee() {
   const { request, setRequest, setTypeDemande } = useWizard();
   const e = request.employee;
   const isTermination = request.typeDemande === TYPE_DEMANDE_TERMINAISON;
+  const isReactivation = request.typeDemande === 'Réactivation';
   const [query, setQuery] = useState('');
 
-  const { data: results = [], isFetching } = useEmployeeSearch(query);
+  const { data: results = [], isFetching } = useEmployeeSearch(query, isReactivation);
 
   const selectedIds = new Set(request.offboarding.employees.map((emp) => emp.workdayEmployeeId));
   const filteredResults = isTermination ? results.filter((r) => !selectedIds.has(r.employeeId)) : results;

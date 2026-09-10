@@ -27,7 +27,6 @@ import { TicketTemplatesAdminPage } from './admin/TicketTemplatesAdminPage';
 import { AppUsersAdminPage } from './admin/AppUsersAdminPage';
 import { RequestsAdminPage } from './admin/RequestsAdminPage';
 import { D365ApproversAdminPage } from './admin/D365ApproversAdminPage';
-import { D365PositionTitleAssignmentsPage } from './admin/D365PositionTitleAssignmentsPage';
 import { D365ApprovalsListPage } from './admin/D365ApprovalsListPage';
 import { D365ApprovalFormPage } from './admin/D365ApprovalFormPage';
 import type { MeDto } from './api/types';
@@ -73,9 +72,6 @@ function AdminLayout({ title, me, children }: { title: string; me: MeDto; childr
               <Link to="/admin/app-users">Administrateurs</Link>
             </>
           )}
-          {(me.isTicketTemplateAdmin || me.isD365Approver) && (
-            <Link to="/admin/d365-position-titles">Titres de poste</Link>
-          )}
           <Link to="/">Retour à l'application</Link>
         </div>
       </header>
@@ -99,19 +95,6 @@ function AdminSectionGuard({ me, children }: { me: MeDto; children: ReactNode })
 
 function TicketTemplateAdminGuard({ me, children }: { me: MeDto; children: ReactNode }) {
   if (!me.isTicketTemplateAdmin) {
-    return (
-      <div className="step-panel">
-        <div className="big-notice">Vous n'avez pas accès à cette section.</div>
-      </div>
-    );
-  }
-  return <>{children}</>;
-}
-
-/// Admin (full control) OR any D365Approver (self-service — see D365PositionTitleAssignmentsPage).
-/// Personnel TI (D365Viewer without D365Approver) stays out, same as Approbateurs D365 itself.
-function PositionTitlesGuard({ me, children }: { me: MeDto; children: ReactNode }) {
-  if (!me.isTicketTemplateAdmin && !me.isD365Approver) {
     return (
       <div className="step-panel">
         <div className="big-notice">Vous n'avez pas accès à cette section.</div>
@@ -237,16 +220,6 @@ function AuthenticatedApp() {
               <TicketTemplateAdminGuard me={me}>
                 <D365ApproversAdminPage />
               </TicketTemplateAdminGuard>
-            </AdminLayout>
-          }
-        />
-        <Route
-          path="/admin/d365-position-titles"
-          element={
-            <AdminLayout title="Administration — Titres de poste" me={me}>
-              <PositionTitlesGuard me={me}>
-                <D365PositionTitleAssignmentsPage me={me} />
-              </PositionTitlesGuard>
             </AdminLayout>
           }
         />

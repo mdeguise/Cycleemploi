@@ -7,15 +7,15 @@ using TremblantLifecycle.Api.Services;
 
 namespace TremblantLifecycle.Api.Controllers;
 
-/// <summary>Manages the D365Approvers table — who gets emailed to fill out a D365 access-approval
-/// form, and whether they're global or scoped to a specific Workday Position_Title.
+/// <summary>Manages the D365Approvers table — who may act at each of the three fixed
+/// D365ApprovalRoles stages (Dynaway / Stage1 / Stage2).
 ///
-/// Two tiers of access, not one: an AppUsers Admin may manage ANYONE's row for ANY title (full
+/// Two tiers of access, not one: an AppUsers Admin may manage ANYONE's row for ANY role (full
 /// control, including AD search — same as before). An existing D365Approver who is NOT an Admin
 /// may additionally VIEW this table and add/remove ONLY a row for their OWN account — this is how
-/// an approver claims responsibility for a Position_Title themselves, without needing an admin to
-/// do it for them. A D365Approver does not need to be an AppUsers Admin, and an AppUsers Admin
-/// does not automatically become a D365 approver — those stay separate tables.</summary>
+/// an approver claims a role themselves, without needing an admin to do it for them. A
+/// D365Approver does not need to be an AppUsers Admin, and an AppUsers Admin does not automatically
+/// become a D365 approver — those stay separate tables.</summary>
 [ApiController]
 [Route("api/d365-approvers")]
 [Authorize]
@@ -24,14 +24,12 @@ public class D365ApproversController : ControllerBase
     private readonly ID365ApproverService _approvers;
     private readonly IAppUserService _appUsers;
     private readonly IAdDirectoryService _ad;
-    private readonly WorkdayContext _workday;
 
-    public D365ApproversController(ID365ApproverService approvers, IAppUserService appUsers, IAdDirectoryService ad, WorkdayContext workday)
+    public D365ApproversController(ID365ApproverService approvers, IAppUserService appUsers, IAdDirectoryService ad)
     {
         _approvers = approvers;
         _appUsers = appUsers;
         _ad = ad;
-        _workday = workday;
     }
 
     private Task<bool> IsCallerAdminAsync(CancellationToken ct) =>
@@ -48,7 +46,7 @@ public class D365ApproversController : ControllerBase
         Sam = a.Sam,
         DisplayName = a.DisplayName,
         Email = a.Email,
-        PositionTitle = a.PositionTitle,
+        ApprovalRole = a.ApprovalRole,
         CreatedAt = a.CreatedAt,
         CreatedByDisplayName = a.CreatedByDisplayName
     };
@@ -78,45 +76,14 @@ public class D365ApproversController : ControllerBase
         }).ToList());
     }
 
-    /// <summary>Every distinct Workday Position_Title currently in use (active/inactive-but-not-
-    /// terminated employees, primary job only — same filter as EmployeesController's search) —
-    /// the master list the "assign an approver per position title" screen walks through. NOT the
-    /// same as D365Approver.PositionTitle values already assigned; a title can appear here with
-    /// zero approvers scoped to it, which is exactly what that screen needs to show as a gap.
-    /// Each title carries the JobCode(s) currently filed under it, shown for reference only — the
-    /// approver-matching itself still keys on PositionTitle alone.</summary>
-    [HttpGet("position-titles")]
-    public async Task<ActionResult<List<D365PositionTitleDto>>> PositionTitles(CancellationToken ct)
-    {
-        if (!await CanViewAsync(ct)) return Forbid();
-
-        var rows = await _workday.WorkdayDemographics.AsNoTracking()
-            .Where(w => w.PrimaryJob == true && w.EmploymentStatus != "Terminated" && w.PositionTitle != null && w.PositionTitle != "")
-            .Select(w => new { w.PositionTitle, w.JobCode })
-            .Distinct()
-            .ToListAsync(ct);
-
-        var titles = rows
-            .GroupBy(r => r.PositionTitle!)
-            .Select(g => new D365PositionTitleDto
-            {
-                PositionTitle = g.Key,
-                JobCodes = g.Select(r => r.JobCode)
-                    .Where(c => !string.IsNullOrWhiteSpace(c))
-                    .Select(c => c!)
-                    .Distinct()
-                    .OrderBy(c => c)
-                    .ToList()
-            })
-            .OrderBy(t => t.PositionTitle)
-            .ToList();
-
-        return Ok(titles);
-    }
-
     [HttpPost]
     public async Task<ActionResult<D365ApproverDto>> Add(CreateD365ApproverDto dto, CancellationToken ct)
     {
+        if (!Models.Entities.D365ApprovalRoles.IsValid(dto.ApprovalRole))
+        {
+            return BadRequest($"Rôle inconnu : {dto.ApprovalRole}. Valeurs permises : {string.Join(", ", Models.Entities.D365ApprovalRoles.All)}.");
+        }
+
         var isAdmin = await IsCallerAdminAsync(ct);
         string sam, displayName;
         string? email;
@@ -135,7 +102,7 @@ public class D365ApproversController : ControllerBase
         {
             // Self-service: a non-admin D365Approver may only ever add a row for THEMSELVES — the
             // identity is resolved from their own Windows/AD session, never trusted from the
-            // request body, so there is no way to claim a title under someone else's name.
+            // request body, so there is no way to claim a role under someone else's name.
             if (!await _approvers.HasAnyAccessAsync(User.GetObjectId(), ct)) return Forbid();
 
             var callerSam = User.GetSamAccountName();
@@ -146,7 +113,7 @@ public class D365ApproversController : ControllerBase
         }
 
         var addedBy = _ad.GetUserInfo(User.GetSamAccountName()).DisplayName ?? User.GetObjectId();
-        var approver = await _approvers.AddAsync(sam, displayName, email, dto.PositionTitle, addedBy, ct);
+        var approver = await _approvers.AddAsync(sam, displayName, email, dto.ApprovalRole, addedBy, ct);
 
         return Ok(ToDto(approver));
     }

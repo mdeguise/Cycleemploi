@@ -7,8 +7,8 @@ public class D365ApproverDto
     public string DisplayName { get; set; } = null!;
     public string? Email { get; set; }
 
-    /// <summary>Null = global approver (any request).</summary>
-    public string? PositionTitle { get; set; }
+    /// <summary>One of D365ApprovalRoles.All — see D365Approver.ApprovalRole.</summary>
+    public string ApprovalRole { get; set; } = null!;
 
     public DateTime CreatedAt { get; set; }
     public string? CreatedByDisplayName { get; set; }
@@ -19,17 +19,7 @@ public class CreateD365ApproverDto
     public string Sam { get; set; } = null!;
     public string DisplayName { get; set; } = null!;
     public string? Email { get; set; }
-    public string? PositionTitle { get; set; }
-}
-
-/// <summary>One row of the "Titres de poste" screen's master list — a distinct Workday
-/// Position_Title plus every JobCode currently filed under it (a title can be shared by more
-/// than one JobCode). JobCodes are informational only — approver routing matches on
-/// PositionTitle alone, never JobCode.</summary>
-public class D365PositionTitleDto
-{
-    public string PositionTitle { get; set; } = null!;
-    public List<string> JobCodes { get; set; } = new();
+    public string ApprovalRole { get; set; } = null!;
 }
 
 /// <summary>"IT Personnel" — sees the tracking list and every request's status, never the Envoyer
@@ -72,16 +62,26 @@ public class D365AccessApprovalSummaryDto
     public string RequesterName { get; set; } = null!;
     public DateOnly? StartDate { get; set; }
 
-    /// <summary>"Pending", "Completed" or "Cancelled" — see D365ApprovalStatus. Completed doesn't
-    /// imply the TDX ticket itself succeeded; TicketNumber/TicketState reflect that separately.</summary>
+    /// <summary>"Pending", "Stage1Approved", "Completed", "Cancelled" or "Rejected" — see
+    /// D365ApprovalStatus. Completed doesn't imply the TDX ticket itself succeeded; TicketNumber/
+    /// TicketState reflect that separately.</summary>
     public string Status { get; set; } = null!;
 
+    /// <summary>True when this request needs Dynaway (single-stage, Dynaway-role approver only) —
+    /// false means the normal Stage1-then-Stage2 chain applies.</summary>
+    public bool IsDynawayPath { get; set; }
+
     public DateTime CreatedAt { get; set; }
+    public string? Stage1ApprovedByDisplayName { get; set; }
+    public DateTime? Stage1ApprovedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
     public string? CompletedByDisplayName { get; set; }
     public DateTime? CancelledAt { get; set; }
     public string? CancelledByDisplayName { get; set; }
     public string? CancelReason { get; set; }
+    public DateTime? RejectedAt { get; set; }
+    public string? RejectedByDisplayName { get; set; }
+    public string? RejectReason { get; set; }
 
     public string? TicketNumber { get; set; }
     public string? TicketState { get; set; }
@@ -98,16 +98,36 @@ public class D365AccessApprovalDetailDto
     public string? CancelledByDisplayName { get; set; }
     public DateTime? CancelledAt { get; set; }
     public string? CancelReason { get; set; }
+    public string? Stage1ApprovedByDisplayName { get; set; }
+    public DateTime? Stage1ApprovedAt { get; set; }
+    public string? RejectedByDisplayName { get; set; }
+    public DateTime? RejectedAt { get; set; }
+    public string? RejectReason { get; set; }
 
-    /// <summary>False for a viewer who can see this (an Administration Admin, for oversight) but is
-    /// not a matched D365Approver — the Envoyer action stays gated to whoever the email actually
-    /// went to.</summary>
+    /// <summary>True when this request needs Dynaway — single-stage, only the Dynaway-role
+    /// approver acts (via CanComplete). False means the normal Stage1 (CanComplete) then Stage2
+    /// (CanConfirmStage2) chain applies.</summary>
+    public bool IsDynawayPath { get; set; }
+
+    /// <summary>True for the Dynaway approver on a Dynaway request, or the Stage1 approver on any
+    /// other request, while Status is Pending — fills out the form and either completes or rejects
+    /// it. False for a viewer who can see this (an Administration Admin, for oversight) but isn't
+    /// the right approver for the current stage.</summary>
     public bool CanComplete { get; set; }
 
-    /// <summary>Same matched-approver rule as CanComplete, but ALSO true for an AppUsers Admin even
-    /// when they aren't a matched approver — a safety net so a Pending request nobody is matched to
-    /// (no scoped approver, no global approver) isn't permanently stuck with no one able to cancel
-    /// it. Only ever true while Status is Pending.</summary>
+    /// <summary>True for the Stage2 approver while Status is Stage1Approved — reviews what Stage1
+    /// entered (read-only) and either confirms (creating the TDX ticket) or rejects. Never true on
+    /// the Dynaway path (single-stage, no Stage2).</summary>
+    public bool CanConfirmStage2 { get; set; }
+
+    /// <summary>True for whichever approver is authorized at the CURRENT stage (Dynaway/Stage1
+    /// while Pending, Stage2 while Stage1Approved) — declines the request outright, with a reason.</summary>
+    public bool CanReject { get; set; }
+
+    /// <summary>Same matched-approver rule as CanComplete/CanConfirmStage2 for the current stage,
+    /// but ALSO true for an AppUsers Admin even when they aren't a matched approver — a safety net
+    /// so a request nobody is matched to act on isn't permanently stuck with no one able to cancel
+    /// it. Only ever true while Status is Pending or Stage1Approved.</summary>
     public bool CanCancel { get; set; }
 
     // ---- Prepopulated, read-only ----
@@ -173,6 +193,14 @@ public class CancelD365AccessApprovalDto
     /// <summary>Optional — shown alongside the cancellation in the Complétées/Annulées list, purely
     /// for context; nothing downstream depends on it.</summary>
     public string? Reason { get; set; }
+}
+
+/// <summary>A Stage1 or Stage2 approver actively declining the request — see
+/// D365ApprovalStatus.Rejected. Unlike Cancel's optional reason, this one is required: the
+/// requester is notified why, so a blank reason would be a dead-end email.</summary>
+public class RejectD365AccessApprovalDto
+{
+    public string Reason { get; set; } = null!;
 }
 
 /// <summary>Everything the standalone D365AccessRequest app needs to prefill its form once a D365

@@ -29,10 +29,22 @@ public interface ITicketOrchestrationService
     /// submits the form.</summary>
     Task<TicketRetryResult> CreateD365AccessTicketAsync(Request request, D365AccessApproval approval, CancellationToken ct);
 
-    /// <summary>Emails the matched D365Approvers (or IT, if none match) that a fully-filled-out
-    /// ad-hoc D365 access request is ready for their review — called by
-    /// D365AccessApprovalsController.SubmitAdHoc right after it creates the Pending approval.</summary>
-    Task NotifyD365ApproversOfAdHocRequestAsync(Request request, D365AccessApproval approval, string? positionTitle, CancellationToken ct);
+    /// <summary>Emails the D365Approvers holding <paramref name="role"/> (or IT, if none are
+    /// configured) that a fully-filled-out ad-hoc D365 access request is ready for their review —
+    /// called by D365AccessApprovalsController.SubmitAdHoc right after it creates the Pending
+    /// approval. role is D365ApprovalRoles.Dynaway or .Stage1 depending on the request's own
+    /// Dynaway checkbox — SubmitAdHoc never reaches Stage2 directly.</summary>
+    Task NotifyD365ApproversOfAdHocRequestAsync(Request request, D365AccessApproval approval, string role, CancellationToken ct);
+
+    /// <summary>Emails the D365ApprovalRoles.Stage2 approvers once Stage1 has completed the form —
+    /// called by D365AccessApprovalsController.Complete right after it advances a non-Dynaway
+    /// approval to Stage1Approved. No TDX call happens here; ConfirmStage2 is the actual gate.</summary>
+    Task NotifyD365Stage2ApproversAsync(Request request, D365AccessApproval approval, CancellationToken ct);
+
+    /// <summary>Tells the original requester why a Stage1 or Stage2 approver declined their D365
+    /// request — called by D365AccessApprovalsController.Reject right after it marks the approval
+    /// Rejected.</summary>
+    Task NotifyRequesterOfD365RejectionAsync(Request request, D365AccessApproval approval, CancellationToken ct);
 }
 
 /// <summary>All the downstream ticket-system integrations, extracted out of RequestsController so
@@ -740,20 +752,35 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         }
     }
 
+    /// <summary>The link into the standalone D365Approvals app (its own route is "/approvals/{id}",
+    /// not Cycle Emploi's embedded "/admin/d365-approvals/{id}") — approvers use that app directly
+    /// and don't need Cycle Emploi Administration access at all, so no email should send them
+    /// somewhere that implies they do.</summary>
+    private string ApprovalLink(int requestId) =>
+        string.IsNullOrWhiteSpace(_appOptions.BaseUrl)
+            ? $"/approvals/{requestId}"
+            : $"{_appOptions.BaseUrl.TrimEnd('/')}/approvals/{requestId}";
+
+    private static readonly Dictionary<string, string> RoleFrenchLabels = new()
+    {
+        [D365ApprovalRoles.Dynaway] = "Dynaway",
+        [D365ApprovalRoles.Stage1] = "première étape",
+        [D365ApprovalRoles.Stage2] = "deuxième étape",
+    };
+
     /// <summary>Creates the D365AccessApproval "pending" row when "Accès D365" was selected —
     /// Onboarding/Réactivation only, for the primary employee, same gating pattern as the
     /// badge/alarm D365 integration. Replaces the old design (an admin pre-fills a per-job-code
     /// template before anyone needs it — in practice that table shipped and stayed completely
-    /// empty). A matched D365Approver is emailed a link to review the request; no TDX call happens
-    /// here at all, only once they complete it — see CreateD365AccessTicketAsync and
-    /// D365AccessApprovalsController.Complete.
+    /// empty). The routing is now purely Dynaway-checkbox-driven (see D365ApprovalRoles) rather
+    /// than Workday-Position_Title-based: a Dynaway request goes to the sole Dynaway-role approver
+    /// (single stage); every other request starts at Stage1. No TDX call happens here at all —
+    /// see CreateD365AccessTicketAsync and D365AccessApprovalsController.Complete/ConfirmStage2.
     ///
     /// d365Detail carries the wizard's own "D365 et Dynaway" step fields (access type, roles,
     /// approval limit, etc. — see RequestsController.Create's validation, which requires it
-    /// whenever "Accès D365" is selected). When present, the approval is created already fully
-    /// filled out — same shape SubmitAdHoc produces for the standalone D365AccessRequest app — so
-    /// the matched approver's job is to review and press "Envoyer", not fill in blanks. Null is
-    /// only a defensive fallback (old clients, if any ever call this without the step).</summary>
+    /// whenever "Accès D365" is selected, so this is never actually null in practice — the
+    /// wizard-driven and ad-hoc-app paths both always arrive here already fully filled out).</summary>
     private async Task TryCreateD365AccessApprovalRequestAsync(Request request, D365WizardDetailDto? d365Detail, CancellationToken ct)
     {
         if (request.RequestType == RequestType.Offboarding) return;
@@ -775,7 +802,6 @@ public class TicketOrchestrationService : ITicketOrchestrationService
             .Where(w => w.EmployeeId == employee.WorkdayEmployeeId && w.PrimaryJob == true)
             .Select(w => new { w.PositionTitle, w.CostCenter })
             .FirstOrDefaultAsync(ct);
-        var positionTitle = workdayInfo?.PositionTitle;
 
         // Same Dynaway-comment stitching as SubmitAdHoc, just fed from d365Detail.Comments (the
         // requester's free text plus the frontend's own locked "(Asset Management) with Dynaway
@@ -791,6 +817,7 @@ public class TicketOrchestrationService : ITicketOrchestrationService
             RequestId = request.RequestId,
             RequestEmployeeId = employee.RequestEmployeeId,
             Status = D365ApprovalStatus.Pending,
+            NeedsDynaway = dynawaySelected,
             AccessType = d365Detail?.AccessType,
             JobTitleEnglish = d365Detail?.JobTitleEnglish,
             LegalEntity = d365Detail is null ? null : D365AccessApprovalsController.FixedLegalEntity,
@@ -810,35 +837,35 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         _db.D365AccessApprovals.Add(approval);
         await _db.SaveChangesAsync(ct);
 
-        if (d365Detail is not null)
-        {
-            // Already fully filled out by the requester — same wording NotifyD365ApproversOfAdHocRequestAsync
-            // uses for the standalone D365AccessRequest app's own ad-hoc submissions.
-            await NotifyD365ApproversOfAdHocRequestAsync(request, approval, positionTitle, ct);
-            return;
-        }
+        var routingRole = dynawaySelected ? D365ApprovalRoles.Dynaway : D365ApprovalRoles.Stage1;
+        await NotifyD365ApproversOfAdHocRequestAsync(request, approval, routingRole, ct);
+    }
 
-        var approvers = await _d365Approvers.MatchingAsync(positionTitle, ct);
+    /// <summary>Emails whoever holds <paramref name="role"/> that a fully-filled-out D365 access
+    /// request is ready for their review — shared by both creation paths (the wizard-driven
+    /// TryCreateD365AccessApprovalRequestAsync and the standalone D365AccessRequest app's own
+    /// SubmitAdHoc), since both always arrive here already fully filled out. Falls back to emailing
+    /// IT when nobody currently holds that role, rather than leaving the request silently stuck.</summary>
+    public async Task NotifyD365ApproversOfAdHocRequestAsync(Request request, D365AccessApproval approval, string role, CancellationToken ct)
+    {
+        var employee = request.Employees.FirstOrDefault(e => e.RequestEmployeeId == approval.RequestEmployeeId)
+            ?? request.Employees.FirstOrDefault(e => e.IsPrimary) ?? request.Employees.FirstOrDefault();
+        if (employee is null) return;
+
+        var approvers = await _d365Approvers.ByRoleAsync(role, ct);
         var recipients = approvers.Where(a => !string.IsNullOrWhiteSpace(a.Email)).Select(a => a.Email!).ToList();
-
-        // Points at the standalone D365Approvals app (its own route is "/approvals/{id}", not
-        // Cycle Emploi's embedded "/admin/d365-approvals/{id}") — approvers use that app directly
-        // and don't need Cycle Emploi Administration access at all, so the email should never send
-        // them somewhere that implies they do.
-        var link = string.IsNullOrWhiteSpace(_appOptions.BaseUrl)
-            ? $"/approvals/{request.RequestId}"
-            : $"{_appOptions.BaseUrl.TrimEnd('/')}/approvals/{request.RequestId}";
+        var link = ApprovalLink(request.RequestId);
+        var roleLabel = RoleFrenchLabels.GetValueOrDefault(role, role);
 
         if (recipients.Count == 0)
         {
-            _logger.LogWarning("No D365Approver matched request {RequestNumber} (position title {PositionTitle}) — emailing IT instead", request.RequestNumber, positionTitle);
+            _logger.LogWarning("No D365Approver holds role {Role} for request {RequestNumber} — emailing IT instead", role, request.RequestNumber);
 
-            var fallbackSubject = $"[Cycle Emploi] Aucun approbateur D365 configuré — demande #{request.RequestNumber} — {employee.NameSnapshot}";
+            var fallbackSubject = $"[Cycle Emploi] Aucun approbateur D365 ({roleLabel}) configuré — demande #{request.RequestNumber} — {employee.NameSnapshot}";
             var fallbackBody =
-                $"La demande #{request.RequestNumber} ({request.RequestType.ToFrenchLabel()}) demande l'accès D365 pour {employee.NameSnapshot} " +
-                $"(titre de poste : {positionTitle ?? "inconnu"}), mais aucun approbateur D365 (global ou pour ce titre de poste) n'est configuré " +
-                "pour recevoir la demande.\n\n" +
-                $"Ajoutez un approbateur dans Administration > Approbateurs D365, puis complétez le formulaire vous-même à ce lien :\n{link}\n";
+                $"La demande #{request.RequestNumber} demande l'accès D365 pour {employee.NameSnapshot}, mais aucun approbateur D365 " +
+                $"({roleLabel}) n'est configuré pour recevoir la demande.\n\n" +
+                $"Ajoutez un approbateur pour ce rôle dans Administration > Approbateurs D365, puis complétez le formulaire vous-même à ce lien :\n{link}\n";
 
             try
             {
@@ -853,16 +880,13 @@ public class TicketOrchestrationService : ITicketOrchestrationService
 
         var subject = $"[Cycle Emploi] Approbation D365 requise — demande #{request.RequestNumber} — {employee.NameSnapshot}";
         var body =
-            $"La demande #{request.RequestNumber} ({request.RequestType.ToFrenchLabel()}) demande l'accès D365 pour {employee.NameSnapshot}.\n\n" +
+            $"{request.CreatedByDisplayName} a soumis une demande d'accès D365 pour {employee.NameSnapshot}, prête pour votre révision ({roleLabel}).\n\n" +
             "== Détails ==\n" +
             $"Employé : {employee.NameSnapshot}\n" +
-            $"Titre de poste : {positionTitle ?? "inconnu"}\n" +
+            $"Poste : {employee.PositionSnapshot}\n" +
             $"Département : {employee.DepartementSnapshot}\n" +
             $"Demandé par : {request.CreatedByDisplayName}\n\n" +
-            $"Veuillez remplir le formulaire d'accès D365 à ce lien :\n{link}\n\n" +
-            "Le formulaire est prérempli avec les informations connues de l'employé; il vous reste à préciser les rôles D365 " +
-            "requis et quelques champs financiers. Un tableau des employés occupant un poste similaire, avec les rôles D365 " +
-            "qu'ils détiennent déjà, y est affiché pour vous aider à décider.";
+            $"Le formulaire est déjà entièrement rempli — vérifiez-le et appuyez sur « Envoyer » pour créer le billet TDX :\n{link}\n";
 
         try
         {
@@ -874,38 +898,26 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         }
     }
 
-    /// <summary>Same recipient-matching and fallback-to-IT logic as
-    /// TryCreateD365AccessApprovalRequestAsync, but the wording assumes the approval is ALREADY
-    /// fully filled out (ad-hoc submissions from D365AccessRequest carry every field from the
-    /// moment they're created) — the approver's job here is to review and press Envoyer, not to
-    /// fill in blanks.</summary>
-    public async Task NotifyD365ApproversOfAdHocRequestAsync(Request request, D365AccessApproval approval, string? positionTitle, CancellationToken ct)
+    public async Task NotifyD365Stage2ApproversAsync(Request request, D365AccessApproval approval, CancellationToken ct)
     {
         var employee = request.Employees.FirstOrDefault(e => e.RequestEmployeeId == approval.RequestEmployeeId)
             ?? request.Employees.FirstOrDefault(e => e.IsPrimary) ?? request.Employees.FirstOrDefault();
         if (employee is null) return;
 
-        var approvers = await _d365Approvers.MatchingAsync(positionTitle, ct);
+        var approvers = await _d365Approvers.ByRoleAsync(D365ApprovalRoles.Stage2, ct);
         var recipients = approvers.Where(a => !string.IsNullOrWhiteSpace(a.Email)).Select(a => a.Email!).ToList();
-
-        // Points at the standalone D365Approvals app (its own route is "/approvals/{id}", not
-        // Cycle Emploi's embedded "/admin/d365-approvals/{id}") — approvers use that app directly
-        // and don't need Cycle Emploi Administration access at all, so the email should never send
-        // them somewhere that implies they do.
-        var link = string.IsNullOrWhiteSpace(_appOptions.BaseUrl)
-            ? $"/approvals/{request.RequestId}"
-            : $"{_appOptions.BaseUrl.TrimEnd('/')}/approvals/{request.RequestId}";
+        var link = ApprovalLink(request.RequestId);
 
         if (recipients.Count == 0)
         {
-            _logger.LogWarning("No D365Approver matched ad-hoc request {RequestNumber} (position title {PositionTitle}) — emailing IT instead", request.RequestNumber, positionTitle);
+            _logger.LogWarning("No D365Approver holds role Stage2 for request {RequestNumber} — emailing IT instead", request.RequestNumber);
 
-            var fallbackSubject = $"[Cycle Emploi] Aucun approbateur D365 configuré — demande #{request.RequestNumber} — {employee.NameSnapshot}";
+            var fallbackSubject = $"[Cycle Emploi] Aucun approbateur D365 (deuxième étape) configuré — demande #{request.RequestNumber} — {employee.NameSnapshot}";
             var fallbackBody =
-                $"La demande #{request.RequestNumber} (accès D365, demande directe) a été remplie par {request.CreatedByDisplayName} pour " +
-                $"{employee.NameSnapshot} (titre de poste : {positionTitle ?? "inconnu"}), mais aucun approbateur D365 (global ou pour ce titre " +
-                "de poste) n'est configuré pour recevoir la demande.\n\n" +
-                $"Ajoutez un approbateur dans Administration > Approbateurs D365, puis envoyez le formulaire vous-même à ce lien :\n{link}\n";
+                $"La demande #{request.RequestNumber} pour {employee.NameSnapshot} a été approuvée en première étape par " +
+                $"{approval.Stage1ApprovedByDisplayName} et attend une confirmation finale, mais aucun approbateur D365 (deuxième étape) " +
+                "n'est configuré pour la recevoir.\n\n" +
+                $"Ajoutez un approbateur pour ce rôle dans Administration > Approbateurs D365, puis confirmez vous-même à ce lien :\n{link}\n";
 
             try
             {
@@ -913,20 +925,22 @@ public class TicketOrchestrationService : ITicketOrchestrationService
             }
             catch (Exception emailEx)
             {
-                _logger.LogError(emailEx, "Also failed to send the no-D365-approver-configured email for ad-hoc request {RequestNumber}", request.RequestNumber);
+                _logger.LogError(emailEx, "Also failed to send the no-Stage2-approver-configured email for request {RequestNumber}", request.RequestNumber);
             }
             return;
         }
 
-        var subject = $"[Cycle Emploi] Approbation D365 requise — demande #{request.RequestNumber} — {employee.NameSnapshot}";
+        var subject = $"[Cycle Emploi] Confirmation D365 requise — demande #{request.RequestNumber} — {employee.NameSnapshot}";
         var body =
-            $"{request.CreatedByDisplayName} a rempli une demande d'accès D365 pour {employee.NameSnapshot} et l'a soumise pour révision.\n\n" +
+            $"{approval.Stage1ApprovedByDisplayName} a approuvé la demande d'accès D365 pour {employee.NameSnapshot} en première étape. " +
+            "Une confirmation finale de votre part est requise avant la création du billet TDX.\n\n" +
             "== Détails ==\n" +
             $"Employé : {employee.NameSnapshot}\n" +
-            $"Titre de poste : {positionTitle ?? "inconnu"}\n" +
+            $"Poste : {employee.PositionSnapshot}\n" +
             $"Département : {employee.DepartementSnapshot}\n" +
-            $"Rempli par : {request.CreatedByDisplayName}\n\n" +
-            $"Le formulaire est déjà entièrement rempli — vérifiez-le et appuyez sur « Envoyer » pour créer le billet TDX :\n{link}\n";
+            $"Demandé par : {request.CreatedByDisplayName}\n" +
+            $"Approuvé (1re étape) par : {approval.Stage1ApprovedByDisplayName}\n\n" +
+            $"Vérifiez la demande et appuyez sur « Confirmer » à ce lien :\n{link}\n";
 
         try
         {
@@ -934,7 +948,30 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         }
         catch (Exception emailEx)
         {
-            _logger.LogError(emailEx, "Failed to email D365 approvers for ad-hoc request {RequestNumber}", request.RequestNumber);
+            _logger.LogError(emailEx, "Failed to email D365 Stage2 approvers for request {RequestNumber}", request.RequestNumber);
+        }
+    }
+
+    public async Task NotifyRequesterOfD365RejectionAsync(Request request, D365AccessApproval approval, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.RequesterEmail)) return;
+
+        var employee = request.Employees.FirstOrDefault(e => e.RequestEmployeeId == approval.RequestEmployeeId)
+            ?? request.Employees.FirstOrDefault(e => e.IsPrimary) ?? request.Employees.FirstOrDefault();
+
+        var subject = $"[Cycle Emploi] Demande d'accès D365 rejetée — demande #{request.RequestNumber}";
+        var body =
+            $"Votre demande d'accès D365 #{request.RequestNumber} pour {employee?.NameSnapshot} a été rejetée par {approval.RejectedByDisplayName}.\n\n" +
+            $"Motif : {approval.RejectReason}\n\n" +
+            "Si vous croyez qu'il s'agit d'une erreur ou souhaitez soumettre une nouvelle demande corrigée, veuillez contacter l'équipe TI.";
+
+        try
+        {
+            await _email.SendAsync(subject, body, [request.RequesterEmail], ct);
+        }
+        catch (Exception emailEx)
+        {
+            _logger.LogError(emailEx, "Failed to email requester of D365 rejection for request {RequestNumber}", request.RequestNumber);
         }
     }
 

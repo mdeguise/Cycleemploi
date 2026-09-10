@@ -28,8 +28,10 @@ export function D365ApprovalFormPage({ me }: { me: MeDto }) {
 
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [isRejecting, setIsRejecting] = useState(false);
+  const [rejectError, setRejectError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = () => {
     if (!requestId) return;
     setIsLoading(true);
     setLoadError(null);
@@ -48,7 +50,9 @@ export function D365ApprovalFormPage({ me }: { me: MeDto }) {
       })
       .catch((err) => setLoadError(err instanceof Error ? err.message : 'Erreur inconnue'))
       .finally(() => setIsLoading(false));
-  }, [api, requestId]);
+  };
+
+  useEffect(load, [api, requestId]);
 
   const toggleRole = (role: string) => {
     setRoles((prev) => (prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]));
@@ -85,6 +89,25 @@ export function D365ApprovalFormPage({ me }: { me: MeDto }) {
       if (!result.succeeded) {
         setSubmitError(result.error ?? 'La création du billet TDX a échoué.');
       }
+      load();
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Erreur inconnue');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleConfirmStage2 = async () => {
+    if (!requestId) return;
+    setSubmitError(null);
+    setIsSubmitting(true);
+    try {
+      const result = await api.d365AccessApprovals.confirmStage2(Number(requestId));
+      setSubmitResult(result);
+      if (!result.succeeded) {
+        setSubmitError(result.error ?? 'La création du billet TDX a échoué.');
+      }
+      load();
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Erreur inconnue');
     } finally {
@@ -101,8 +124,7 @@ export function D365ApprovalFormPage({ me }: { me: MeDto }) {
     setIsCancelling(true);
     try {
       await api.d365AccessApprovals.cancel(Number(requestId), { reason: reason.trim() || null });
-      const refreshed = await api.d365AccessApprovals.detail(Number(requestId));
-      setData(refreshed);
+      load();
     } catch (err) {
       setCancelError(err instanceof Error ? err.message : 'Erreur inconnue');
     } finally {
@@ -110,25 +132,64 @@ export function D365ApprovalFormPage({ me }: { me: MeDto }) {
     }
   };
 
+  const handleReject = async () => {
+    if (!requestId) return;
+    const reason = window.prompt('Rejeter cette demande — motif (obligatoire, transmis au demandeur) :');
+    if (reason === null) return;
+    if (!reason.trim()) {
+      setRejectError('Un motif est requis pour rejeter une demande.');
+      return;
+    }
+
+    setRejectError(null);
+    setIsRejecting(true);
+    try {
+      await api.d365AccessApprovals.reject(Number(requestId), { reason: reason.trim() });
+      load();
+    } catch (err) {
+      setRejectError(err instanceof Error ? err.message : 'Erreur inconnue');
+    } finally {
+      setIsRejecting(false);
+    }
+  };
+
   if (isLoading) return <div className="step-panel">Chargement…</div>;
   if (loadError) return <div className="step-panel"><div className="big-notice">{loadError}</div></div>;
   if (!data) return null;
 
-  const readOnly = !data.canComplete || submitResult?.succeeded;
+  // Stage1 (or the Dynaway approver) edits the form; Stage2 only ever confirms what Stage1 already
+  // entered — same fields, shown read-only. Anyone else viewing (an oversight Admin, a D365Viewer,
+  // or the wrong stage's approver) also gets the read-only view.
+  const isEditableStage = data.canComplete && data.status === 'Pending';
+  const isConfirmStage = data.canConfirmStage2 && data.status === 'Stage1Approved';
+  const readOnly = !isEditableStage || !!submitResult;
+
+  const stageLabel = data.isDynawayPath ? 'Dynaway (étape unique)' : data.status === 'Stage1Approved' ? 'Étape 2' : 'Étape 1';
 
   return (
     <div className="step-panel">
       <div className="step-panel__header">
         <div>
           <div className="step-panel__title">Accès D365 — {data.employeeName}</div>
-          <div className="step-panel__subtitle">Demande {data.requestNumber} — demandée par {data.requesterName}</div>
+          <div className="step-panel__subtitle">
+            Demande {data.requestNumber} — demandée par {data.requesterName} — {stageLabel}
+          </div>
         </div>
       </div>
 
       {!submitResult && data.status === 'Pending' && (
         <div className="big-notice">
-          En appuyant sur « Envoyer », une véritable demande d'accès D365 sera créée dans TDX (formulaire « D365 -
-          Access », équipe ENT - FinApp Triage) — cette action n'est pas réversible depuis cette page.
+          {data.isDynawayPath
+            ? 'En appuyant sur « Envoyer », une véritable demande d\'accès D365 sera créée dans TDX (formulaire « D365 - Access », équipe ENT - FinApp Triage) — cette action n\'est pas réversible depuis cette page.'
+            : 'En appuyant sur « Envoyer », cette demande passera à l\'étape 2 pour une confirmation finale — aucun billet TDX n\'est encore créé à cette étape.'}
+        </div>
+      )}
+      {!submitResult && data.status === 'Stage1Approved' && (
+        <div className="big-notice">
+          Approuvée en étape 1 par {data.stage1ApprovedByDisplayName ?? '—'}
+          {data.stage1ApprovedAt ? ` le ${new Date(data.stage1ApprovedAt).toLocaleDateString('fr-CA')}` : ''}. En appuyant
+          sur « Confirmer », une véritable demande d'accès D365 sera créée dans TDX — cette action n'est pas réversible
+          depuis cette page.
         </div>
       )}
       {submitResult?.succeeded && (
@@ -137,17 +198,14 @@ export function D365ApprovalFormPage({ me }: { me: MeDto }) {
           maintenant complétée.
         </div>
       )}
-      {!data.canComplete && data.status === 'Pending' && (
+      {!isEditableStage && !isConfirmStage && (data.status === 'Pending' || data.status === 'Stage1Approved') && (
         <div className="big-notice">
           {me.isD365Approver ? (
-            <>
-              Vous consultez cette demande, mais vous n'êtes pas l'approbateur assigné — seul un approbateur D365 associé
-              (globalement ou pour le titre de poste « {data.positionTitle ?? '—'} ») peut la compléter.
-            </>
+            <>Vous consultez cette demande, mais vous n'êtes pas l'approbateur assigné à l'étape actuelle ({stageLabel}).</>
           ) : (
             <>
-              Vous consultez cette demande à titre de Personnel TI (accès en lecture seule) — seul un approbateur
-              D365 associé peut la compléter et l'envoyer à TDX.
+              Vous consultez cette demande à titre de Personnel TI (accès en lecture seule) — seul l'approbateur assigné à
+              l'étape actuelle peut agir.
             </>
           )}
         </div>
@@ -160,6 +218,13 @@ export function D365ApprovalFormPage({ me }: { me: MeDto }) {
           Cette demande a été annulée{data.cancelledByDisplayName ? ` par ${data.cancelledByDisplayName}` : ''}
           {data.cancelledAt ? ` le ${new Date(data.cancelledAt).toLocaleDateString('fr-CA')}` : ''}.
           {data.cancelReason ? ` Motif : « ${data.cancelReason} ».` : ' Aucun motif fourni.'}
+        </div>
+      )}
+      {data.status === 'Rejected' && (
+        <div className="big-notice">
+          Cette demande a été rejetée{data.rejectedByDisplayName ? ` par ${data.rejectedByDisplayName}` : ''}
+          {data.rejectedAt ? ` le ${new Date(data.rejectedAt).toLocaleDateString('fr-CA')}` : ''}.
+          {data.rejectReason ? ` Motif : « ${data.rejectReason} ».` : ''}
         </div>
       )}
 
@@ -180,7 +245,7 @@ export function D365ApprovalFormPage({ me }: { me: MeDto }) {
       </div>
 
       <form onSubmit={handleSubmit}>
-        <div className="field-section-title">À compléter</div>
+        <div className="field-section-title">{isConfirmStage ? 'Rempli en étape 1 — à confirmer' : 'À compléter'}</div>
         <div className="field-grid field-grid--2">
           <Field label="Titre du poste (anglais)" required>
             <input type="text" value={jobTitleEnglish} onChange={(ev) => setJobTitleEnglish(ev.target.value)} disabled={readOnly} />
@@ -263,19 +328,30 @@ export function D365ApprovalFormPage({ me }: { me: MeDto }) {
 
         {submitError && <div className="required-note" style={{ color: 'var(--tremblant-red-dark)' }}>{submitError}</div>}
         {cancelError && <div className="required-note" style={{ color: 'var(--tremblant-red-dark)' }}>{cancelError}</div>}
+        {rejectError && <div className="required-note" style={{ color: 'var(--tremblant-red-dark)' }}>{rejectError}</div>}
 
         <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
           <button type="button" className="btn btn-secondary" onClick={() => navigate('/admin/d365-approvals')}>
             Retour
           </button>
-          {data.canCancel && data.status === 'Pending' && !submitResult && (
+          {data.canReject && !submitResult && (
+            <button type="button" className="btn btn-danger" onClick={handleReject} disabled={isRejecting}>
+              {isRejecting ? 'Rejet…' : 'Rejeter'}
+            </button>
+          )}
+          {data.canCancel && !submitResult && (
             <button type="button" className="btn btn-danger" onClick={handleCancel} disabled={isCancelling}>
               {isCancelling ? 'Annulation…' : 'Annuler la demande'}
             </button>
           )}
-          {!readOnly && (
+          {isEditableStage && !submitResult && (
             <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
               {isSubmitting ? 'Envoi…' : 'Envoyer'}
+            </button>
+          )}
+          {isConfirmStage && !submitResult && (
+            <button type="button" className="btn btn-primary" onClick={handleConfirmStage2} disabled={isSubmitting}>
+              {isSubmitting ? 'Confirmation…' : 'Confirmer'}
             </button>
           )}
         </div>

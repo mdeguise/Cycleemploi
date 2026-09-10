@@ -1,14 +1,21 @@
 import { useEffect, useState } from 'react';
 import { useApi } from '../api/ApiContext';
-import type { D365ApproverDto, D365ViewerDto } from '../api/types';
+import type { D365ApprovalRole, D365ApproverDto, D365ViewerDto } from '../api/types';
 import { usePicker, PickerField } from '../components/AdPicker';
+
+const APPROVAL_ROLE_LABELS: Record<string, string> = {
+  Dynaway: 'Dynaway (étape unique)',
+  Stage1: 'Étape 1',
+  Stage2: 'Étape 2',
+};
+const APPROVAL_ROLES: D365ApprovalRole[] = ['Dynaway', 'Stage1', 'Stage2'];
 
 function ApproversSection() {
   const api = useApi();
   const [approvers, setApprovers] = useState<D365ApproverDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [positionTitle, setPositionTitle] = useState('');
+  const [approvalRole, setApprovalRole] = useState<D365ApprovalRole>('Dynaway');
   const [addError, setAddError] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const picker = usePicker((q) => api.d365Approvers.adSearch(q));
@@ -38,10 +45,9 @@ function ApproversSection() {
         sam: picker.picked.sam,
         displayName: picker.picked.displayName,
         email: picker.picked.email ?? null,
-        positionTitle: positionTitle.trim() || null,
+        approvalRole,
       });
       picker.reset();
-      setPositionTitle('');
       load();
     } catch (err) {
       setAddError(err instanceof Error ? err.message : 'Erreur inconnue');
@@ -64,10 +70,11 @@ function ApproversSection() {
     <>
       <div className="field-section-title">Approbateurs D365</div>
       <div className="step-panel__subtitle" style={{ marginTop: -4 }}>
-        Personnes qui reçoivent un lien pour compléter le formulaire d'accès D365 lorsqu'une demande le requiert et
-        peuvent l'envoyer à TDX. Un approbateur <strong>global</strong> (aucun titre de poste) peut agir sur
-        n'importe quelle demande. Un approbateur associé à un <strong>titre de poste</strong> précis ne reçoit que
-        les demandes visant ce titre exact.
+        Personnes qui reçoivent un lien pour agir sur une demande d'accès D365. Une demande qui coche
+        « Besoin de gestion des actifs (Asset Management) avec Dynaway » va directement à <strong>Dynaway</strong> (approbation
+        unique, billet TDX créé immédiatement). Toute autre demande passe d'abord par <strong>Étape 1</strong> (remplit le
+        formulaire), puis par <strong>Étape 2</strong> (confirmation finale, sans nouvelle saisie) avant la création du billet
+        TDX. Plusieurs personnes peuvent partager le même rôle — n'importe laquelle peut agir pour cette étape.
       </div>
 
       {isLoading && <div>Chargement…</div>}
@@ -81,7 +88,7 @@ function ApproversSection() {
                 <th style={{ padding: '8px 12px' }}>Nom</th>
                 <th style={{ padding: '8px 12px' }}>Compte</th>
                 <th style={{ padding: '8px 12px' }}>Courriel</th>
-                <th style={{ padding: '8px 12px' }}>Portée</th>
+                <th style={{ padding: '8px 12px' }}>Rôle</th>
                 <th style={{ padding: '8px 12px' }}>Ajouté le</th>
                 <th style={{ padding: '8px 12px' }}></th>
               </tr>
@@ -91,7 +98,7 @@ function ApproversSection() {
                 <tr>
                   <td colSpan={6} style={{ padding: '8px 12px', color: 'var(--muted)' }}>
                     Aucun approbateur configuré — les demandes d'accès D365 seront envoyées à l'équipe informatique
-                    par courriel jusqu'à ce qu'au moins un approbateur global soit ajouté.
+                    par courriel jusqu'à ce qu'un approbateur soit ajouté pour chaque rôle.
                   </td>
                 </tr>
               )}
@@ -101,7 +108,7 @@ function ApproversSection() {
                   <td style={{ padding: '8px 12px' }}><code>{a.sam}</code></td>
                   <td style={{ padding: '8px 12px' }}>{a.email ?? '—'}</td>
                   <td style={{ padding: '8px 12px' }}>
-                    {a.positionTitle ? a.positionTitle : <span className="review-tag">Global</span>}
+                    <span className="review-tag">{APPROVAL_ROLE_LABELS[a.approvalRole] ?? a.approvalRole}</span>
                   </td>
                   <td style={{ padding: '8px 12px' }}>{new Date(a.createdAt).toLocaleDateString('fr-CA')}</td>
                   <td style={{ padding: '8px 12px', textAlign: 'right' }}>
@@ -117,14 +124,13 @@ function ApproversSection() {
           <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 520 }}>
             <PickerField picker={picker} />
             <div className="field">
-              <label className="field__label">Titre de poste (Workday) — laisser vide pour un approbateur global</label>
+              <label className="field__label">Rôle</label>
               <div className="field__input-wrap">
-                <input
-                  type="text"
-                  value={positionTitle}
-                  onChange={(ev) => setPositionTitle(ev.target.value)}
-                  placeholder="ex. : Préposé maintenance — doit correspondre exactement au titre Workday"
-                />
+                <select value={approvalRole} onChange={(ev) => setApprovalRole(ev.target.value as D365ApprovalRole)}>
+                  {APPROVAL_ROLES.map((r) => (
+                    <option key={r} value={r}>{APPROVAL_ROLE_LABELS[r]}</option>
+                  ))}
+                </select>
               </div>
             </div>
             {addError && <div className="required-note" style={{ color: 'var(--tremblant-red-dark)' }}>{addError}</div>}

@@ -86,12 +86,30 @@ public class D365AccessApprovalsController : ControllerBase
         await _viewers.HasAnyAccessAsync(User.GetObjectId(), ct) ||
         await _appUsers.IsAdminAsync(User.GetObjectId(), ct);
 
-    /// <summary>Same matched-approver rule as Complete, plus an AppUsers Admin even when they
-    /// aren't matched — cancelling is the only way out for a request nobody is matched to act on
-    /// (no scoped approver, no global approver), so it needs a safety net Complete deliberately
-    /// doesn't have.</summary>
-    private async Task<bool> CanCancelAsync(string? positionTitle, CancellationToken ct) =>
-        await _approvers.CanActOnAsync(User.GetObjectId(), positionTitle, ct) ||
+    /// <summary>Which D365ApprovalRoles role is authorized to act RIGHT NOW, given the request's
+    /// path and the approval's current status — null once it's in a terminal state (nobody can act
+    /// further).</summary>
+    private static string? CurrentStageRole(bool isDynawayPath, D365ApprovalStatus status) => status switch
+    {
+        D365ApprovalStatus.Pending => isDynawayPath ? D365ApprovalRoles.Dynaway : D365ApprovalRoles.Stage1,
+        D365ApprovalStatus.Stage1Approved => D365ApprovalRoles.Stage2,
+        _ => null
+    };
+
+    /// <summary>True if the caller holds whichever role is authorized at the approval's current
+    /// stage — the actual gate behind Complete/ConfirmStage2/Reject.</summary>
+    private async Task<bool> CanActAtCurrentStageAsync(bool isDynawayPath, D365ApprovalStatus status, CancellationToken ct)
+    {
+        var role = CurrentStageRole(isDynawayPath, status);
+        return role is not null && await _approvers.HasRoleAsync(User.GetObjectId(), role, ct);
+    }
+
+    /// <summary>Same current-stage rule as Complete/ConfirmStage2/Reject, plus an AppUsers Admin
+    /// even when they aren't the matched approver — cancelling is the only way out for a request
+    /// nobody is matched to act on (e.g. a misconfigured D365Approvers table), so it needs a safety
+    /// net the others deliberately don't have.</summary>
+    private async Task<bool> CanCancelAsync(bool isDynawayPath, D365ApprovalStatus status, CancellationToken ct) =>
+        await CanActAtCurrentStageAsync(isDynawayPath, status, ct) ||
         await _appUsers.IsAdminAsync(User.GetObjectId(), ct);
 
     [HttpGet]
@@ -161,12 +179,18 @@ public class D365AccessApprovalsController : ControllerBase
                 RequesterName = a.Request.CreatedByDisplayName,
                 StartDate = a.Request.OnboardingDetail?.DateEntreePrevue,
                 Status = a.Status.ToString(),
+                IsDynawayPath = a.NeedsDynaway,
                 CreatedAt = a.CreatedAt,
+                Stage1ApprovedByDisplayName = a.Stage1ApprovedByDisplayName,
+                Stage1ApprovedAt = a.Stage1ApprovedAt,
                 CompletedAt = a.CompletedAt,
                 CompletedByDisplayName = a.CompletedByDisplayName,
                 CancelledAt = a.CancelledAt,
                 CancelledByDisplayName = a.CancelledByDisplayName,
                 CancelReason = a.CancelReason,
+                RejectedAt = a.RejectedAt,
+                RejectedByDisplayName = a.RejectedByDisplayName,
+                RejectReason = a.RejectReason,
                 TicketNumber = ticket?.Outcome == TicketOutcome.Created ? ticket.TicketNumber : null,
                 TicketState = ticket?.Outcome == TicketOutcome.Failed ? "Failed" : live?.State.ToString(),
                 TicketStateLabel = ticket?.Outcome == TicketOutcome.Failed ? "Échec de création" : live?.Label
@@ -195,8 +219,10 @@ public class D365AccessApprovalsController : ControllerBase
             .FirstOrDefaultAsync(ct);
 
         if (!await CanViewAsync(ct)) return Forbid();
-        var canComplete = await _approvers.CanActOnAsync(User.GetObjectId(), workdayInfo?.PositionTitle, ct);
-        var canCancel = await CanCancelAsync(workdayInfo?.PositionTitle, ct);
+        var isDynawayPath = approval.NeedsDynaway;
+        var canActNow = await CanActAtCurrentStageAsync(isDynawayPath, approval.Status, ct);
+        var canCancel = await CanCancelAsync(isDynawayPath, approval.Status, ct);
+        var isActionableStatus = approval.Status is D365ApprovalStatus.Pending or D365ApprovalStatus.Stage1Approved;
 
         var managerName = await ResolveManagerNameAsync(workdayInfo?.ManagerId, workdayInfo?.Manager, ct);
         var peers = await BuildPeersAsync(employee.WorkdayEmployeeId, workdayInfo?.JobCode, workdayInfo?.PositionTitle, ct);
@@ -206,11 +232,19 @@ public class D365AccessApprovalsController : ControllerBase
             RequestId = approval.RequestId,
             RequestNumber = approval.Request.RequestNumber,
             Status = approval.Status.ToString(),
+            IsDynawayPath = isDynawayPath,
             CancelledByDisplayName = approval.CancelledByDisplayName,
             CancelledAt = approval.CancelledAt,
             CancelReason = approval.CancelReason,
-            CanComplete = canComplete && approval.Status == D365ApprovalStatus.Pending,
-            CanCancel = canCancel && approval.Status == D365ApprovalStatus.Pending,
+            Stage1ApprovedByDisplayName = approval.Stage1ApprovedByDisplayName,
+            Stage1ApprovedAt = approval.Stage1ApprovedAt,
+            RejectedByDisplayName = approval.RejectedByDisplayName,
+            RejectedAt = approval.RejectedAt,
+            RejectReason = approval.RejectReason,
+            CanComplete = canActNow && approval.Status == D365ApprovalStatus.Pending,
+            CanConfirmStage2 = canActNow && approval.Status == D365ApprovalStatus.Stage1Approved,
+            CanReject = canActNow && isActionableStatus,
+            CanCancel = canCancel && isActionableStatus,
             RequesterName = approval.Request.CreatedByDisplayName,
             EmployeeName = employee.NameSnapshot,
             EmployeeEmail = workdayInfo?.WorkEmail ?? workdayInfo?.Email,
@@ -302,10 +336,13 @@ public class D365AccessApprovalsController : ControllerBase
             .ToList();
     }
 
-    /// <summary>The Envoyer action. Saves what the approver entered, then immediately attempts the
-    /// real TDX ticket — the approval is marked Completed either way (the human decision is made;
-    /// whether the downstream TDX call itself succeeded is reported back and, if not, handled by the
-    /// normal Administration/Réessayer path like every other ticket kind).</summary>
+    /// <summary>The Envoyer action — Dynaway approver on a Dynaway request (single-stage, same
+    /// behavior as before this redesign), or Stage1 approver on every other request. Saves what the
+    /// approver entered; on the Dynaway path this immediately attempts the real TDX ticket (approval
+    /// marked Completed either way — the human decision is made; whether the downstream TDX call
+    /// itself succeeded is reported back and, if not, handled by the normal Administration/Réessayer
+    /// path). On the non-Dynaway path this instead advances to Stage1Approved and emails the Stage2
+    /// approvers — no TDX call happens until ConfirmStage2.</summary>
     [HttpPost("{requestId:int}/complete")]
     public async Task<ActionResult<CompleteD365AccessApprovalResultDto>> Complete(int requestId, CompleteD365AccessApprovalDto dto, CancellationToken ct)
     {
@@ -318,16 +355,17 @@ public class D365AccessApprovalsController : ControllerBase
 
         if (approval.Status != D365ApprovalStatus.Pending)
         {
-            return Conflict(new CompleteD365AccessApprovalResultDto { Succeeded = false, Error = "Cette approbation a déjà été complétée." });
+            return Conflict(new CompleteD365AccessApprovalResultDto { Succeeded = false, Error = "Cette approbation n'est plus en attente de cette étape." });
         }
+
+        var isDynawayPath = approval.NeedsDynaway;
+        if (!await CanActAtCurrentStageAsync(isDynawayPath, approval.Status, ct)) return Forbid();
 
         var employee = approval.Request.Employees.FirstOrDefault(e => e.RequestEmployeeId == approval.RequestEmployeeId);
         var workdayInfo = employee is null ? null : await _workday.WorkdayDemographics
             .Where(w => w.EmployeeId == employee.WorkdayEmployeeId && w.PrimaryJob == true)
-            .Select(w => new { w.PositionTitle, w.CostCenter })
+            .Select(w => new { w.CostCenter })
             .FirstOrDefaultAsync(ct);
-
-        if (!await _approvers.CanActOnAsync(User.GetObjectId(), workdayInfo?.PositionTitle, ct)) return Forbid();
 
         if (string.IsNullOrWhiteSpace(dto.JobTitleEnglish))
         {
@@ -357,14 +395,33 @@ public class D365AccessApprovalsController : ControllerBase
         {
             approval.Roles.Add(new D365AccessApprovalRole { Role = role });
         }
+
+        var actorDisplayName = _ad.GetUserInfo(User.GetSamAccountName()).DisplayName ?? User.GetObjectId();
+
+        if (!isDynawayPath)
+        {
+            approval.Status = D365ApprovalStatus.Stage1Approved;
+            approval.Stage1ApprovedByObjectId = User.GetObjectId();
+            approval.Stage1ApprovedByDisplayName = actorDisplayName;
+            approval.Stage1ApprovedAt = DateTime.UtcNow;
+
+            await _db.SaveChangesAsync(ct);
+
+            _logger.LogInformation("D365 Stage1 approver {Approver} approved request {RequestNumber} — awaiting Stage2", User.GetObjectId(), approval.Request.RequestNumber);
+
+            await _orchestration.NotifyD365Stage2ApproversAsync(approval.Request, approval, ct);
+
+            return Ok(new CompleteD365AccessApprovalResultDto { Succeeded = true });
+        }
+
         approval.Status = D365ApprovalStatus.Completed;
         approval.CompletedByObjectId = User.GetObjectId();
-        approval.CompletedByDisplayName = _ad.GetUserInfo(User.GetSamAccountName()).DisplayName ?? User.GetObjectId();
+        approval.CompletedByDisplayName = actorDisplayName;
         approval.CompletedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync(ct);
 
-        _logger.LogInformation("D365 approver {Approver} completed approval for request {RequestNumber}", User.GetObjectId(), approval.Request.RequestNumber);
+        _logger.LogInformation("D365 Dynaway approver {Approver} completed approval for request {RequestNumber}", User.GetObjectId(), approval.Request.RequestNumber);
 
         var result = await _orchestration.CreateD365AccessTicketAsync(approval.Request, approval, ct);
 
@@ -376,10 +433,85 @@ public class D365AccessApprovalsController : ControllerBase
         });
     }
 
-    /// <summary>Marks a Pending approval Cancelled — no TDX ticket is ever created for it. Gated by
-    /// CanCancelAsync (matched approver OR AppUsers Admin), broader than Complete's matched-approver-
-    /// only rule, since a request with no matched approver at all would otherwise be stuck forever
-    /// with no one able to act on it either way.</summary>
+    /// <summary>The Stage2 approver's final sign-off, non-Dynaway requests only — a pure
+    /// confirmation of whatever Stage1 already filled in (no fields to re-enter). Marks the
+    /// approval Completed and attempts the real TDX ticket, same as Complete does on the Dynaway
+    /// path.</summary>
+    [HttpPost("{requestId:int}/confirm-stage2")]
+    public async Task<ActionResult<CompleteD365AccessApprovalResultDto>> ConfirmStage2(int requestId, CancellationToken ct)
+    {
+        var approval = await _db.D365AccessApprovals
+            .Include(a => a.Request).ThenInclude(r => r.Employees)
+            .FirstOrDefaultAsync(a => a.RequestId == requestId, ct);
+        if (approval is null) return NotFound();
+
+        if (approval.Status != D365ApprovalStatus.Stage1Approved)
+        {
+            return Conflict(new CompleteD365AccessApprovalResultDto { Succeeded = false, Error = "Cette approbation n'est pas en attente d'une confirmation Stage2." });
+        }
+
+        var isDynawayPath = approval.NeedsDynaway;
+        if (!await CanActAtCurrentStageAsync(isDynawayPath, approval.Status, ct)) return Forbid();
+
+        approval.Status = D365ApprovalStatus.Completed;
+        approval.CompletedByObjectId = User.GetObjectId();
+        approval.CompletedByDisplayName = _ad.GetUserInfo(User.GetSamAccountName()).DisplayName ?? User.GetObjectId();
+        approval.CompletedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation("D365 Stage2 approver {Approver} confirmed request {RequestNumber}", User.GetObjectId(), approval.Request.RequestNumber);
+
+        var result = await _orchestration.CreateD365AccessTicketAsync(approval.Request, approval, ct);
+
+        return Ok(new CompleteD365AccessApprovalResultDto
+        {
+            Succeeded = result.Succeeded,
+            TicketNumber = result.TicketNumber,
+            Error = result.Error
+        });
+    }
+
+    /// <summary>A Stage1 or Stage2 approver actively declining the request — terminal, no TDX
+    /// ticket is ever created. Distinct from Cancel: this is an approver's own "no" (reason
+    /// required, requester notified why), not an administrative withdrawal.</summary>
+    [HttpPost("{requestId:int}/reject")]
+    public async Task<IActionResult> Reject(int requestId, RejectD365AccessApprovalDto dto, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Reason)) return BadRequest("Un motif de rejet est requis.");
+
+        var approval = await _db.D365AccessApprovals
+            .Include(a => a.Request).ThenInclude(r => r.Employees)
+            .FirstOrDefaultAsync(a => a.RequestId == requestId, ct);
+        if (approval is null) return NotFound();
+
+        if (approval.Status is not (D365ApprovalStatus.Pending or D365ApprovalStatus.Stage1Approved))
+        {
+            return Conflict("Cette demande n'est plus en attente.");
+        }
+
+        var isDynawayPath = approval.NeedsDynaway;
+        if (!await CanActAtCurrentStageAsync(isDynawayPath, approval.Status, ct)) return Forbid();
+
+        approval.Status = D365ApprovalStatus.Rejected;
+        approval.RejectedByObjectId = User.GetObjectId();
+        approval.RejectedByDisplayName = _ad.GetUserInfo(User.GetSamAccountName()).DisplayName ?? User.GetObjectId();
+        approval.RejectedAt = DateTime.UtcNow;
+        approval.RejectReason = dto.Reason.Trim();
+
+        await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation("D365 approver {Approver} rejected request {RequestNumber}", User.GetObjectId(), approval.Request.RequestNumber);
+
+        await _orchestration.NotifyRequesterOfD365RejectionAsync(approval.Request, approval, ct);
+
+        return NoContent();
+    }
+
+    /// <summary>Marks a Pending/Stage1Approved approval Cancelled — no TDX ticket is ever created
+    /// for it. Gated by CanCancelAsync (whoever is authorized at the current stage OR an AppUsers
+    /// Admin), broader than Complete/ConfirmStage2/Reject's matched-approver-only rule, since a
+    /// request nobody is matched to act on would otherwise be stuck forever either way.</summary>
     [HttpPost("{requestId:int}/cancel")]
     public async Task<IActionResult> Cancel(int requestId, CancelD365AccessApprovalDto dto, CancellationToken ct)
     {
@@ -388,18 +520,13 @@ public class D365AccessApprovalsController : ControllerBase
             .FirstOrDefaultAsync(a => a.RequestId == requestId, ct);
         if (approval is null) return NotFound();
 
-        if (approval.Status != D365ApprovalStatus.Pending)
+        if (approval.Status is not (D365ApprovalStatus.Pending or D365ApprovalStatus.Stage1Approved))
         {
             return Conflict("Cette demande n'est plus en attente.");
         }
 
-        var employee = approval.Request.Employees.FirstOrDefault(e => e.RequestEmployeeId == approval.RequestEmployeeId);
-        var positionTitle = employee is null ? null : await _workday.WorkdayDemographics
-            .Where(w => w.EmployeeId == employee.WorkdayEmployeeId && w.PrimaryJob == true)
-            .Select(w => w.PositionTitle)
-            .FirstOrDefaultAsync(ct);
-
-        if (!await CanCancelAsync(positionTitle, ct)) return Forbid();
+        var isDynawayPath = approval.NeedsDynaway;
+        if (!await CanCancelAsync(isDynawayPath, approval.Status, ct)) return Forbid();
 
         approval.Status = D365ApprovalStatus.Cancelled;
         approval.CancelledByObjectId = User.GetObjectId();
@@ -576,6 +703,7 @@ public class D365AccessApprovalsController : ControllerBase
             RequestId = request.RequestId,
             RequestEmployeeId = request.Employees.Single().RequestEmployeeId,
             Status = D365ApprovalStatus.Pending,
+            NeedsDynaway = dto.NeedsDynaway,
             AccessType = dto.AccessType,
             JobTitleEnglish = dto.JobTitleEnglish.Trim(),
             LegalEntity = FixedLegalEntity,
@@ -597,7 +725,8 @@ public class D365AccessApprovalsController : ControllerBase
 
         _logger.LogInformation("D365 approver {Approver} submitted ad-hoc D365 access request {RequestNumber} for {Employee}", User.GetObjectId(), request.RequestNumber, employeeName);
 
-        await _orchestration.NotifyD365ApproversOfAdHocRequestAsync(request, approval, workdayInfo.PositionTitle, ct);
+        var routingRole = dto.NeedsDynaway ? D365ApprovalRoles.Dynaway : D365ApprovalRoles.Stage1;
+        await _orchestration.NotifyD365ApproversOfAdHocRequestAsync(request, approval, routingRole, ct);
 
         return Ok(new SubmitAdHocD365AccessResultDto { RequestId = request.RequestId, RequestNumber = request.RequestNumber });
     }

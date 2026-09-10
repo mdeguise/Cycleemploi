@@ -170,12 +170,15 @@ export interface D365UserSecurityRoleDto {
 
 // --- D365 access approval (D365ApproversController / D365AccessApprovalsController) ---
 
+/** "Dynaway" | "Stage1" | "Stage2" — see backend D365ApprovalRoles. */
+export type D365ApprovalRole = 'Dynaway' | 'Stage1' | 'Stage2';
+
 export interface D365ApproverDto {
   d365ApproverId: number;
   sam: string;
   displayName: string;
   email?: string | null;
-  positionTitle?: string | null;
+  approvalRole: D365ApprovalRole;
   createdAt: string;
   createdByDisplayName?: string | null;
 }
@@ -184,14 +187,7 @@ export interface CreateD365ApproverDto {
   sam: string;
   displayName: string;
   email?: string | null;
-  positionTitle?: string | null;
-}
-
-/** One row of the "Titres de poste" master list. jobCodes is informational only — approver
- * routing matches on positionTitle alone, never jobCode. */
-export interface D365PositionTitleDto {
-  positionTitle: string;
-  jobCodes: string[];
+  approvalRole: D365ApprovalRole;
 }
 
 export interface D365ViewerDto {
@@ -223,13 +219,20 @@ export interface D365AccessApprovalSummaryDto {
   managerName?: string | null;
   requesterName: string;
   startDate?: string | null;
+  /** "Pending" | "Stage1Approved" | "Completed" | "Cancelled" | "Rejected". */
   status: string;
+  isDynawayPath: boolean;
   createdAt: string;
+  stage1ApprovedByDisplayName?: string | null;
+  stage1ApprovedAt?: string | null;
   completedAt?: string | null;
   completedByDisplayName?: string | null;
   cancelledAt?: string | null;
   cancelledByDisplayName?: string | null;
   cancelReason?: string | null;
+  rejectedAt?: string | null;
+  rejectedByDisplayName?: string | null;
+  rejectReason?: string | null;
   ticketNumber?: string | null;
   ticketState?: string | null;
   ticketStateLabel?: string | null;
@@ -238,11 +241,24 @@ export interface D365AccessApprovalSummaryDto {
 export interface D365AccessApprovalDetailDto {
   requestId: number;
   requestNumber: string;
+  /** "Pending" | "Stage1Approved" | "Completed" | "Cancelled" | "Rejected". */
   status: string;
+  isDynawayPath: boolean;
   cancelledByDisplayName?: string | null;
   cancelledAt?: string | null;
   cancelReason?: string | null;
+  stage1ApprovedByDisplayName?: string | null;
+  stage1ApprovedAt?: string | null;
+  rejectedByDisplayName?: string | null;
+  rejectedAt?: string | null;
+  rejectReason?: string | null;
+  /** True for the Dynaway approver on a Dynaway request, or the Stage1 approver on any other
+   * request, while Status is Pending. */
   canComplete: boolean;
+  /** True for the Stage2 approver while Status is Stage1Approved. Never true on the Dynaway path. */
+  canConfirmStage2: boolean;
+  /** True for whichever approver is authorized at the current stage. */
+  canReject: boolean;
   canCancel: boolean;
   requesterName: string;
   employeeName: string;
@@ -290,6 +306,10 @@ export interface CompleteD365AccessApprovalResultDto {
 
 export interface CancelD365AccessApprovalDto {
   reason?: string | null;
+}
+
+export interface RejectD365AccessApprovalDto {
+  reason: string;
 }
 
 /** GET /api/d365-access-approvals/adhoc/prefill — same endpoint the standalone D365AccessRequest

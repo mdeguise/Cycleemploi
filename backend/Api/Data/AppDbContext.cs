@@ -143,14 +143,11 @@ public class AppDbContext : DbContext
             entity.Property(m => m.Sam).HasMaxLength(100).IsRequired();
             entity.Property(m => m.Email).HasMaxLength(200);
             entity.Property(m => m.DisplayName).HasMaxLength(200).IsRequired();
-            entity.Property(m => m.PositionTitle).HasMaxLength(200);
+            entity.Property(m => m.ApprovalRole).HasMaxLength(50).IsRequired();
             entity.Property(m => m.CreatedByDisplayName).HasMaxLength(200);
-            // A person can be listed once as a global approver (PositionTitle null) and separately
-            // scoped to specific titles — but not added twice for the exact same scope. HasFilter(null)
-            // is essential, not cosmetic — see RequestTicket's doc comment for why: EF Core defaults a
-            // unique index over a nullable column to "WHERE [PositionTitle] IS NOT NULL", which would
-            // let the SAME person be added as a global approver (PositionTitle null) twice.
-            entity.HasIndex(m => new { m.Sam, m.PositionTitle }).IsUnique().HasFilter(null);
+            // A person can hold more than one role (e.g. Stage1 and Stage2) but not be added twice
+            // for the exact same role.
+            entity.HasIndex(m => new { m.Sam, m.ApprovalRole }).IsUnique();
         });
 
         modelBuilder.Entity<D365Viewer>(entity =>

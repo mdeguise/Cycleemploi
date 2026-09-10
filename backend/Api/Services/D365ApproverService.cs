@@ -9,25 +9,24 @@ namespace TremblantLifecycle.Api.Services;
 /// a person's access survives the iDirectory -> ENTERPRISE migration the same way AppUsers does.</summary>
 public interface ID365ApproverService
 {
-    /// <summary>True if this identity has ANY row at all (global or scoped) — gates seeing the "D365
-    /// - Approbations" nav link and the tracking list; acting on a SPECIFIC request is a separate,
-    /// narrower check (see CanActOnAsync).</summary>
+    /// <summary>True if this identity has ANY row at all (any role) — gates seeing the "D365 -
+    /// Approbations" nav link and the tracking list; acting on a SPECIFIC request/stage is a
+    /// separate, narrower check (see HasRoleAsync).</summary>
     Task<bool> HasAnyAccessAsync(string? identityName, CancellationToken ct);
 
-    /// <summary>True if this identity may complete an approval for an employee whose Workday
-    /// Position_Title is <paramref name="positionTitle"/> — a global approver (no PositionTitle on
-    /// their row) can act on anything; a scoped approver only on a matching title.</summary>
-    Task<bool> CanActOnAsync(string? identityName, string? positionTitle, CancellationToken ct);
+    /// <summary>True if this identity holds the given D365ApprovalRoles role — the actual
+    /// authorization check for acting at one specific stage.</summary>
+    Task<bool> HasRoleAsync(string? identityName, string role, CancellationToken ct);
 
     Task<List<D365Approver>> ListAsync(CancellationToken ct);
 
     Task<D365Approver?> GetAsync(int d365ApproverId, CancellationToken ct);
 
-    /// <summary>Every approver eligible to act on a request for this position title — global
-    /// approvers plus those scoped to it — used to build the notification-email recipient list.</summary>
-    Task<List<D365Approver>> MatchingAsync(string? positionTitle, CancellationToken ct);
+    /// <summary>Every approver holding this role — used to build the notification-email recipient
+    /// list for that stage.</summary>
+    Task<List<D365Approver>> ByRoleAsync(string role, CancellationToken ct);
 
-    Task<D365Approver> AddAsync(string sam, string displayName, string? email, string? positionTitle, string? addedByDisplayName, CancellationToken ct);
+    Task<D365Approver> AddAsync(string sam, string displayName, string? email, string approvalRole, string? addedByDisplayName, CancellationToken ct);
     Task<bool> RemoveAsync(int d365ApproverId, CancellationToken ct);
 }
 
@@ -56,36 +55,34 @@ public class D365ApproverService : ID365ApproverService
         }
     }
 
-    public async Task<bool> CanActOnAsync(string? identityName, string? positionTitle, CancellationToken ct)
+    public async Task<bool> HasRoleAsync(string? identityName, string role, CancellationToken ct)
     {
         var sam = AppUserService.Normalize(identityName);
         if (sam.Length == 0) return false;
 
         return await _db.D365Approvers.AsNoTracking()
-            .AnyAsync(a => a.Sam == sam && (a.PositionTitle == null || a.PositionTitle == positionTitle), ct);
+            .AnyAsync(a => a.Sam == sam && a.ApprovalRole == role, ct);
     }
 
     public Task<List<D365Approver>> ListAsync(CancellationToken ct) =>
         _db.D365Approvers.AsNoTracking()
-            .OrderBy(a => a.PositionTitle == null ? 0 : 1) // global approvers first
-            .ThenBy(a => a.PositionTitle)
+            .OrderBy(a => a.ApprovalRole)
             .ThenBy(a => a.DisplayName)
             .ToListAsync(ct);
 
     public Task<D365Approver?> GetAsync(int d365ApproverId, CancellationToken ct) =>
         _db.D365Approvers.AsNoTracking().FirstOrDefaultAsync(a => a.D365ApproverId == d365ApproverId, ct);
 
-    public Task<List<D365Approver>> MatchingAsync(string? positionTitle, CancellationToken ct) =>
+    public Task<List<D365Approver>> ByRoleAsync(string role, CancellationToken ct) =>
         _db.D365Approvers.AsNoTracking()
-            .Where(a => a.PositionTitle == null || a.PositionTitle == positionTitle)
+            .Where(a => a.ApprovalRole == role)
             .ToListAsync(ct);
 
-    public async Task<D365Approver> AddAsync(string sam, string displayName, string? email, string? positionTitle, string? addedByDisplayName, CancellationToken ct)
+    public async Task<D365Approver> AddAsync(string sam, string displayName, string? email, string approvalRole, string? addedByDisplayName, CancellationToken ct)
     {
         var normalized = AppUserService.Normalize(sam);
-        var scope = string.IsNullOrWhiteSpace(positionTitle) ? null : positionTitle.Trim();
 
-        var existing = await _db.D365Approvers.FirstOrDefaultAsync(a => a.Sam == normalized && a.PositionTitle == scope, ct);
+        var existing = await _db.D365Approvers.FirstOrDefaultAsync(a => a.Sam == normalized && a.ApprovalRole == approvalRole, ct);
         if (existing is not null)
         {
             existing.DisplayName = displayName;
@@ -99,7 +96,7 @@ public class D365ApproverService : ID365ApproverService
             Sam = normalized,
             DisplayName = displayName,
             Email = email,
-            PositionTitle = scope,
+            ApprovalRole = approvalRole,
             CreatedAt = DateTime.UtcNow,
             CreatedByDisplayName = addedByDisplayName
         };

@@ -18,15 +18,15 @@ public class EmployeesController : ControllerBase
         _workday = workday;
     }
 
-    /// <summary>Searches WorkdayDemographic by number/last name/first name, filtered to active
-    /// employees (Employment_Status != "Terminated" — NOT == "Active", since "Inactive" covers
-    /// on-leave/layoff, which the business treats as active for this app — see the
-    /// WorkdayDemographic entity's doc comment) and collapsed to one row per employee via
-    /// PrimaryJob == true. TODO: confirm the "!= Terminated" business rule with HR/the business owner
-    /// before launch — it's what the data and the app's own "seuls les employés actifs" notice
-    /// text both point to, but wasn't explicitly re-confirmed after the schema discovery.</summary>
+    /// <summary>Searches WorkdayDemographic by number/last name/first name, collapsed to one row per
+    /// employee via PrimaryJob == true. Filtered to active employees (Employment_Status !=
+    /// "Terminated" — NOT == "Active", since "Inactive" covers on-leave/layoff, which the business
+    /// treats as active for this app — see the WorkdayDemographic entity's doc comment) UNLESS
+    /// includeTerminated is set — Réactivation's entire purpose is finding someone who left, so the
+    /// wizard passes includeTerminated=true there specifically (see Step1Employee.tsx); every other
+    /// caller (Onboarding, Offboarding, the D365 ad-hoc apps) still only searches active people.</summary>
     [HttpGet("search")]
-    public async Task<ActionResult<List<EmployeeDto>>> Search([FromQuery] string q, CancellationToken ct)
+    public async Task<ActionResult<List<EmployeeDto>>> Search([FromQuery] string q, [FromQuery] bool includeTerminated, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(q) || q.Length < 2)
         {
@@ -36,7 +36,7 @@ public class EmployeesController : ControllerBase
         var terms = q.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
         var query = _workday.WorkdayDemographics
-            .Where(e => e.PrimaryJob == true && e.EmploymentStatus != "Terminated");
+            .Where(e => e.PrimaryJob == true && (includeTerminated || e.EmploymentStatus != "Terminated"));
 
         if (terms.Length <= 1)
         {

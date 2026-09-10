@@ -2,8 +2,9 @@ namespace TremblantLifecycle.Api.Models.Entities;
 
 public enum D365ApprovalStatus
 {
-    /// <summary>Created at submit time when "Accès D365" was requested. No approver has filled out
-    /// the form yet — this is what the tracking screen calls "pending".</summary>
+    /// <summary>Created at submit time when "Accès D365" was requested. For a Dynaway request,
+    /// awaiting the sole Dynaway approver. For every other request, awaiting a Stage1 approver to
+    /// fill out the form — this is what the tracking screen calls "pending".</summary>
     Pending = 0,
 
     /// <summary>An approver filled out the form and pressed Envoyer. Whether the resulting TDX
@@ -13,10 +14,20 @@ public enum D365ApprovalStatus
     /// this form to the approver.</summary>
     Completed = 1,
 
-    /// <summary>A matched approver (or an AppUsers Admin, as a safety net for a request nobody is
-    /// matched to act on) decided this request should not proceed — no TDX ticket is ever created.
-    /// Terminal, same as Completed: a Cancelled approval never becomes Pending or Completed again.</summary>
-    Cancelled = 2
+    /// <summary>A Stage1/Dynaway approver (or an AppUsers Admin, as a safety net) decided this
+    /// request should not proceed at all — no TDX ticket is ever created. Terminal: never becomes
+    /// Pending/Stage1Approved/Completed again. Distinct from Rejected, which is a Stage1/Stage2
+    /// approver actively saying no (with a reason) rather than this administrative withdrawal.</summary>
+    Cancelled = 2,
+
+    /// <summary>Non-Dynaway requests only — a Stage1 approver has filled out and completed the
+    /// form; awaiting a Stage2 approver's final confirmation (read-only review, no re-entry) before
+    /// the TDX ticket is created. Never reached on the Dynaway path, which is single-stage.</summary>
+    Stage1Approved = 3,
+
+    /// <summary>A Stage1 or Stage2 approver actively declined the request (see RejectReason) —
+    /// terminal, no TDX ticket is ever created. The requester is notified why.</summary>
+    Rejected = 4
 }
 
 /// <summary>One row per (Onboarding/Réactivation) request that requested "Accès D365" — the
@@ -39,6 +50,14 @@ public class D365AccessApproval
     public int RequestEmployeeId { get; set; }
 
     public D365ApprovalStatus Status { get; set; } = D365ApprovalStatus.Pending;
+
+    /// <summary>Set once at creation time (from the wizard's Dynaway checkbox, or the standalone
+    /// ad-hoc app's own — see TryCreateD365AccessApprovalRequestAsync/SubmitAdHoc) and never
+    /// changed after — decides the whole routing question: true routes to the sole Dynaway-role
+    /// approver (single stage); false routes through Stage1 then Stage2. Stored directly here
+    /// rather than re-derived from Request.ApplicationsDetail each time, since an ad-hoc request
+    /// (RequestType.D365AccessOnly) never populates ApplicationsDetail at all.</summary>
+    public bool NeedsDynaway { get; set; }
 
     /// <summary>"New Access" | "Change Access" | "Remove Access" — the real TDX form's own
     /// wording, matched exactly so the value can be sent straight through (see
@@ -87,6 +106,17 @@ public class D365AccessApproval
     public ICollection<D365AccessApprovalRole> Roles { get; set; } = new List<D365AccessApprovalRole>();
 
     public DateTime CreatedAt { get; set; }
+
+    /// <summary>Set by Stage1 completing the form (non-Dynaway path only) — recorded separately
+    /// from CompletedBy* because the FINAL sign-off on a two-stage request is Stage2's, not
+    /// Stage1's. Null on the Dynaway path (single-stage — CompletedBy* covers it) and null until
+    /// Stage1 acts.</summary>
+    public string? Stage1ApprovedByObjectId { get; set; }
+    public string? Stage1ApprovedByDisplayName { get; set; }
+    public DateTime? Stage1ApprovedAt { get; set; }
+
+    /// <summary>The FINAL approval: the Dynaway approver on a Dynaway request, or the Stage2
+    /// approver's confirmation on every other request.</summary>
     public string? CompletedByObjectId { get; set; }
     public string? CompletedByDisplayName { get; set; }
     public DateTime? CompletedAt { get; set; }
@@ -98,6 +128,14 @@ public class D365AccessApproval
     /// <summary>Optional free-text — why this request was cancelled, for whoever looks at it later
     /// (the original requester has no other way to find out).</summary>
     public string? CancelReason { get; set; }
+
+    /// <summary>Set when a Stage1 or Stage2 approver actively declines the request (see
+    /// D365ApprovalStatus.Rejected) — distinct from Cancel, which is an administrative withdrawal
+    /// rather than an approver's own "no".</summary>
+    public string? RejectedByObjectId { get; set; }
+    public string? RejectedByDisplayName { get; set; }
+    public DateTime? RejectedAt { get; set; }
+    public string? RejectReason { get; set; }
 }
 
 /// <summary>A single checked role on a completed D365AccessApproval — same free-text vocabulary as

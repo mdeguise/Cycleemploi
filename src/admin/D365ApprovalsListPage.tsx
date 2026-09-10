@@ -25,9 +25,13 @@ export function D365ApprovalsListPage({ me }: { me: MeDto }) {
       .finally(() => setIsLoading(false));
   }, [api]);
 
-  const pending = rows.filter((r) => r.status === 'Pending');
+  const pending = rows.filter((r) => r.status === 'Pending' || r.status === 'Stage1Approved');
   const completed = rows.filter((r) => r.status === 'Completed');
   const cancelled = rows.filter((r) => r.status === 'Cancelled');
+  const rejected = rows.filter((r) => r.status === 'Rejected');
+
+  const stageLabel = (r: D365AccessApprovalSummaryDto) =>
+    r.isDynawayPath ? 'Dynaway' : r.status === 'Stage1Approved' ? 'Étape 2' : 'Étape 1';
 
   // ticketState is the two-way "does a human still need to look at this" summary (Open/Closed),
   // normalized across Freshdesk and TDX's very different status models — see LiveTicketStatus.cs.
@@ -81,6 +85,7 @@ export function D365ApprovalsListPage({ me }: { me: MeDto }) {
                 <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--border, #ddd)' }}>
                   <th style={{ padding: '8px 12px' }}>Demande</th>
                   <th style={{ padding: '8px 12px' }}>Employé</th>
+                  <th style={{ padding: '8px 12px' }}>Étape</th>
                   <th style={{ padding: '8px 12px' }}>Titre de poste</th>
                   <th style={{ padding: '8px 12px' }}>Gestionnaire</th>
                   <th style={{ padding: '8px 12px' }}>Demandé par</th>
@@ -92,13 +97,14 @@ export function D365ApprovalsListPage({ me }: { me: MeDto }) {
               <tbody>
                 {pending.length === 0 && (
                   <tr>
-                    <td colSpan={8} style={{ padding: '8px 12px', color: 'var(--muted)' }}>Aucune approbation en attente.</td>
+                    <td colSpan={9} style={{ padding: '8px 12px', color: 'var(--muted)' }}>Aucune approbation en attente.</td>
                   </tr>
                 )}
                 {pending.map((r) => (
                   <tr key={r.requestId} style={{ borderBottom: '1px solid var(--border, #eee)' }}>
                     <td style={{ padding: '8px 12px' }}>{r.requestNumber}</td>
                     <td style={{ padding: '8px 12px' }}>{r.employeeName}</td>
+                    <td style={{ padding: '8px 12px' }}><span className="review-tag">{stageLabel(r)}</span></td>
                     <td style={{ padding: '8px 12px' }}>{r.positionTitle ?? '—'}</td>
                     <td style={{ padding: '8px 12px' }}>{r.managerName ?? '—'}</td>
                     <td style={{ padding: '8px 12px' }}>{r.requesterName}</td>
@@ -179,6 +185,39 @@ export function D365ApprovalsListPage({ me }: { me: MeDto }) {
                     <td style={{ padding: '8px 12px' }}>{r.cancelledByDisplayName ?? '—'}</td>
                     <td style={{ padding: '8px 12px' }}>{r.cancelledAt ? new Date(r.cancelledAt).toLocaleDateString('fr-CA') : '—'}</td>
                     <td style={{ padding: '8px 12px', color: r.cancelReason ? 'inherit' : 'var(--muted)' }}>{r.cancelReason ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="field-section-title" style={{ marginTop: 24 }}>Rejetées ({rejected.length})</div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--border, #ddd)' }}>
+                  <th style={{ padding: '8px 12px' }}>Demande</th>
+                  <th style={{ padding: '8px 12px' }}>Employé</th>
+                  <th style={{ padding: '8px 12px' }}>Demandé par</th>
+                  <th style={{ padding: '8px 12px' }}>Rejetée par</th>
+                  <th style={{ padding: '8px 12px' }}>Rejetée le</th>
+                  <th style={{ padding: '8px 12px' }}>Motif</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rejected.length === 0 && (
+                  <tr>
+                    <td colSpan={6} style={{ padding: '8px 12px', color: 'var(--muted)' }}>Aucune approbation rejetée.</td>
+                  </tr>
+                )}
+                {rejected.map((r) => (
+                  <tr key={r.requestId} style={{ borderBottom: '1px solid var(--border, #eee)' }}>
+                    <td style={{ padding: '8px 12px' }}>{r.requestNumber}</td>
+                    <td style={{ padding: '8px 12px' }}>{r.employeeName}</td>
+                    <td style={{ padding: '8px 12px' }}>{r.requesterName}</td>
+                    <td style={{ padding: '8px 12px' }}>{r.rejectedByDisplayName ?? '—'}</td>
+                    <td style={{ padding: '8px 12px' }}>{r.rejectedAt ? new Date(r.rejectedAt).toLocaleDateString('fr-CA') : '—'}</td>
+                    <td style={{ padding: '8px 12px' }}>{r.rejectReason ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>

@@ -24,12 +24,12 @@ import type {
   UpdateTicketTemplateDto,
   D365ApproverDto,
   CreateD365ApproverDto,
-  D365PositionTitleDto,
   D365ViewerDto,
   CreateD365ViewerDto,
   D365AccessApprovalSummaryDto,
   D365AccessApprovalDetailDto,
   CancelD365AccessApprovalDto,
+  RejectD365AccessApprovalDto,
   CompleteD365AccessApprovalDto,
   CompleteD365AccessApprovalResultDto,
   D365AdHocPrefillDto,
@@ -47,8 +47,10 @@ export function createApi(client: ApiClient) {
       get: () => client.get<CatalogsDto>('/api/catalogs'),
     },
     employees: {
-      search: (q: string) =>
-        client.get<EmployeeDto[]>(`/api/employees/search?q=${encodeURIComponent(q)}`),
+      search: (q: string, includeTerminated = false) =>
+        client.get<EmployeeDto[]>(
+          `/api/employees/search?q=${encodeURIComponent(q)}&includeTerminated=${includeTerminated}`
+        ),
       getById: (workdayId: number) => client.get<EmployeeDto>(`/api/employees/${workdayId}`),
     },
     requests: {
@@ -79,7 +81,6 @@ export function createApi(client: ApiClient) {
         client.get<AdAccountDto[]>(`/api/d365-approvers/ad-search?q=${encodeURIComponent(q)}`),
       add: (dto: CreateD365ApproverDto) => client.post<D365ApproverDto>('/api/d365-approvers', dto),
       remove: (id: number) => client.delete<void>(`/api/d365-approvers/${id}`),
-      positionTitles: () => client.get<D365PositionTitleDto[]>('/api/d365-approvers/position-titles'),
     },
     d365Viewers: {
       list: () => client.get<D365ViewerDto[]>('/api/d365-viewers'),
@@ -94,6 +95,10 @@ export function createApi(client: ApiClient) {
         client.get<D365AccessApprovalDetailDto>(`/api/d365-access-approvals/${requestId}`),
       complete: (requestId: number, dto: CompleteD365AccessApprovalDto) =>
         client.post<CompleteD365AccessApprovalResultDto>(`/api/d365-access-approvals/${requestId}/complete`, dto),
+      confirmStage2: (requestId: number) =>
+        client.post<CompleteD365AccessApprovalResultDto>(`/api/d365-access-approvals/${requestId}/confirm-stage2`, {}),
+      reject: (requestId: number, dto: RejectD365AccessApprovalDto) =>
+        client.post<void>(`/api/d365-access-approvals/${requestId}/reject`, dto),
       cancel: (requestId: number, dto: CancelD365AccessApprovalDto) =>
         client.post<void>(`/api/d365-access-approvals/${requestId}/cancel`, dto),
     },
