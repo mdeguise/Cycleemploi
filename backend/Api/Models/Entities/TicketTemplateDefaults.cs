@@ -236,6 +236,14 @@ public static class TicketTemplateDefaults
         new("CommentairesRedingote", "Commentaires — uniformes et matériel à fournir", TicketFieldCategory.Request),
     ];
 
+    private static readonly IReadOnlyList<TicketTemplateField> TdxDescriptionOffboardingRequestFields =
+    [
+        .. TdxDescriptionRequestFields,
+        new("RaisonArret", "Motif de la fin d'emploi ou de la mise à pied", TicketFieldCategory.Request),
+        new("DetailsRaison", "Précisions sur le motif", TicketFieldCategory.Request),
+        new("Reembaucheriez", "Cet équipier est-il admissible à une réembauche?", TicketFieldCategory.Request),
+    ];
+
     public static readonly IReadOnlyList<TicketTemplateDefinition> All =
     [
         new(
@@ -418,9 +426,13 @@ public static class TicketTemplateDefaults
             "TDX — Description du billet, équipe IT Operations (Terminaison)",
             "Description (HTML — <b>, <br>, <h4> sont rendus) du billet TDX \"Quick Incident\" (application OneIT, groupe T - IT Operations) pour un avis de terminaison ou mise à pied.",
             TicketTemplateShape.Inline,
-            TdxDescriptionRequestFields,
+            TdxDescriptionOffboardingRequestFields,
             AllowsEmployeeFields: true,
-            Inline(F("EmployeeName"), T(" - "), F("Gestionnaire"), T(" - "), F("Poste"), T(" - "), F("CodeEmploi"), T(" - "), F("DateEffective"))),
+            Inline(
+                F("EmployeeName"), T(" - "), F("Gestionnaire"), T(" - "), F("Poste"), T(" - "), F("CodeEmploi"), T(" - "), F("DateEffective"),
+                T("<h4>Détails de la cessation</h4><b>Motif de la fin d'emploi ou de la mise à pied :</b> "), F("RaisonArret"),
+                T("<br><b>Précisions sur le motif :</b> "), F("DetailsRaison"),
+                T("<br><b>Cet équipier est-il admissible à une réembauche? :</b> "), F("Reembaucheriez"))),
     ];
 
     public static readonly IReadOnlyDictionary<string, TicketTemplateDefinition> ByKey =
