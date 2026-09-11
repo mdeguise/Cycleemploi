@@ -174,14 +174,31 @@ export const OUI_NON = ['Oui', 'Non'];
 export const RAISON_ARRET_MISE_A_PIED_TEMPORAIRE = 'Mise à pied temporaire (manque de travail)';
 export const RAISON_ARRET_DEMISSION_VOLONTAIRE = 'Démission volontaire';
 
+/** RAISON_ARRET_MISE_A_PIED_TEMPORAIRE and RAISON_ARRET_DEMISSION_VOLONTAIRE stay in this list even
+ * though they're not part of the HR-provided leave-type taxonomy above them — Step2Cessation.tsx
+ * shows extra questions specifically for each of these two (date de retour connue / préavis reçu)
+ * and that behavior was kept on request when the list was replaced with the HR taxonomy. */
 export const RAISONS_ARRET = [
-  'Fin de saison / mise à pied saisonnière',
+  'Aidant Naturel',
+  'Ass. Invalidité',
+  'CNESST',
+  'Congé Compassion',
+  'Congé de Deuil',
+  'Congé Maternité',
+  'Congé Parental',
+  'Congé Paternité',
+  'Congé Personnel',
+  'Congé Préventif',
+  'Congé Sans Solde',
+  'Interruption d\'emploi',
+  'Maladie',
+  'Maladie (Famille)',
+  'Maladie Longue Durée',
+  'Mise-à-Pied',
+  'Responsabilité familiale',
+  'Suspension',
   RAISON_ARRET_MISE_A_PIED_TEMPORAIRE,
   RAISON_ARRET_DEMISSION_VOLONTAIRE,
-  'Congédiement',
-  'Fin de contrat',
-  'Retraite',
-  'Autre',
 ];
 
 export const REEMBAUCHERIEZ_NON = 'Non';
