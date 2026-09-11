@@ -64,6 +64,7 @@ public class TicketOrchestrationService : ITicketOrchestrationService
     private readonly FreshdeskOptions _freshdeskOptions;
     private readonly IDynamicsEamService _dynamics;
     private readonly ITdxService _tdx;
+    private readonly TdxOptions _tdxOptions;
     private readonly IEmailNotificationService _email;
     private readonly IRequestTicketService _tickets;
     private readonly ID365ApproverService _d365Approvers;
@@ -96,6 +97,7 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         IOptions<FreshdeskOptions> freshdeskOptions,
         IDynamicsEamService dynamics,
         ITdxService tdx,
+        IOptions<TdxOptions> tdxOptions,
         IEmailNotificationService email,
         IRequestTicketService tickets,
         ID365ApproverService d365Approvers,
@@ -109,6 +111,7 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         _freshdeskOptions = freshdeskOptions.Value;
         _dynamics = dynamics;
         _tdx = tdx;
+        _tdxOptions = tdxOptions.Value;
         _email = email;
         _tickets = tickets;
         _d365Approvers = d365Approvers;
@@ -127,7 +130,7 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         await TrySendRequesterConfirmationEmailAsync(request, ct);
     }
 
-    private record ConfirmationField(string Label, string Value);
+    private record ConfirmationField(string Label, string Value, string? Url = null);
     private record ConfirmationSection(string Title, List<ConfirmationField> Fields);
 
     /// <summary>Confirms to the person who submitted the request that it went through, with every
@@ -174,7 +177,8 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         var rows = tickets
             .Select(t => new ConfirmationField(
                 TicketKindLabels.For(t.Kind),
-                t.Outcome == TicketOutcome.Created ? $"#{t.TicketNumber}" : "Échec — voir Administration > Demandes"))
+                t.Outcome == TicketOutcome.Created ? $"#{t.TicketNumber}" : "Échec — voir Administration > Demandes",
+                t.Outcome == TicketOutcome.Created ? TicketUrl(t.Kind, t.TicketNumber) : null))
             .ToList();
 
         var d365Access = await _db.D365AccessApprovals.AsNoTracking()
@@ -281,7 +285,7 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         if (tickets.Count > 0)
         {
             lines.Add("== Billets créés ==");
-            foreach (var t in tickets) lines.Add($"{t.Label} : {t.Value}");
+            foreach (var t in tickets) lines.Add(t.Url is null ? $"{t.Label} : {t.Value}" : $"{t.Label} : {t.Value} — {t.Url}");
             lines.Add("");
         }
 
@@ -309,9 +313,12 @@ public class TicketOrchestrationService : ITicketOrchestrationService
             {
                 var bg = alt ? "#f7f4f2" : "#ffffff";
                 var valueStyle = highlightValue ? $"font-weight:600;color:{BrandRed};" : "color:#2b2b2b;";
+                var valueHtml = f.Url is null
+                    ? Enc(f.Value)
+                    : $"<a href=\"{Enc(f.Url)}\" style=\"{valueStyle}text-decoration:underline;\">{Enc(f.Value)}</a>";
                 sb.Append($"<tr style=\"background:{bg};\">")
                   .Append($"<td style=\"padding:8px 12px;color:#6b6b6b;font-size:13px;white-space:nowrap;vertical-align:top;\">{Enc(f.Label)}</td>")
-                  .Append($"<td style=\"padding:8px 12px;font-size:13px;{valueStyle}\">{Enc(f.Value)}</td>")
+                  .Append($"<td style=\"padding:8px 12px;font-size:13px;{valueStyle}\">{valueHtml}</td>")
                   .Append("</tr>");
                 alt = !alt;
             }
@@ -355,6 +362,26 @@ public class TicketOrchestrationService : ITicketOrchestrationService
     private static void AddIfPresent(List<ConfirmationField> fields, string label, string? value)
     {
         if (!string.IsNullOrWhiteSpace(value)) fields.Add(new ConfirmationField(label, value));
+    }
+
+    /// <summary>Direct link to the real ticket, for the confirmation email — Freshdesk's own
+    /// customer/requester-facing portal path (the requester is a Freshdesk contact, not necessarily
+    /// an agent — see CreateTicketAsync's `email = requesterEmail`), and TDX's agent-facing
+    /// TDNext ticket-detail path (same host/AppId pattern already used by D365ApprovalsListPage.tsx's
+    /// admin screen — both Tdx and D365Access tickets live under the same TDX AppId, just different
+    /// FormIDs). D365Badge has no real ticket id (it's a Power Automate job code), so no link.</summary>
+    private string? TicketUrl(TicketKind kind, string? ticketNumber)
+    {
+        if (string.IsNullOrWhiteSpace(ticketNumber)) return null;
+
+        return kind switch
+        {
+            TicketKind.Freshdesk or TicketKind.FreshdeskChildWithJobCodes or TicketKind.FreshdeskChildWithoutJobCodes or TicketKind.FreshdeskStationnement =>
+                $"https://{_freshdeskOptions.Subdomain}/support/tickets/{ticketNumber}",
+            TicketKind.Tdx or TicketKind.D365Access =>
+                $"https://get.alterra.support/TDNext/Apps/{_tdxOptions.AppId}/Tickets/TicketDet?TicketID={ticketNumber}",
+            _ => null
+        };
     }
 
     private static string? JoinOrNull(IEnumerable<string>? values)
