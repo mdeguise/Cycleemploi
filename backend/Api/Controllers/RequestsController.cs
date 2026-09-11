@@ -175,6 +175,31 @@ public class RequestsController : ControllerBase
             return BadRequest(new { errors });
         }
 
+        // Every downstream ticket integration below is awaited sequentially (Freshdesk, TDX, D365
+        // badge, confirmation email — several real network calls), so this whole request can easily
+        // take much longer than a requester expects from a "Soumettre" click. A requester who thinks
+        // it hung/failed and clicks again (or reloads and refills the form) produces a second,
+        // otherwise-identical Request row — this happened for real with INT-2026-00090/00091 (same
+        // employee, 49 seconds apart, same requester). Block an exact repeat (same requester, same
+        // request type, same set of employees) submitted in the last 5 minutes rather than silently
+        // creating a duplicate and duplicate downstream tickets.
+        var duplicateWindowStart = now.AddMinutes(-5);
+        var candidateEmployeeIds = request.Employees.Select(e => e.WorkdayEmployeeId).OrderBy(id => id).ToList();
+        var recentOwnRequests = await _db.Requests.AsNoTracking()
+            .Include(r => r.Employees)
+            .Where(r => r.RequestType == requestType && r.CreatedByObjectId == request.CreatedByObjectId && r.CreatedAt >= duplicateWindowStart)
+            .ToListAsync(ct);
+        var duplicate = recentOwnRequests.FirstOrDefault(r =>
+            r.Employees.Select(e => e.WorkdayEmployeeId).OrderBy(id => id).SequenceEqual(candidateEmployeeIds));
+        if (duplicate is not null)
+        {
+            return Conflict(new
+            {
+                error = $"Une demande identique a déjà été soumise il y a moins de 5 minutes (#{duplicate.RequestNumber}). " +
+                    "Vérifiez vos courriels avant de soumettre à nouveau — si ce n'est pas une erreur, réessayez dans quelques minutes."
+            });
+        }
+
         request.RequestNumber = await _requestNumbers.GenerateAsync(requestType, ct);
         request.SubmittedAt = now;
 

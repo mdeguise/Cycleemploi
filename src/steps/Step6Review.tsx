@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useWizard } from '../context/WizardContext';
+import { ApiError } from '../api/client';
 import { StepFooter } from '../components/StepFooter';
 import { SubmissionModal } from '../components/SubmissionModal';
 import {
@@ -16,6 +17,21 @@ import {
 import { REGLE_DE_PAYE_AUTRE, ACCES_BADGE, BESOIN_CODE_ALARME, STATIONNEMENT_REQUIS, ACCES_D365, DYNAWAY } from '../data/catalogs';
 import { formatDateFr } from '../utils/formatDate';
 
+/** The backend rejects an exact repeat submission (same requester/type/employees within 5 minutes,
+ * see RequestsController.Create) with 409 + a JSON body carrying a requester-friendly message
+ * naming the original request number — surface that instead of the generic fallback. */
+function extractSubmitErrorMessage(err: unknown): string {
+  if (err instanceof ApiError && err.status === 409) {
+    try {
+      const body = JSON.parse(err.message) as { error?: string };
+      if (body.error) return body.error;
+    } catch {
+      // Not JSON — fall through to the generic message below.
+    }
+  }
+  return err instanceof Error ? err.message : 'La soumission a échoué. Veuillez réessayer.';
+}
+
 export function Step6Review() {
   const { request, goToStep, submitRequest } = useWizard();
   const { employee: e, access: a, equipment: eq, applications: apps, d365: d, comments: c } = request;
@@ -30,13 +46,14 @@ export function Step6Review() {
   const nameFor = (value: string) => value;
 
   const handleSubmit = async () => {
+    if (isSubmitting) return;
     setSubmitError(null);
     setIsSubmitting(true);
     try {
       await submitRequest();
       setShowConfirmation(true);
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'La soumission a échoué. Veuillez réessayer.');
+      setSubmitError(extractSubmitErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -358,7 +375,14 @@ export function Step6Review() {
         </div>
       )}
 
-      <StepFooter onSubmit={handleSubmit} submitDisabled={isSubmitting} />
+      {isSubmitting && (
+        <div className="step-panel__subtitle" role="status">
+          Envoi en cours — ceci peut prendre jusqu'à une minute pendant la création des billets. Ne fermez pas cette
+          page et ne cliquez qu'une seule fois sur « Soumettre la demande ».
+        </div>
+      )}
+
+      <StepFooter onSubmit={handleSubmit} submitDisabled={isSubmitting} isSubmitting={isSubmitting} />
       <SubmissionModal open={showConfirmation} onClose={() => setShowConfirmation(false)} />
     </div>
   );
