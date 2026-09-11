@@ -199,6 +199,10 @@ export const RAISONS_ARRET = [
   'Suspension',
   RAISON_ARRET_MISE_A_PIED_TEMPORAIRE,
   RAISON_ARRET_DEMISSION_VOLONTAIRE,
+  'Congédiement',
+  'Fin de contrat',
+  'Retraite',
+  'Autre',
 ];
 
 export const REEMBAUCHERIEZ_NON = 'Non';
