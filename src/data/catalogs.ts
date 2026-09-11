@@ -69,6 +69,44 @@ export const BESOIN_CODE_ALARME = 'Besoin de code d\'alarme';
 export const STATIONNEMENT_REQUIS = 'Stationnement requis';
 export const ACCES_D365 = 'Accès D365';
 
+export interface StationnementOption {
+  nom: string;
+  description?: string;
+}
+
+/** The stored value (AccessDetail.Stationnement, a single string) is `nom` alone — the parenthetical
+ * detail lives in `description` and is shown as helper text once an option is picked, so Freshdesk/TDX
+ * tickets read the short label rather than the full explanation. */
+export const STATIONNEMENT_OPTIONS: StationnementOption[] = [
+  { nom: 'VIP' },
+  { nom: 'P14- Maison Blanche Été' },
+  { nom: 'P14- Maison Blanche Hiver' },
+  { nom: 'P14- Maison Blanche Annuel' },
+  {
+    nom: 'Stationnements Intérieurs LST',
+    description:
+      "Droit de stationnement dans tous les hôtels SMT : Sommet des Neiges, Lodge de la Montagne, Ermitage du Lac et Tour des Voyageurs.",
+  },
+  {
+    nom: 'Accès Intérieur LST',
+    description:
+      "Carte d'accès pour le travail dans tous les hôtels SMT : Sommet des Neiges, Lodge de la Montagne, Ermitage du Lac et Tour des Voyageurs.",
+  },
+  { nom: 'Accès Intérieur PSB', description: "Code d'accès pour le travail dans Johanssen et Deslauriers." },
+  {
+    nom: 'Stationnement Intérieur PSB NORD',
+    description: "Code d'accès — droit de stationnement dans Johanssen NORD.",
+  },
+  {
+    nom: 'Véhicule de service régulier',
+    description: 'Carte d\'accès pour tous les stationnements extérieurs.',
+  },
+  {
+    nom: 'Véhicule de service exécutif',
+    description: 'Accès à tous les stationnements intérieurs hôtels SMT et extérieurs payants.',
+  },
+];
+
 export interface PosHebergementSysteme {
   nom: string;
   description: string;

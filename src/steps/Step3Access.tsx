@@ -10,6 +10,7 @@ import {
   ACCES_BADGE,
   BESOIN_CODE_ALARME,
   STATIONNEMENT_REQUIS,
+  STATIONNEMENT_OPTIONS,
   ACCES_D365,
   DYNAWAY,
   APPLICATIONS,
@@ -128,12 +129,22 @@ export function Step3Access() {
                 )}
                 {sys.nom === STATIONNEMENT_REQUIS && a.systemes.includes(STATIONNEMENT_REQUIS) && (
                   <Field label="Précisions - stationnement">
-                    <input
-                      type="text"
-                      value={a.stationnement}
-                      onChange={(ev) => updateStationnement(ev.target.value)}
-                      placeholder="Sélectionnez ou précisez le ou les stationnements requis"
-                    />
+                    <select value={a.stationnement} onChange={(ev) => updateStationnement(ev.target.value)}>
+                      <option value="">Sélectionnez le type de stationnement requis</option>
+                      {STATIONNEMENT_OPTIONS.map((opt) => (
+                        <option key={opt.nom} value={opt.nom}>
+                          {opt.nom}
+                        </option>
+                      ))}
+                    </select>
+                    {(() => {
+                      const selected = STATIONNEMENT_OPTIONS.find((opt) => opt.nom === a.stationnement);
+                      return selected?.description ? (
+                        <div className="step-panel__subtitle" style={{ marginTop: 6 }}>
+                          {selected.description}
+                        </div>
+                      ) : null;
+                    })()}
                   </Field>
                 )}
               </Fragment>
