@@ -144,6 +144,9 @@ interface WizardContextValue {
   /** The one and only server call — sends the entire wizard state and creates+submits the
    * request atomically. No partial-save state exists before this. */
   submitRequest: () => Promise<void>;
+  /** Clears every field and returns to Step 1 so the same requester can immediately start a new
+   * request without a full page reload — called when the confirmation modal is closed. */
+  resetForNewRequest: () => void;
 }
 
 const WizardContext = createContext<WizardContextValue | undefined>(undefined);
@@ -229,6 +232,12 @@ export function WizardProvider({
     }));
   };
 
+  const resetForNewRequest = () => {
+    setRequest(createEmptyRequest(demandePar));
+    setCurrentStep(0);
+    setFurthestStep(0);
+  };
+
   const value: WizardContextValue = {
     request,
     setRequest,
@@ -245,6 +254,7 @@ export function WizardProvider({
     stepCount,
     setTypeDemande,
     submitRequest,
+    resetForNewRequest,
   };
 
   return <WizardContext.Provider value={value}>{children}</WizardContext.Provider>;

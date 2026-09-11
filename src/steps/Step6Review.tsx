@@ -33,7 +33,7 @@ function extractSubmitErrorMessage(err: unknown): string {
 }
 
 export function Step6Review() {
-  const { request, goToStep, submitRequest } = useWizard();
+  const { request, goToStep, submitRequest, resetForNewRequest } = useWizard();
   const { employee: e, access: a, equipment: eq, applications: apps, d365: d, comments: c } = request;
   const selected = e.employee;
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -383,7 +383,13 @@ export function Step6Review() {
       )}
 
       <StepFooter onSubmit={handleSubmit} submitDisabled={isSubmitting} isSubmitting={isSubmitting} />
-      <SubmissionModal open={showConfirmation} onClose={() => setShowConfirmation(false)} />
+      <SubmissionModal
+        open={showConfirmation}
+        onClose={() => {
+          setShowConfirmation(false);
+          resetForNewRequest();
+        }}
+      />
     </div>
   );
 }

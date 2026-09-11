@@ -21,7 +21,7 @@ export function SubmissionModal({ open, onClose }: SubmissionModalProps) {
           de l'équipe informatique dans TDX.
         </p>
         <button type="button" className="btn btn-primary" onClick={onClose}>
-          Fermer
+          Faire une nouvelle demande
         </button>
       </div>
     </div>
