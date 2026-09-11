@@ -31,6 +31,18 @@ public interface IFreshdeskService
     /// it is called while rendering a list, where one unreachable ticket must not fail the whole
     /// page. A failure returns Unknown, which the UI shows as such rather than guessing.</summary>
     Task<LiveTicketStatus> GetTicketStatusAsync(long ticketId, CancellationToken ct);
+
+    /// <summary>Adds files to an already-created ticket (Freshdesk's PUT .../tickets/{id} with
+    /// multipart attachments — there is no separate "create ticket with attachments" call in this
+    /// app, since Documents justificatifs are uploaded in a follow-up request after the main
+    /// submission, once the ticket already exists). Throws on failure — same best-effort contract as
+    /// the Create* methods; the caller decides what to do about it.</summary>
+    Task AddAttachmentsAsync(long ticketId, IReadOnlyList<AttachmentFile> files, CancellationToken ct);
 }
+
+/// <summary>In-memory file content shared between IFreshdeskService.AddAttachmentsAsync and
+/// IEmailNotificationService's attachment overload — read once from disk by the caller so both can
+/// use the same bytes without re-reading the file twice.</summary>
+public record AttachmentFile(string FileName, string ContentType, byte[] Bytes);
 
 public class FreshdeskTicketException(string message) : Exception(message);

@@ -2,6 +2,7 @@ import type { ApiClient } from './client';
 import type {
   AdAccountDto,
   AdminRequestDetailDto,
+  AttachmentDto,
   AdminRequestListDto,
   TicketViewDto,
   AppUserDto,
@@ -57,6 +58,14 @@ export function createApi(client: ApiClient) {
       /** Creates AND submits in one call — no partial-save state. See SubmitRequestDto. */
       submit: (dto: SubmitRequestDto) => client.post<RequestDto>('/api/requests', dto),
       get: (id: number) => client.get<RequestDto>(`/api/requests/${id}`),
+      /** Follow-up call after submit — "Documents justificatifs" are never part of the atomic
+       * submit itself. Best-effort on the server past the point the files are saved: see
+       * RequestsController.UploadAttachments / NotifyAttachmentsUploadedAsync. */
+      uploadAttachments: (id: number, files: File[]) => {
+        const formData = new FormData();
+        for (const file of files) formData.append('files', file);
+        return client.postFiles<AttachmentDto[]>(`/api/requests/${id}/attachments`, formData);
+      },
     },
     d365SecurityRoles: {
       list: () => client.get<D365SecurityRoleMappingDto[]>('/api/d365-security-roles'),

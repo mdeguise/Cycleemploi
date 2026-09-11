@@ -244,6 +244,32 @@ public class FreshdeskService : IFreshdeskService
         return TicketTemplateRenderer.RenderBlock(template, requestValues, employeeValuesList);
     }
 
+    public async Task AddAttachmentsAsync(long ticketId, IReadOnlyList<AttachmentFile> files, CancellationToken ct)
+    {
+        using var content = new MultipartFormDataContent();
+        foreach (var file in files)
+        {
+            var fileContent = new ByteArrayContent(file.Bytes);
+            fileContent.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse(
+                string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType);
+            content.Add(fileContent, "attachments[]", file.FileName);
+        }
+
+        using var requestMessage = new HttpRequestMessage(HttpMethod.Put, $"https://{_options.Subdomain}/api/v2/tickets/{ticketId}")
+        {
+            Content = content
+        };
+        requestMessage.Headers.Authorization = new AuthenticationHeaderValue(
+            "Basic", Convert.ToBase64String(Encoding.ASCII.GetBytes($"{_options.ApiKey}:X")));
+
+        using var response = await _http.SendAsync(requestMessage, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
+            throw new FreshdeskTicketException($"Freshdesk returned {(int)response.StatusCode} {response.ReasonPhrase} while adding attachments to ticket {ticketId}: {responseBody}");
+        }
+    }
+
     private async Task<long> PostTicketAsync(object payload, CancellationToken ct)
     {
         using var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");

@@ -27,7 +27,7 @@ export function createApiClient() {
       ...init,
       credentials: 'include',
       headers: {
-        ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(init?.body && !(init.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
         ...init?.headers,
       },
     });
@@ -51,6 +51,10 @@ export function createApiClient() {
     put: <T>(path: string, body?: unknown) =>
       request<T>(path, { method: 'PUT', body: body ? JSON.stringify(body) : undefined }),
     delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+    // No Content-Type header here — the browser sets multipart/form-data with the right boundary
+    // itself from the FormData body. Setting it manually (like the JSON methods above) would omit
+    // the boundary parameter and the server couldn't parse the parts.
+    postFiles: <T>(path: string, formData: FormData) => request<T>(path, { method: 'POST', body: formData }),
   };
 }
 

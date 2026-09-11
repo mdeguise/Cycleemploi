@@ -19,12 +19,15 @@ public class SendGridEmailNotificationService : IEmailNotificationService
         SendAsync(subject, body, [_options.ToAddress], ct);
 
     public Task SendAsync(string subject, string body, IReadOnlyList<string> toAddresses, CancellationToken ct) =>
-        SendCoreAsync(subject, body, htmlBody: null, toAddresses, ct);
+        SendCoreAsync(subject, body, htmlBody: null, toAddresses, null, ct);
 
     public Task SendAsync(string subject, string plainTextBody, string htmlBody, IReadOnlyList<string> toAddresses, CancellationToken ct) =>
-        SendCoreAsync(subject, plainTextBody, htmlBody, toAddresses, ct);
+        SendCoreAsync(subject, plainTextBody, htmlBody, toAddresses, null, ct);
 
-    private async Task SendCoreAsync(string subject, string plainTextBody, string? htmlBody, IReadOnlyList<string> toAddresses, CancellationToken ct)
+    public Task SendAsync(string subject, string body, IReadOnlyList<string> toAddresses, IReadOnlyList<AttachmentFile> attachments, CancellationToken ct) =>
+        SendCoreAsync(subject, body, htmlBody: null, toAddresses, attachments, ct);
+
+    private async Task SendCoreAsync(string subject, string plainTextBody, string? htmlBody, IReadOnlyList<string> toAddresses, IReadOnlyList<AttachmentFile>? attachments, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(_options.ApiKey))
         {
@@ -44,6 +47,14 @@ public class SendGridEmailNotificationService : IEmailNotificationService
             subject,
             plainTextBody,
             htmlContent: htmlBody);
+
+        if (attachments is { Count: > 0 })
+        {
+            foreach (var file in attachments)
+            {
+                message.AddAttachment(file.FileName, Convert.ToBase64String(file.Bytes), file.ContentType);
+            }
+        }
 
         var response = await client.SendEmailAsync(message, ct);
         if (!response.IsSuccessStatusCode)

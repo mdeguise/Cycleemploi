@@ -45,6 +45,13 @@ public interface ITicketOrchestrationService
     /// request — called by D365AccessApprovalsController.Reject right after it marks the approval
     /// Rejected.</summary>
     Task NotifyRequesterOfD365RejectionAsync(Request request, D365AccessApproval approval, CancellationToken ct);
+
+    /// <summary>Best-effort — catches its own failures, same contract as the Try* methods in
+    /// RunAllAsync. Called by RequestsController right after "Documents justificatifs" files are
+    /// uploaded (a follow-up request after the main submission, since files are never part of the
+    /// atomic create-and-submit call): attaches them to the already-created RH-Général Freshdesk
+    /// ticket if one exists, and emails a copy to the requester referencing the request number.</summary>
+    Task NotifyAttachmentsUploadedAsync(Request request, IReadOnlyList<Attachment> attachments, CancellationToken ct);
 }
 
 /// <summary>All the downstream ticket-system integrations, extracted out of RequestsController so
@@ -999,6 +1006,65 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         catch (Exception emailEx)
         {
             _logger.LogError(emailEx, "Failed to email requester of D365 rejection for request {RequestNumber}", request.RequestNumber);
+        }
+    }
+
+    public async Task NotifyAttachmentsUploadedAsync(Request request, IReadOnlyList<Attachment> attachments, CancellationToken ct)
+    {
+        if (attachments.Count == 0) return;
+
+        List<AttachmentFile> files;
+        try
+        {
+            files = new List<AttachmentFile>(attachments.Count);
+            foreach (var a in attachments)
+            {
+                var bytes = await File.ReadAllBytesAsync(a.StoragePath, ct);
+                files.Add(new AttachmentFile(a.FileName, a.ContentType, bytes));
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to read uploaded attachment files from disk for request {RequestNumber}", request.RequestNumber);
+            return;
+        }
+
+        // Attach to the RH-Général ticket if it was actually created — a Freshdesk-creation failure
+        // is tracked and retried separately (Administration > Demandes); attaching to a ticket that
+        // doesn't exist yet isn't something this method waits for or retries on its own.
+        var tickets = await _tickets.ListForRequestAsync(request.RequestId, ct);
+        var freshdeskTicket = tickets.FirstOrDefault(t => t.Kind == TicketKind.Freshdesk && t.Outcome == TicketOutcome.Created);
+        if (freshdeskTicket is not null && long.TryParse(freshdeskTicket.TicketNumber, out var ticketId))
+        {
+            try
+            {
+                await _freshdesk.AddAttachmentsAsync(ticketId, files, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to attach uploaded files to Freshdesk ticket {TicketId} for request {RequestNumber}", ticketId, request.RequestNumber);
+            }
+        }
+        else
+        {
+            _logger.LogWarning("No Created Freshdesk ticket found for request {RequestNumber} — uploaded attachments were not added to any ticket", request.RequestNumber);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.RequesterEmail))
+        {
+            var subject = $"[Cycle Emploi] Documents justificatifs ajoutés — demande #{request.RequestNumber}";
+            var body =
+                $"Les documents justificatifs suivants ont été ajoutés à votre demande #{request.RequestNumber} et au billet Freshdesk associé :\n\n" +
+                string.Join("\n", files.Select(f => $"- {f.FileName}"));
+
+            try
+            {
+                await _email.SendAsync(subject, body, [request.RequesterEmail], files, ct);
+            }
+            catch (Exception emailEx)
+            {
+                _logger.LogError(emailEx, "Failed to email requester with uploaded attachments for request {RequestNumber}", request.RequestNumber);
+            }
         }
     }
 

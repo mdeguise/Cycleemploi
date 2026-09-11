@@ -156,3 +156,9 @@ public class HelpTicketResultDto
 {
     public int TicketId { get; set; }
 }
+
+public class AttachmentDto
+{
+    public string FileName { get; set; } = null!;
+    public long SizeBytes { get; set; }
+}

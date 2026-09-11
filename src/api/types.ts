@@ -86,6 +86,11 @@ export interface RequestEmployeeDto {
   gestionnaireSnapshot?: string | null;
 }
 
+export interface AttachmentDto {
+  fileName: string;
+  sizeBytes: number;
+}
+
 export interface RequestDto {
   requestId: number;
   requestNumber: string;

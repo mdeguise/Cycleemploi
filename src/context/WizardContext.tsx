@@ -230,6 +230,18 @@ export function WizardProvider({
       demandeNumero: created.requestNumber,
       dateCreation: created.createdAt.slice(0, 10),
     }));
+
+    // Documents justificatifs are never part of the atomic submit above — the request is already
+    // fully submitted by this point, so a failure here (a slow/unavailable upload) must not turn
+    // into a submission failure the requester sees. Best-effort, same as every downstream ticket
+    // integration on the server side.
+    if (request.offboarding.attachments.length > 0) {
+      try {
+        await api.requests.uploadAttachments(created.requestId, request.offboarding.attachments);
+      } catch (err) {
+        console.error('Failed to upload Documents justificatifs', err);
+      }
+    }
   };
 
   const resetForNewRequest = () => {

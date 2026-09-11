@@ -14,4 +14,9 @@ public interface IEmailNotificationService
     /// that renders HTML shows htmlBody; anything else (or "view plain text") falls back to
     /// plainTextBody. Used for the requester confirmation email.</summary>
     Task SendAsync(string subject, string plainTextBody, string htmlBody, IReadOnlyList<string> toAddresses, CancellationToken ct);
+
+    /// <summary>Same as the plain-text overload, with file attachments — used for the "Documents
+    /// justificatifs" follow-up email once an offboarding requester uploads files after submitting
+    /// (see RequestsController's attachment upload endpoint).</summary>
+    Task SendAsync(string subject, string body, IReadOnlyList<string> toAddresses, IReadOnlyList<AttachmentFile> attachments, CancellationToken ct);
 }

@@ -20,6 +20,7 @@ public class RequestsController : ControllerBase
     private readonly RequestAuthorizationService _authz;
     private readonly IAdDirectoryService _ad;
     private readonly ITicketOrchestrationService _orchestration;
+    private readonly IWebHostEnvironment _env;
     private readonly ILogger<RequestsController> _logger;
 
     /// <summary>Systèmes junction rows store the catalog's display text directly (see
@@ -41,6 +42,7 @@ public class RequestsController : ControllerBase
         RequestAuthorizationService authz,
         IAdDirectoryService ad,
         ITicketOrchestrationService orchestration,
+        IWebHostEnvironment env,
         ILogger<RequestsController> logger)
     {
         _db = db;
@@ -49,6 +51,7 @@ public class RequestsController : ControllerBase
         _authz = authz;
         _ad = ad;
         _orchestration = orchestration;
+        _env = env;
         _logger = logger;
     }
 
@@ -240,6 +243,57 @@ public class RequestsController : ControllerBase
         }
 
         return Ok(dto);
+    }
+
+    /// <summary>Uploads "Documents justificatifs" for an already-submitted request — a follow-up
+    /// call from the wizard right after Create returns, never part of the atomic submit itself (see
+    /// Create's doc comment on why nothing else is partial-save). Best-effort from here on: files
+    /// are saved and recorded regardless of whether the Freshdesk/email follow-up succeeds — see
+    /// NotifyAttachmentsUploadedAsync.</summary>
+    [HttpPost("{id:int}/attachments")]
+    [RequestSizeLimit(25_000_000)]
+    public async Task<ActionResult<List<AttachmentDto>>> UploadAttachments(int id, List<IFormFile> files, CancellationToken ct)
+    {
+        var request = await _db.Requests.Include(r => r.Employees).FirstOrDefaultAsync(r => r.RequestId == id, ct);
+        if (request is null) return NotFound();
+        if (request.CreatedByObjectId != User.GetObjectId()) return Forbid();
+        if (files.Count == 0) return BadRequest("Aucun fichier fourni.");
+
+        // App_Data needs BUILTIN\IIS_IUSRS granted Modify on vm-trm-live (not there by default —
+        // confirmed via a real UnauthorizedAccessException the first time this endpoint ran; see
+        // powerapp_canvas_build_state.md).
+        var dir = Path.Combine(_env.ContentRootPath, "App_Data", "attachments", id.ToString());
+        Directory.CreateDirectory(dir);
+
+        var saved = new List<Attachment>();
+        foreach (var file in files)
+        {
+            var safeName = Path.GetFileName(file.FileName);
+            var storagePath = Path.Combine(dir, $"{Guid.NewGuid()}_{safeName}");
+            await using (var stream = System.IO.File.Create(storagePath))
+            {
+                await file.CopyToAsync(stream, ct);
+            }
+
+            var attachment = new Attachment
+            {
+                RequestId = id,
+                FileName = safeName,
+                ContentType = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType,
+                SizeBytes = file.Length,
+                StoragePath = storagePath,
+                UploadedAt = DateTime.UtcNow,
+                UploadedByObjectId = User.GetObjectId()
+            };
+            _db.Attachments.Add(attachment);
+            saved.Add(attachment);
+        }
+
+        await _db.SaveChangesAsync(ct);
+
+        await _orchestration.NotifyAttachmentsUploadedAsync(request, saved, ct);
+
+        return Ok(saved.Select(a => new AttachmentDto { FileName = a.FileName, SizeBytes = a.SizeBytes }).ToList());
     }
 
     private async Task<List<string>> ValidateForSubmitAsync(Request request, SubmitRequestDto dto, AdUserInfo requester, CancellationToken ct)
