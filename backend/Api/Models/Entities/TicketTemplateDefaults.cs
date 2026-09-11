@@ -229,6 +229,7 @@ public static class TicketTemplateDefaults
         new("Stationnement", "Stationnement requis", TicketFieldCategory.Request),
         new("JustificationAcces", "Justification des accès demandés", TicketFieldCategory.Request),
         new("CodeAlarmeDetails", "Précisions sur le code d'alarme", TicketFieldCategory.Request),
+        new("Equipements", "Équipement sélectionné", TicketFieldCategory.Request),
         new("Applications", "Applications sélectionnées", TicketFieldCategory.Request),
         new("CommentairesIT", "Commentaires — technologies de l'information", TicketFieldCategory.Request),
         new("CommentairesStationnement", "Commentaires — stationnement", TicketFieldCategory.Request),
@@ -419,7 +420,16 @@ public static class TicketTemplateDefaults
             TicketTemplateShape.Inline,
             TdxDescriptionRequestFields,
             AllowsEmployeeFields: true,
-            Inline(F("EmployeeName"), T(" - "), F("Gestionnaire"), T(" - "), F("Poste"), T(" - "), F("CodeEmploi"), T(" - "), F("DateEffective"))),
+            Inline(
+                F("EmployeeName"), T(" - "), F("Gestionnaire"), T(" - "), F("Poste"), T(" - "), F("CodeEmploi"), T(" - "), F("DateEffective"),
+                T("<h4>Accès et applications</h4><b>Systèmes et accès demandés :</b> "), F("SystemesAcces"),
+                T("<br><b>Zones ou édifices requis (badge) :</b> "), F("ZonesBadge"),
+                T("<br><b>Justification des accès :</b> "), F("JustificationAcces"),
+                T("<br><b>Précisions sur le code d'alarme :</b> "), F("CodeAlarmeDetails"),
+                T("<br><b>Systèmes POS et hébergement :</b> "), F("PosHebergement"),
+                T("<br><b>Applications :</b> "), F("Applications"),
+                T("<h4>Équipement</h4><b>Équipement demandé :</b> "), F("Equipements"),
+                T("<h4>Commentaires</h4><b>IT :</b> "), F("CommentairesIT"))),
 
         new(
             TicketTemplateKeys.TdxDescriptionOffboarding,
@@ -432,7 +442,15 @@ public static class TicketTemplateDefaults
                 F("EmployeeName"), T(" - "), F("Gestionnaire"), T(" - "), F("Poste"), T(" - "), F("CodeEmploi"), T(" - "), F("DateEffective"),
                 T("<h4>Détails de la cessation</h4><b>Motif de la fin d'emploi ou de la mise à pied :</b> "), F("RaisonArret"),
                 T("<br><b>Précisions sur le motif :</b> "), F("DetailsRaison"),
-                T("<br><b>Cet équipier est-il admissible à une réembauche? :</b> "), F("Reembaucheriez"))),
+                T("<br><b>Cet équipier est-il admissible à une réembauche? :</b> "), F("Reembaucheriez"),
+                T("<h4>Accès et applications</h4><b>Systèmes et accès à retirer :</b> "), F("SystemesAcces"),
+                T("<br><b>Zones ou édifices (badge) :</b> "), F("ZonesBadge"),
+                T("<br><b>Justification des accès :</b> "), F("JustificationAcces"),
+                T("<br><b>Précisions sur le code d'alarme :</b> "), F("CodeAlarmeDetails"),
+                T("<br><b>Systèmes POS et hébergement :</b> "), F("PosHebergement"),
+                T("<br><b>Applications :</b> "), F("Applications"),
+                T("<h4>Équipement</h4><b>Équipement à récupérer :</b> "), F("Equipements"),
+                T("<h4>Commentaires</h4><b>IT :</b> "), F("CommentairesIT"))),
     ];
 
     public static readonly IReadOnlyDictionary<string, TicketTemplateDefinition> ByKey =

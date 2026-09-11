@@ -81,6 +81,7 @@ public class TdxService : ITdxService
         values["Stationnement"] = access?.Stationnement;
         values["JustificationAcces"] = access?.Justification;
         values["CodeAlarmeDetails"] = access?.CodeAlarmeDetails;
+        values["Equipements"] = JoinOrNull(request.EquipmentDetail?.Equipements.Select(x => x.Value));
 
         if (isOffboarding)
         {
@@ -89,6 +90,9 @@ public class TdxService : ITdxService
             values["CommentairesStationnement"] = d?.CommentairesStationnement;
             values["CommentairesPuceAcces"] = d?.CommentairesPuceAcces;
             values["CommentairesRedingote"] = d?.CommentairesRedingote;
+            values["RaisonArret"] = d?.RaisonArret;
+            values["DetailsRaison"] = d?.DetailsRaison;
+            values["Reembaucheriez"] = d?.Reembaucheriez;
         }
         else
         {
