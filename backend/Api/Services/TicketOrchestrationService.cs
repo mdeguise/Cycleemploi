@@ -90,6 +90,13 @@ public class TicketOrchestrationService : ITicketOrchestrationService
     /// with why — the approver has no other way to know it came from Dynaway, not a manual request.</summary>
     private const string DynawayApplicationValue = "Dynaway";
 
+    private const string AccesAdCourrielSystemeValue = "Compte Active Directory / courriel";
+    private const string AccesVpnSystemeValue = "Accès VPN";
+    private const string Microsoft365ApplicationValue = "Microsoft 365";
+    private const string TeamsApplicationValue = "Teams";
+    private const string OrdinateurPortableEquipementValue = "Ordinateur portable";
+    private const string OrdinateurBureauEquipementValue = "Ordinateur de bureau";
+
     /// <summary>Internal (not private) so D365AccessApprovalsController.SubmitAdHoc can prepend the
     /// same wording when its own "Besoin de gestion des actifs (Asset Management) avec Dynaway"
     /// checkbox is ticked — same reasoning as the onboarding wizard's Dynaway checkbox, just a
@@ -716,8 +723,36 @@ public class TicketOrchestrationService : ITicketOrchestrationService
     /// regardless of type — unlike the D365 badge/alarm integration, there's no gating condition
     /// here. Loops per employee on the request, same as the Freshdesk child tickets and D365
     /// integration, since a termination can target several people at once.</summary>
+    /// <summary>Offboarding always gets a TDX ticket (IT still needs to know to deprovision).
+    /// Onboarding/Réactivation only gets one when the request actually asks for something IT
+    /// Operations would act on — a request with none of these checked (e.g. only a badge or parking)
+    /// has nothing for T - IT Operations to do. Kept as an explicit user-approved list rather than
+    /// "any access/equipment/application selected" so adding a new catalog item never silently starts
+    /// (or stops) triggering a TDX ticket.</summary>
+    private static bool RequiresTdxTicket(Request request)
+    {
+        if (request.RequestType == RequestType.Offboarding) return true;
+
+        var systemes = request.AccessDetail?.Systemes.Select(s => s.Value).ToHashSet() ?? [];
+        var applications = request.ApplicationsDetail?.Applications.Select(a => a.Value).ToHashSet() ?? [];
+        var equipements = request.EquipmentDetail?.Equipements.Select(e => e.Value).ToHashSet() ?? [];
+
+        return systemes.Contains(AccesAdCourrielSystemeValue)
+            || systemes.Contains(AccesVpnSystemeValue)
+            || systemes.Contains(AccesD365SystemeValue)
+            || applications.Contains(Microsoft365ApplicationValue)
+            || applications.Contains(TeamsApplicationValue)
+            || applications.Contains(DynawayApplicationValue)
+            || !string.IsNullOrWhiteSpace(request.ApplicationsDetail?.AutreLogiciel)
+            || (request.AccessDetail?.PosHebergement.Count ?? 0) > 0
+            || equipements.Contains(OrdinateurPortableEquipementValue)
+            || equipements.Contains(OrdinateurBureauEquipementValue);
+    }
+
     private async Task TryCreateTdxTicketAsync(Request request, AdUserInfo requester, CancellationToken ct, int? onlyRequestEmployeeId = null)
     {
+        if (!RequiresTdxTicket(request)) return;
+
         List<RequestEmployee> employeesToProcess = request.RequestType == RequestType.Offboarding
             ? request.Employees.ToList()
             : (request.Employees.FirstOrDefault(e => e.IsPrimary) ?? request.Employees.FirstOrDefault()) is { } emp
