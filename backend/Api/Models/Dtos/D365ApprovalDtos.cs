@@ -188,6 +188,17 @@ public class CompleteD365AccessApprovalResultDto
     public string? Error { get; set; }
 }
 
+/// <summary>Stage2 only ever confirms what Stage1 already entered — no other field is editable at
+/// this stage. ApprovalLimit is the one exception, requested specifically for the two named Stage2
+/// approvers (Marie-Eve Bessette, Jinny Montreuil-Emond) to correct before the TDX ticket is
+/// created; null means "leave Stage1's value as-is". No further server-side restriction beyond the
+/// existing CanActAtCurrentStageAsync check — every Stage2 holder is one of those two people by
+/// construction (see D365ApprovalRoles), there's no third caller to distinguish from.</summary>
+public class ConfirmStage2Dto
+{
+    public decimal? ApprovalLimit { get; set; }
+}
+
 public class CancelD365AccessApprovalDto
 {
     /// <summary>Optional — shown alongside the cancellation in the Complétées/Annulées list, purely

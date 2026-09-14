@@ -309,6 +309,11 @@ export interface CompleteD365AccessApprovalResultDto {
   error?: string | null;
 }
 
+/** null means "leave Stage1's value as-is" — see ConfirmStage2Dto's server-side doc comment. */
+export interface ConfirmStage2Dto {
+  approvalLimit?: number | null;
+}
+
 export interface CancelD365AccessApprovalDto {
   reason?: string | null;
 }

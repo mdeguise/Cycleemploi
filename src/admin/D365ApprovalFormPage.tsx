@@ -4,10 +4,22 @@ import { useApi } from '../api/ApiContext';
 import { Field } from '../components/FormField';
 import type { D365AccessApprovalDetailDto, MeDto } from '../api/types';
 
+/** Stage2's form is otherwise entirely read-only (it only ever confirms what Stage1 entered) — this
+ * one field is the exception, unlocked specifically for these two named Stage2 approvers so they can
+ * correct the amount before the TDX ticket is created. No further server-side restriction beyond the
+ * existing role check: every Stage2 holder is one of these two people by construction. */
+const ELEVATED_LIMIT_EMAILS = ['mbessette@tremblant.ca', 'jmontreuil-emond@tremblant.ca'];
+const ELEVATED_APPROVAL_LIMITS = [0, 500, 2000, 5000, 25000, 50000, 100000, 500000, 1000000, 1500000];
+
+function formatLimit(v: number): string {
+  return v === 0 ? 'Aucune' : `${v.toLocaleString('fr-CA')} $`;
+}
+
 export function D365ApprovalFormPage({ me }: { me: MeDto }) {
   const { requestId } = useParams<{ requestId: string }>();
   const navigate = useNavigate();
   const api = useApi();
+  const isElevatedApprover = ELEVATED_LIMIT_EMAILS.includes((me.email ?? '').toLowerCase());
 
   const [data, setData] = useState<D365AccessApprovalDetailDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -102,7 +114,11 @@ export function D365ApprovalFormPage({ me }: { me: MeDto }) {
     setSubmitError(null);
     setIsSubmitting(true);
     try {
-      const result = await api.d365AccessApprovals.confirmStage2(Number(requestId));
+      const canEditLimit = isElevatedApprover && data?.status === 'Stage1Approved';
+      const result = await api.d365AccessApprovals.confirmStage2(
+        Number(requestId),
+        canEditLimit ? { approvalLimit: Number(approvalLimit) } : {},
+      );
       setSubmitResult(result);
       if (!result.succeeded) {
         setSubmitError(result.error ?? 'La création du billet TDX a échoué.');
@@ -163,6 +179,8 @@ export function D365ApprovalFormPage({ me }: { me: MeDto }) {
   const isEditableStage = data.canComplete && data.status === 'Pending';
   const isConfirmStage = data.canConfirmStage2 && data.status === 'Stage1Approved';
   const readOnly = !isEditableStage || !!submitResult;
+  const approvalLimitEditableAtConfirm = isConfirmStage && isElevatedApprover && !submitResult;
+  const approvalLimitReadOnly = readOnly && !approvalLimitEditableAtConfirm;
 
   const stageLabel = data.isDynawayPath ? 'Dynaway (étape unique)' : data.status === 'Stage1Approved' ? 'Étape 2' : 'Étape 1';
 
@@ -251,7 +269,20 @@ export function D365ApprovalFormPage({ me }: { me: MeDto }) {
             <input type="text" value={jobTitleEnglish} onChange={(ev) => setJobTitleEnglish(ev.target.value)} disabled={readOnly} />
           </Field>
           <Field label="Limite d'approbation ($)" required>
-            <input type="number" min="0" step="0.01" value={approvalLimit} onChange={(ev) => setApprovalLimit(ev.target.value)} disabled={readOnly} />
+            {approvalLimitEditableAtConfirm ? (
+              <select value={approvalLimit} onChange={(ev) => setApprovalLimit(ev.target.value)}>
+                {/* Stage1 enters a free numeric amount — if it isn't one of the fixed choices, show
+                    it anyway so the dropdown never silently substitutes a different value. */}
+                {!ELEVATED_APPROVAL_LIMITS.includes(Number(approvalLimit)) && approvalLimit !== '' && (
+                  <option value={approvalLimit}>{Number(approvalLimit).toLocaleString('fr-CA')} $ (saisi à l'étape 1)</option>
+                )}
+                {ELEVATED_APPROVAL_LIMITS.map((v) => (
+                  <option key={v} value={v}>{formatLimit(v)}</option>
+                ))}
+              </select>
+            ) : (
+              <input type="number" min="0" step="0.01" value={approvalLimit} onChange={(ev) => setApprovalLimit(ev.target.value)} disabled={approvalLimitReadOnly} />
+            )}
           </Field>
         </div>
 

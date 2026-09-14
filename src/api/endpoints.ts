@@ -33,6 +33,7 @@ import type {
   RejectD365AccessApprovalDto,
   CompleteD365AccessApprovalDto,
   CompleteD365AccessApprovalResultDto,
+  ConfirmStage2Dto,
   D365AdHocPrefillDto,
 } from './types';
 
@@ -104,8 +105,8 @@ export function createApi(client: ApiClient) {
         client.get<D365AccessApprovalDetailDto>(`/api/d365-access-approvals/${requestId}`),
       complete: (requestId: number, dto: CompleteD365AccessApprovalDto) =>
         client.post<CompleteD365AccessApprovalResultDto>(`/api/d365-access-approvals/${requestId}/complete`, dto),
-      confirmStage2: (requestId: number) =>
-        client.post<CompleteD365AccessApprovalResultDto>(`/api/d365-access-approvals/${requestId}/confirm-stage2`, {}),
+      confirmStage2: (requestId: number, dto: ConfirmStage2Dto = {}) =>
+        client.post<CompleteD365AccessApprovalResultDto>(`/api/d365-access-approvals/${requestId}/confirm-stage2`, dto),
       reject: (requestId: number, dto: RejectD365AccessApprovalDto) =>
         client.post<void>(`/api/d365-access-approvals/${requestId}/reject`, dto),
       cancel: (requestId: number, dto: CancelD365AccessApprovalDto) =>

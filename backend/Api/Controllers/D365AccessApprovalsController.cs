@@ -438,7 +438,7 @@ public class D365AccessApprovalsController : ControllerBase
     /// approval Completed and attempts the real TDX ticket, same as Complete does on the Dynaway
     /// path.</summary>
     [HttpPost("{requestId:int}/confirm-stage2")]
-    public async Task<ActionResult<CompleteD365AccessApprovalResultDto>> ConfirmStage2(int requestId, CancellationToken ct)
+    public async Task<ActionResult<CompleteD365AccessApprovalResultDto>> ConfirmStage2(int requestId, ConfirmStage2Dto dto, CancellationToken ct)
     {
         var approval = await _db.D365AccessApprovals
             .Include(a => a.Request).ThenInclude(r => r.Employees)
@@ -452,6 +452,11 @@ public class D365AccessApprovalsController : ControllerBase
 
         var isDynawayPath = approval.NeedsDynaway;
         if (!await CanActAtCurrentStageAsync(isDynawayPath, approval.Status, ct)) return Forbid();
+
+        if (dto.ApprovalLimit is { } newLimit && newLimit >= 0)
+        {
+            approval.ApprovalLimit = newLimit;
+        }
 
         approval.Status = D365ApprovalStatus.Completed;
         approval.CompletedByObjectId = User.GetObjectId();
