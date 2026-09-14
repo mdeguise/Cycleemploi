@@ -94,6 +94,7 @@ public class TicketOrchestrationService : ITicketOrchestrationService
     private const string AccesVpnSystemeValue = "Accès VPN";
     private const string Microsoft365ApplicationValue = "Microsoft 365";
     private const string TeamsApplicationValue = "Teams";
+    private const string ConfigurationEvoliaSystemeValue = "Configuration dans Evolia";
     private const string OrdinateurPortableEquipementValue = "Ordinateur portable";
     private const string OrdinateurBureauEquipementValue = "Ordinateur de bureau";
 
@@ -523,6 +524,7 @@ public class TicketOrchestrationService : ITicketOrchestrationService
             // already succeeded, while still creating the ones that never got made.
             foreach (var kind in FannedOutKinds)
             {
+                if (kind == TicketKind.FreshdeskChildWithJobCodes && !RequiresHorairesTicket(request)) continue;
                 if (!await ChildAlreadyCreatedAsync(request.RequestId, kind, ct))
                 {
                     await TryCreateFannedOutFreshdeskTicketAsync(request, requesterEmail, kind, ct);
@@ -572,13 +574,26 @@ public class TicketOrchestrationService : ITicketOrchestrationService
     }
 
     /// <summary>Every independent (non-main) Freshdesk ticket kind fanned out on every submission —
-    /// order here is just iteration order, not significance.</summary>
+    /// order here is just iteration order, not significance. FreshdeskChildWithJobCodes (RH -
+    /// Horaires) is the one exception: see RequiresHorairesTicket, checked by name at each call
+    /// site rather than filtered out of this list, so the list itself stays a simple enumeration of
+    /// "every fanned-out kind that exists."</summary>
     private static readonly TicketKind[] FannedOutKinds =
     [
         TicketKind.FreshdeskChildWithJobCodes,
         TicketKind.FreshdeskChildWithoutJobCodes,
         TicketKind.FreshdeskStationnement
     ];
+
+    /// <summary>Offboarding always gets the RH - Horaires ticket (payroll needs to know regardless).
+    /// Onboarding/Réactivation only gets one when "Configuration dans Evolia" was checked — per user
+    /// request, RH - Horaires' actual job here is Evolia scheduling setup, so no Evolia checkbox
+    /// means nothing for them to do.</summary>
+    private static bool RequiresHorairesTicket(Request request)
+    {
+        if (request.RequestType == RequestType.Offboarding) return true;
+        return request.AccessDetail?.Systemes.Any(s => s.Value == ConfigurationEvoliaSystemeValue) ?? false;
+    }
 
     private static (long GroupId, string GroupName) FannedOutDestination(TicketKind kind, FreshdeskOptions options) => kind switch
     {

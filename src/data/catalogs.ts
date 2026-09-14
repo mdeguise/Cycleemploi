@@ -62,11 +62,13 @@ export const SYSTEMES_ACCES: AccessSystem[] = [
   { nom: 'Besoin de code d\'alarme', description: 'Créer un code d\'alarme individuel pour cet employé.' },
   { nom: 'Stationnement requis', description: 'Réserver un ou des stationnements pour cet employé.' },
   { nom: 'Accès D365', description: 'Accès à Dynamics 365 (Comptes fournisseurs, Grand livre, Comptes clients, Approvisionnement)' },
+  { nom: 'Configuration dans Evolia', description: 'Configurer cet employé dans Evolia (horaires de travail).' },
 ];
 
 export const ACCES_BADGE = 'Badge d\'accès aux édifices';
 export const BESOIN_CODE_ALARME = 'Besoin de code d\'alarme';
 export const STATIONNEMENT_REQUIS = 'Stationnement requis';
+export const CONFIGURATION_EVOLIA = 'Configuration dans Evolia';
 export const ACCES_D365 = 'Accès D365';
 
 export interface StationnementOption {
