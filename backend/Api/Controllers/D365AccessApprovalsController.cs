@@ -37,7 +37,7 @@ public class D365AccessApprovalsController : ControllerBase
     /// control, not the dropdown. Internal so RequestsController can apply the same validation to the
     /// wizard's own "D365 et Dynaway" step.</summary>
     internal static readonly string[] ElevatedApprovalLimitEmails = ["mbessette@tremblant.ca"];
-    internal static readonly decimal[] StandardApprovalLimits = [0, 2000, 5000];
+    internal static readonly decimal[] StandardApprovalLimits = [500, 2000, 5000];
     internal static readonly decimal[] ElevatedApprovalLimits = [0, 2000, 5000, 25000, 50000, 100000, 500000, 1000000, 1500000];
 
     private readonly AppDbContext _db;

@@ -29,7 +29,7 @@ const ACCESS_TYPE_LABELS: Record<string, string> = {
  * D365AccessApprovalsController.ElevatedApprovalLimitEmails) gets the full one, same catalog the
  * standalone D365AccessRequest app uses. UI-only convenience: the backend re-checks the submitted
  * value against the same two catalogs. */
-const STANDARD_APPROVAL_LIMITS = [0, 2000, 5000];
+const STANDARD_APPROVAL_LIMITS = [500, 2000, 5000];
 const ELEVATED_APPROVAL_LIMITS = [0, 2000, 5000, 25000, 50000, 100000, 500000, 1000000, 1500000];
 const ELEVATED_APPROVAL_LIMIT_EMAILS = ['mbessette@tremblant.ca'];
 
@@ -56,6 +56,16 @@ export function StepD365Dynaway() {
   const approvalLimitOptions = ELEVATED_APPROVAL_LIMIT_EMAILS.includes((meEmail ?? '').toLowerCase())
     ? ELEVATED_APPROVAL_LIMITS
     : STANDARD_APPROVAL_LIMITS;
+
+  // The stored value can predate a catalog change (e.g. the default used to be 0/Aucune, no longer
+  // a standard option) or belong to the other catalog entirely — snap it to a valid choice so the
+  // dropdown's displayed value and the value actually submitted never disagree.
+  useEffect(() => {
+    if (!approvalLimitOptions.includes(Number(d.approvalLimit))) {
+      setRequest((prev) => ({ ...prev, d365: { ...prev.d365, approvalLimit: String(approvalLimitOptions[0]) } }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meEmail, d.approvalLimit]);
 
   useEffect(() => {
     if (!d365Selected || !employee || prefillLoadedFor === employee.workdayEmployeeId) return;
@@ -169,8 +179,8 @@ export function StepD365Dynaway() {
           disabledHint={dynawaySelected ? 'Requis automatiquement — Dynaway est sélectionné ci-dessous.' : undefined}
         />
         <ChoiceCard
-          title="Dynaway"
-          description="Gestion des actifs et de la maintenance (EAM) — requiert automatiquement un accès D365."
+          title="Besoin de gestion des actifs (Asset Management) avec Dynaway"
+          description="Gestion des actifs et de la maintenance (EAM) — requiert automatiquement un accès D365. Approuvé exclusivement par Pierre-Luc Carpentier."
           selected={dynawaySelected}
           onToggle={toggleDynaway}
         />
