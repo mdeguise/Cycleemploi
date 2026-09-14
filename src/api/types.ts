@@ -175,8 +175,9 @@ export interface D365UserSecurityRoleDto {
 
 // --- D365 access approval (D365ApproversController / D365AccessApprovalsController) ---
 
-/** "Dynaway" | "Stage1" | "Stage2" — see backend D365ApprovalRoles. */
-export type D365ApprovalRole = 'Dynaway' | 'Stage1' | 'Stage2';
+/** See backend D365ApprovalRoles. Stage1/Stage2 are the legacy generic model, kept only so rows
+ * seeded before the Dynaway/Procurement/Other redesign keep displaying — never newly assignable. */
+export type D365ApprovalRole = 'Dynaway' | 'Stage1' | 'Stage2' | 'ProcurementStage1' | 'ProcurementStage2' | 'Other';
 
 export interface D365ApproverDto {
   d365ApproverId: number;
@@ -227,6 +228,9 @@ export interface D365AccessApprovalSummaryDto {
   /** "Pending" | "Stage1Approved" | "Completed" | "Cancelled" | "Rejected". */
   status: string;
   isDynawayPath: boolean;
+  /** "Dynaway" | "Procurement" | "Other" for an approval created after the routing redesign — null
+   * for one created before it (legacy generic Stage1/Stage2 routing). */
+  category?: string | null;
   createdAt: string;
   stage1ApprovedByDisplayName?: string | null;
   stage1ApprovedAt?: string | null;
@@ -249,6 +253,9 @@ export interface D365AccessApprovalDetailDto {
   /** "Pending" | "Stage1Approved" | "Completed" | "Cancelled" | "Rejected". */
   status: string;
   isDynawayPath: boolean;
+  /** "Dynaway" | "Procurement" | "Other" for an approval created after the routing redesign — null
+   * for one created before it (legacy generic Stage1/Stage2 routing). */
+  category?: string | null;
   cancelledByDisplayName?: string | null;
   cancelledAt?: string | null;
   cancelReason?: string | null;

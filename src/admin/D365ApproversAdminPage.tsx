@@ -4,11 +4,16 @@ import type { D365ApprovalRole, D365ApproverDto, D365ViewerDto } from '../api/ty
 import { usePicker, PickerField } from '../components/AdPicker';
 
 const APPROVAL_ROLE_LABELS: Record<string, string> = {
-  Dynaway: 'Dynaway (étape unique)',
-  Stage1: 'Étape 1',
-  Stage2: 'Étape 2',
+  Dynaway: 'DYNAWAY (étape unique)',
+  Other: 'OTHER (étape unique)',
+  ProcurementStage1: 'PROCUREMENT — Étape 1',
+  ProcurementStage2: 'PROCUREMENT — Étape 2',
+  // Legacy — kept so rows seeded before the Dynaway/Procurement/Other redesign still display
+  // correctly; never offered in APPROVAL_ROLES below.
+  Stage1: 'Étape 1 (ancien modèle)',
+  Stage2: 'Étape 2 (ancien modèle)',
 };
-const APPROVAL_ROLES: D365ApprovalRole[] = ['Dynaway', 'Stage1', 'Stage2'];
+const APPROVAL_ROLES: D365ApprovalRole[] = ['Dynaway', 'ProcurementStage1', 'ProcurementStage2', 'Other'];
 
 function ApproversSection() {
   const api = useApi();
@@ -71,10 +76,13 @@ function ApproversSection() {
       <div className="field-section-title">Approbateurs D365</div>
       <div className="step-panel__subtitle" style={{ marginTop: -4 }}>
         Personnes qui reçoivent un lien pour agir sur une demande d'accès D365. Une demande qui coche
-        « Besoin de gestion des actifs (Asset Management) avec Dynaway » va directement à <strong>Dynaway</strong> (approbation
-        unique, billet TDX créé immédiatement). Toute autre demande passe d'abord par <strong>Étape 1</strong> (remplit le
-        formulaire), puis par <strong>Étape 2</strong> (confirmation finale, sans nouvelle saisie) avant la création du billet
-        TDX. Plusieurs personnes peuvent partager le même rôle — n'importe laquelle peut agir pour cette étape.
+        « Besoin de gestion des actifs (Asset Management) avec Dynaway » va directement à <strong>DYNAWAY</strong> (approbation
+        unique, billet TDX créé immédiatement). Une demande qui coche au moins un rôle Procurement passe d'abord par{' '}
+        <strong>PROCUREMENT — Étape 1</strong> (remplit le formulaire), puis par <strong>PROCUREMENT — Étape 2</strong>{' '}
+        (confirmation finale, sans nouvelle saisie) avant la création du billet TDX. Toute autre demande va directement à{' '}
+        <strong>OTHER</strong> (approbation unique, comme Dynaway). Plusieurs personnes peuvent partager le même rôle —
+        n'importe laquelle peut agir pour cette étape. Les rôles « ancien modèle » ne sont plus assignables — ils restent
+        visibles uniquement pour les demandes déjà en cours soumises avant ce changement.
       </div>
 
       {isLoading && <div>Chargement…</div>}

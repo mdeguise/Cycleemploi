@@ -31,7 +31,11 @@ export function D365ApprovalsListPage({ me }: { me: MeDto }) {
   const rejected = rows.filter((r) => r.status === 'Rejected');
 
   const stageLabel = (r: D365AccessApprovalSummaryDto) =>
-    r.isDynawayPath ? 'Dynaway' : r.status === 'Stage1Approved' ? 'Étape 2' : 'Étape 1';
+    r.category === 'Dynaway' ? 'Dynaway'
+    : r.category === 'Other' ? 'Other'
+    : r.category === 'Procurement' ? (r.status === 'Stage1Approved' ? 'Procurement — Étape 2' : 'Procurement — Étape 1')
+    : r.isDynawayPath ? 'Dynaway'
+    : r.status === 'Stage1Approved' ? 'Étape 2' : 'Étape 1';
 
   // ticketState is the two-way "does a human still need to look at this" summary (Open/Closed),
   // normalized across Freshdesk and TDX's very different status models — see LiveTicketStatus.cs.

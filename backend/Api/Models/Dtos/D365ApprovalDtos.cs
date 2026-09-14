@@ -71,6 +71,12 @@ public class D365AccessApprovalSummaryDto
     /// false means the normal Stage1-then-Stage2 chain applies.</summary>
     public bool IsDynawayPath { get; set; }
 
+    /// <summary>"Dynaway" | "Procurement" | "Other" for any approval created after the routing
+    /// redesign (see D365AccessApproval.ApprovalCategory) — null for one created before it, which
+    /// still routes through the legacy generic Stage1/Stage2 model. Procurement is two-stage;
+    /// Dynaway and Other are both single-stage.</summary>
+    public string? Category { get; set; }
+
     public DateTime CreatedAt { get; set; }
     public string? Stage1ApprovedByDisplayName { get; set; }
     public DateTime? Stage1ApprovedAt { get; set; }
@@ -108,6 +114,11 @@ public class D365AccessApprovalDetailDto
     /// approver acts (via CanComplete). False means the normal Stage1 (CanComplete) then Stage2
     /// (CanConfirmStage2) chain applies.</summary>
     public bool IsDynawayPath { get; set; }
+
+    /// <summary>"Dynaway" | "Procurement" | "Other" for any approval created after the routing
+    /// redesign — null for one created before it (legacy generic Stage1/Stage2 routing). See
+    /// D365AccessApproval.ApprovalCategory.</summary>
+    public string? Category { get; set; }
 
     /// <summary>True for the Dynaway approver on a Dynaway request, or the Stage1 approver on any
     /// other request, while Status is Pending — fills out the form and either completes or rejects

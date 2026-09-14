@@ -850,6 +850,9 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         [D365ApprovalRoles.Dynaway] = "Dynaway",
         [D365ApprovalRoles.Stage1] = "première étape",
         [D365ApprovalRoles.Stage2] = "deuxième étape",
+        [D365ApprovalRoles.ProcurementStage1] = "Procurement — première étape",
+        [D365ApprovalRoles.ProcurementStage2] = "Procurement — deuxième étape",
+        [D365ApprovalRoles.Other] = "Autre",
     };
 
     /// <summary>Creates the D365AccessApproval "pending" row when "Accès D365" was selected —
@@ -902,6 +905,7 @@ public class TicketOrchestrationService : ITicketOrchestrationService
             RequestEmployeeId = employee.RequestEmployeeId,
             Status = D365ApprovalStatus.Pending,
             NeedsDynaway = dynawaySelected,
+            ApprovalCategory = D365ApprovalCategories.Determine(dynawaySelected, d365Detail?.Roles ?? []),
             AccessType = d365Detail?.AccessType,
             JobTitleEnglish = d365Detail?.JobTitleEnglish,
             LegalEntity = d365Detail is null ? null : D365AccessApprovalsController.FixedLegalEntity,
@@ -921,7 +925,12 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         _db.D365AccessApprovals.Add(approval);
         await _db.SaveChangesAsync(ct);
 
-        var routingRole = dynawaySelected ? D365ApprovalRoles.Dynaway : D365ApprovalRoles.Stage1;
+        var routingRole = approval.ApprovalCategory switch
+        {
+            D365ApprovalCategories.Dynaway => D365ApprovalRoles.Dynaway,
+            D365ApprovalCategories.Procurement => D365ApprovalRoles.ProcurementStage1,
+            _ => D365ApprovalRoles.Other
+        };
         await NotifyD365ApproversOfAdHocRequestAsync(request, approval, routingRole, ct);
     }
 
@@ -988,13 +997,14 @@ public class TicketOrchestrationService : ITicketOrchestrationService
             ?? request.Employees.FirstOrDefault(e => e.IsPrimary) ?? request.Employees.FirstOrDefault();
         if (employee is null) return;
 
-        var approvers = await _d365Approvers.ByRoleAsync(D365ApprovalRoles.Stage2, ct);
+        var stage2Role = D365ApprovalCategories.Stage2Role(approval.ApprovalCategory);
+        var approvers = await _d365Approvers.ByRoleAsync(stage2Role, ct);
         var recipients = approvers.Where(a => !string.IsNullOrWhiteSpace(a.Email)).Select(a => a.Email!).ToList();
         var link = ApprovalLink(request.RequestId);
 
         if (recipients.Count == 0)
         {
-            _logger.LogWarning("No D365Approver holds role Stage2 for request {RequestNumber} — emailing IT instead", request.RequestNumber);
+            _logger.LogWarning("No D365Approver holds role {Role} for request {RequestNumber} — emailing IT instead", stage2Role, request.RequestNumber);
 
             var fallbackSubject = $"[Cycle Emploi] Aucun approbateur D365 (deuxième étape) configuré — demande #{request.RequestNumber} — {employee.NameSnapshot}";
             var fallbackBody =

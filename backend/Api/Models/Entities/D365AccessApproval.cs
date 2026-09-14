@@ -59,6 +59,16 @@ public class D365AccessApproval
     /// (RequestType.D365AccessOnly) never populates ApplicationsDetail at all.</summary>
     public bool NeedsDynaway { get; set; }
 
+    /// <summary>Set once at creation time (D365ApprovalCategories.Determine, from NeedsDynaway plus
+    /// the roles already requested) for every approval created after the Dynaway/Procurement/Other
+    /// redesign — Dynaway routes to the sole Dynaway approver, Procurement goes through
+    /// ProcurementStage1 then ProcurementStage2, Other routes to the sole Other approver (both
+    /// single-stage, same shape as Dynaway). Null on every approval created BEFORE that redesign —
+    /// those keep working under the old generic NeedsDynaway ? Dynaway : Stage1-then-Stage2 routing
+    /// (see D365AccessApprovalsController.CurrentStageRole) rather than being reclassified
+    /// retroactively, per explicit user decision when the redesign shipped.</summary>
+    public string? ApprovalCategory { get; set; }
+
     /// <summary>"New Access" | "Change Access" | "Remove Access" — the real TDX form's own
     /// wording, matched exactly so the value can be sent straight through (see
     /// D365AccessApprovalsController.AllowedAccessTypes). Null on every approval created by the

@@ -182,7 +182,16 @@ export function D365ApprovalFormPage({ me }: { me: MeDto }) {
   const approvalLimitEditableAtConfirm = isConfirmStage && isElevatedApprover && !submitResult;
   const approvalLimitReadOnly = readOnly && !approvalLimitEditableAtConfirm;
 
-  const stageLabel = data.isDynawayPath ? 'Dynaway (étape unique)' : data.status === 'Stage1Approved' ? 'Étape 2' : 'Étape 1';
+  // data.category is null for an approval created before the Dynaway/Procurement/Other redesign —
+  // that one still routes through the legacy generic Stage1/Stage2 chain (isDynawayPath decides
+  // single- vs two-stage there, same as before this redesign shipped).
+  const isSingleStage = data.category === 'Dynaway' || data.category === 'Other' || (data.category == null && data.isDynawayPath);
+  const stageLabel =
+    data.category === 'Dynaway' ? 'Dynaway (étape unique)'
+    : data.category === 'Other' ? 'Other (étape unique)'
+    : data.category === 'Procurement' ? (data.status === 'Stage1Approved' ? 'Procurement — Étape 2' : 'Procurement — Étape 1')
+    : data.isDynawayPath ? 'Dynaway (étape unique)'
+    : data.status === 'Stage1Approved' ? 'Étape 2' : 'Étape 1';
 
   return (
     <div className="step-panel">
@@ -197,7 +206,7 @@ export function D365ApprovalFormPage({ me }: { me: MeDto }) {
 
       {!submitResult && data.status === 'Pending' && (
         <div className="big-notice">
-          {data.isDynawayPath
+          {isSingleStage
             ? 'En appuyant sur « Envoyer », une véritable demande d\'accès D365 sera créée dans TDX (formulaire « D365 - Access », équipe ENT - FinApp Triage) — cette action n\'est pas réversible depuis cette page.'
             : 'En appuyant sur « Envoyer », cette demande passera à l\'étape 2 pour une confirmation finale — aucun billet TDX n\'est encore créé à cette étape.'}
         </div>

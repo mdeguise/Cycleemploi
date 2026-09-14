@@ -86,21 +86,51 @@ public class D365AccessApprovalsController : ControllerBase
         await _viewers.HasAnyAccessAsync(User.GetObjectId(), ct) ||
         await _appUsers.IsAdminAsync(User.GetObjectId(), ct);
 
-    /// <summary>Which D365ApprovalRoles role is authorized to act RIGHT NOW, given the request's
-    /// path and the approval's current status — null once it's in a terminal state (nobody can act
-    /// further).</summary>
-    private static string? CurrentStageRole(bool isDynawayPath, D365ApprovalStatus status) => status switch
+    /// <summary>Whether an approval (new or legacy) is single-stage — fills and finalizes in one
+    /// step — or two-stage. Dynaway and Other (new model) plus a legacy Dynaway approval are
+    /// single-stage; Procurement (new model) and every legacy non-Dynaway approval are two-stage.</summary>
+    private static bool IsSingleStage(D365AccessApproval approval) => approval.ApprovalCategory switch
     {
-        D365ApprovalStatus.Pending => isDynawayPath ? D365ApprovalRoles.Dynaway : D365ApprovalRoles.Stage1,
-        D365ApprovalStatus.Stage1Approved => D365ApprovalRoles.Stage2,
-        _ => null
+        null => approval.NeedsDynaway, // legacy: only Dynaway was single-stage
+        D365ApprovalCategories.Dynaway or D365ApprovalCategories.Other => true,
+        D365ApprovalCategories.Procurement => false,
+        _ => false
     };
+
+    /// <summary>Which D365ApprovalRoles role is authorized to act RIGHT NOW, given the approval's
+    /// category (or the legacy NeedsDynaway routing when it has none) and current status — null
+    /// once it's in a terminal state (nobody can act further).</summary>
+    private static string? CurrentStageRole(D365AccessApproval approval)
+    {
+        if (approval.ApprovalCategory is null)
+        {
+            return approval.Status switch
+            {
+                D365ApprovalStatus.Pending => approval.NeedsDynaway ? D365ApprovalRoles.Dynaway : D365ApprovalRoles.Stage1,
+                D365ApprovalStatus.Stage1Approved => D365ApprovalCategories.Stage2Role(null),
+                _ => null
+            };
+        }
+
+        return approval.ApprovalCategory switch
+        {
+            D365ApprovalCategories.Dynaway => approval.Status == D365ApprovalStatus.Pending ? D365ApprovalRoles.Dynaway : null,
+            D365ApprovalCategories.Other => approval.Status == D365ApprovalStatus.Pending ? D365ApprovalRoles.Other : null,
+            D365ApprovalCategories.Procurement => approval.Status switch
+            {
+                D365ApprovalStatus.Pending => D365ApprovalRoles.ProcurementStage1,
+                D365ApprovalStatus.Stage1Approved => D365ApprovalCategories.Stage2Role(D365ApprovalCategories.Procurement),
+                _ => null
+            },
+            _ => null
+        };
+    }
 
     /// <summary>True if the caller holds whichever role is authorized at the approval's current
     /// stage — the actual gate behind Complete/ConfirmStage2/Reject.</summary>
-    private async Task<bool> CanActAtCurrentStageAsync(bool isDynawayPath, D365ApprovalStatus status, CancellationToken ct)
+    private async Task<bool> CanActAtCurrentStageAsync(D365AccessApproval approval, CancellationToken ct)
     {
-        var role = CurrentStageRole(isDynawayPath, status);
+        var role = CurrentStageRole(approval);
         return role is not null && await _approvers.HasRoleAsync(User.GetObjectId(), role, ct);
     }
 
@@ -108,8 +138,8 @@ public class D365AccessApprovalsController : ControllerBase
     /// even when they aren't the matched approver — cancelling is the only way out for a request
     /// nobody is matched to act on (e.g. a misconfigured D365Approvers table), so it needs a safety
     /// net the others deliberately don't have.</summary>
-    private async Task<bool> CanCancelAsync(bool isDynawayPath, D365ApprovalStatus status, CancellationToken ct) =>
-        await CanActAtCurrentStageAsync(isDynawayPath, status, ct) ||
+    private async Task<bool> CanCancelAsync(D365AccessApproval approval, CancellationToken ct) =>
+        await CanActAtCurrentStageAsync(approval, ct) ||
         await _appUsers.IsAdminAsync(User.GetObjectId(), ct);
 
     [HttpGet]
@@ -180,6 +210,7 @@ public class D365AccessApprovalsController : ControllerBase
                 StartDate = a.Request.OnboardingDetail?.DateEntreePrevue,
                 Status = a.Status.ToString(),
                 IsDynawayPath = a.NeedsDynaway,
+                Category = a.ApprovalCategory,
                 CreatedAt = a.CreatedAt,
                 Stage1ApprovedByDisplayName = a.Stage1ApprovedByDisplayName,
                 Stage1ApprovedAt = a.Stage1ApprovedAt,
@@ -220,8 +251,8 @@ public class D365AccessApprovalsController : ControllerBase
 
         if (!await CanViewAsync(ct)) return Forbid();
         var isDynawayPath = approval.NeedsDynaway;
-        var canActNow = await CanActAtCurrentStageAsync(isDynawayPath, approval.Status, ct);
-        var canCancel = await CanCancelAsync(isDynawayPath, approval.Status, ct);
+        var canActNow = await CanActAtCurrentStageAsync(approval, ct);
+        var canCancel = await CanCancelAsync(approval, ct);
         var isActionableStatus = approval.Status is D365ApprovalStatus.Pending or D365ApprovalStatus.Stage1Approved;
 
         var managerName = await ResolveManagerNameAsync(workdayInfo?.ManagerId, workdayInfo?.Manager, ct);
@@ -233,6 +264,7 @@ public class D365AccessApprovalsController : ControllerBase
             RequestNumber = approval.Request.RequestNumber,
             Status = approval.Status.ToString(),
             IsDynawayPath = isDynawayPath,
+            Category = approval.ApprovalCategory,
             CancelledByDisplayName = approval.CancelledByDisplayName,
             CancelledAt = approval.CancelledAt,
             CancelReason = approval.CancelReason,
@@ -336,13 +368,15 @@ public class D365AccessApprovalsController : ControllerBase
             .ToList();
     }
 
-    /// <summary>The Envoyer action — Dynaway approver on a Dynaway request (single-stage, same
-    /// behavior as before this redesign), or Stage1 approver on every other request. Saves what the
-    /// approver entered; on the Dynaway path this immediately attempts the real TDX ticket (approval
-    /// marked Completed either way — the human decision is made; whether the downstream TDX call
-    /// itself succeeded is reported back and, if not, handled by the normal Administration/Réessayer
-    /// path). On the non-Dynaway path this instead advances to Stage1Approved and emails the Stage2
-    /// approvers — no TDX call happens until ConfirmStage2.</summary>
+    /// <summary>The Envoyer action — whoever CurrentStageRole says is authorized at Pending: the
+    /// Dynaway approver (Dynaway category, or legacy NeedsDynaway), the Other approver (Other
+    /// category, single-stage same shape as Dynaway), or ProcurementStage1/legacy Stage1 (two-stage
+    /// categories). Saves what the approver entered; on a single-stage approval this immediately
+    /// attempts the real TDX ticket (approval marked Completed either way — the human decision is
+    /// made; whether the downstream TDX call itself succeeded is reported back and, if not, handled
+    /// by the normal Administration/Réessayer path). On a two-stage approval this instead advances
+    /// to Stage1Approved and emails the second-stage approvers — no TDX call happens until
+    /// ConfirmStage2.</summary>
     [HttpPost("{requestId:int}/complete")]
     public async Task<ActionResult<CompleteD365AccessApprovalResultDto>> Complete(int requestId, CompleteD365AccessApprovalDto dto, CancellationToken ct)
     {
@@ -358,8 +392,7 @@ public class D365AccessApprovalsController : ControllerBase
             return Conflict(new CompleteD365AccessApprovalResultDto { Succeeded = false, Error = "Cette approbation n'est plus en attente de cette étape." });
         }
 
-        var isDynawayPath = approval.NeedsDynaway;
-        if (!await CanActAtCurrentStageAsync(isDynawayPath, approval.Status, ct)) return Forbid();
+        if (!await CanActAtCurrentStageAsync(approval, ct)) return Forbid();
 
         var employee = approval.Request.Employees.FirstOrDefault(e => e.RequestEmployeeId == approval.RequestEmployeeId);
         var workdayInfo = employee is null ? null : await _workday.WorkdayDemographics
@@ -398,7 +431,7 @@ public class D365AccessApprovalsController : ControllerBase
 
         var actorDisplayName = _ad.GetUserInfo(User.GetSamAccountName()).DisplayName ?? User.GetObjectId();
 
-        if (!isDynawayPath)
+        if (!IsSingleStage(approval))
         {
             approval.Status = D365ApprovalStatus.Stage1Approved;
             approval.Stage1ApprovedByObjectId = User.GetObjectId();
@@ -421,7 +454,7 @@ public class D365AccessApprovalsController : ControllerBase
 
         await _db.SaveChangesAsync(ct);
 
-        _logger.LogInformation("D365 Dynaway approver {Approver} completed approval for request {RequestNumber}", User.GetObjectId(), approval.Request.RequestNumber);
+        _logger.LogInformation("D365 approver {Approver} completed approval for request {RequestNumber}", User.GetObjectId(), approval.Request.RequestNumber);
 
         var result = await _orchestration.CreateD365AccessTicketAsync(approval.Request, approval, ct);
 
@@ -450,8 +483,7 @@ public class D365AccessApprovalsController : ControllerBase
             return Conflict(new CompleteD365AccessApprovalResultDto { Succeeded = false, Error = "Cette approbation n'est pas en attente d'une confirmation Stage2." });
         }
 
-        var isDynawayPath = approval.NeedsDynaway;
-        if (!await CanActAtCurrentStageAsync(isDynawayPath, approval.Status, ct)) return Forbid();
+        if (!await CanActAtCurrentStageAsync(approval, ct)) return Forbid();
 
         if (dto.ApprovalLimit is { } newLimit && newLimit >= 0)
         {
@@ -495,8 +527,7 @@ public class D365AccessApprovalsController : ControllerBase
             return Conflict("Cette demande n'est plus en attente.");
         }
 
-        var isDynawayPath = approval.NeedsDynaway;
-        if (!await CanActAtCurrentStageAsync(isDynawayPath, approval.Status, ct)) return Forbid();
+        if (!await CanActAtCurrentStageAsync(approval, ct)) return Forbid();
 
         approval.Status = D365ApprovalStatus.Rejected;
         approval.RejectedByObjectId = User.GetObjectId();
@@ -530,8 +561,7 @@ public class D365AccessApprovalsController : ControllerBase
             return Conflict("Cette demande n'est plus en attente.");
         }
 
-        var isDynawayPath = approval.NeedsDynaway;
-        if (!await CanCancelAsync(isDynawayPath, approval.Status, ct)) return Forbid();
+        if (!await CanCancelAsync(approval, ct)) return Forbid();
 
         approval.Status = D365ApprovalStatus.Cancelled;
         approval.CancelledByObjectId = User.GetObjectId();
@@ -709,6 +739,7 @@ public class D365AccessApprovalsController : ControllerBase
             RequestEmployeeId = request.Employees.Single().RequestEmployeeId,
             Status = D365ApprovalStatus.Pending,
             NeedsDynaway = dto.NeedsDynaway,
+            ApprovalCategory = D365ApprovalCategories.Determine(dto.NeedsDynaway, dto.Roles),
             AccessType = dto.AccessType,
             JobTitleEnglish = dto.JobTitleEnglish.Trim(),
             LegalEntity = FixedLegalEntity,
@@ -730,7 +761,12 @@ public class D365AccessApprovalsController : ControllerBase
 
         _logger.LogInformation("D365 approver {Approver} submitted ad-hoc D365 access request {RequestNumber} for {Employee}", User.GetObjectId(), request.RequestNumber, employeeName);
 
-        var routingRole = dto.NeedsDynaway ? D365ApprovalRoles.Dynaway : D365ApprovalRoles.Stage1;
+        var routingRole = approval.ApprovalCategory switch
+        {
+            D365ApprovalCategories.Dynaway => D365ApprovalRoles.Dynaway,
+            D365ApprovalCategories.Procurement => D365ApprovalRoles.ProcurementStage1,
+            _ => D365ApprovalRoles.Other
+        };
         await _orchestration.NotifyD365ApproversOfAdHocRequestAsync(request, approval, routingRole, ct);
 
         return Ok(new SubmitAdHocD365AccessResultDto { RequestId = request.RequestId, RequestNumber = request.RequestNumber });
