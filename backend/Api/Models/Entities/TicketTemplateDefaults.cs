@@ -195,6 +195,7 @@ public static class TicketTemplateDefaults
     [
         new("RequestTypeLabel", "Type de demande", TicketFieldCategory.Request),
         new("DerniereJournee", "Dernière journée de travail", TicketFieldCategory.Request),
+        new("RaisonArret", "Motif de la fin d'emploi ou de la mise à pied", TicketFieldCategory.Request),
         new("SystemesAcces", "Systèmes et accès sélectionnés", TicketFieldCategory.Request),
         new("ZonesBadge", "Zones ou édifices requis pour le badge", TicketFieldCategory.Request),
         new("PosHebergement", "Systèmes POS et hébergement sélectionnés", TicketFieldCategory.Request),
