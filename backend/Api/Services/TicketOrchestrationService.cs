@@ -76,6 +76,7 @@ public class TicketOrchestrationService : ITicketOrchestrationService
     private readonly IRequestTicketService _tickets;
     private readonly ID365ApproverService _d365Approvers;
     private readonly AppOptions _appOptions;
+    private readonly OffboardingNotificationOptions _offboardingNotificationOptions;
     private readonly ILogger<TicketOrchestrationService> _logger;
 
     /// <summary>Systèmes junction rows store the catalog's display text directly — these must match
@@ -117,6 +118,7 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         IRequestTicketService tickets,
         ID365ApproverService d365Approvers,
         IOptions<AppOptions> appOptions,
+        IOptions<OffboardingNotificationOptions> offboardingNotificationOptions,
         ILogger<TicketOrchestrationService> logger)
     {
         _db = db;
@@ -131,6 +133,7 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         _tickets = tickets;
         _d365Approvers = d365Approvers;
         _appOptions = appOptions.Value;
+        _offboardingNotificationOptions = offboardingNotificationOptions.Value;
         _logger = logger;
     }
 
@@ -176,6 +179,33 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         catch (Exception emailEx)
         {
             _logger.LogError(emailEx, "Failed to send the requester confirmation email for request {RequestNumber}", request.RequestNumber);
+        }
+    }
+
+    /// <summary>Copies the RH Général Freshdesk ticket just created for a termination/layoff request
+    /// to the fixed AVISARRETDETRAVAIL@tremblant.ca mailbox — same request content as the ticket
+    /// (via the shared BuildConfirmationSections/RenderPlainText/RenderHtml helpers), plus that
+    /// ticket's own number so the recipient can cross-reference it. Called right after the RH
+    /// Général ticket succeeds in TryCreateFreshdeskTicketAsync — best-effort like every other email
+    /// in this file.</summary>
+    private async Task TrySendAvisArretDeTravailEmailAsync(Request request, long freshdeskTicketId, CancellationToken ct)
+    {
+        try
+        {
+            var sections = BuildConfirmationSections(request);
+            var ticketField = new ConfirmationField(
+                "Billet Freshdesk (RH Général)",
+                $"#{freshdeskTicketId}",
+                TicketUrl(TicketKind.Freshdesk, freshdeskTicketId.ToString()));
+
+            var subject = $"[Cycle Emploi] Avis de terminaison ou mise à pied — demande #{request.RequestNumber}";
+            var plainText = RenderPlainText(request, [ticketField], sections);
+            var html = RenderHtml(request, [ticketField], sections);
+            await _email.SendAsync(subject, plainText, html, [_offboardingNotificationOptions.AvisArretDeTravailAddress], ct);
+        }
+        catch (Exception emailEx)
+        {
+            _logger.LogError(emailEx, "Failed to send the AVISARRETDETRAVAIL@tremblant.ca notice for request {RequestNumber}", request.RequestNumber);
         }
     }
 
@@ -515,6 +545,11 @@ public class TicketOrchestrationService : ITicketOrchestrationService
 
             var ticketId = await _freshdesk.CreateTicketAsync(request, requesterEmail, ct);
             await _tickets.RecordSuccessAsync(request.RequestId, TicketKind.Freshdesk, null, ticketId.ToString(), ct);
+
+            if (request.RequestType == RequestType.Offboarding)
+            {
+                await TrySendAvisArretDeTravailEmailAsync(request, ticketId, ct);
+            }
 
             // Best-effort, independent of each other and of the main ticket above (which already
             // succeeded and is committed) — fanning the same submission out to three other

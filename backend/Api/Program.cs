@@ -70,6 +70,7 @@ builder.Services.AddScoped<ITicketStatusService, TicketStatusService>();
 // --- Ticket-system integrations (submit-time, best-effort — see RequestsController.Submit) ---
 builder.Services.Configure<FreshdeskOptions>(builder.Configuration.GetSection("Freshdesk"));
 builder.Services.Configure<SendGridOptions>(builder.Configuration.GetSection("SendGrid"));
+builder.Services.Configure<OffboardingNotificationOptions>(builder.Configuration.GetSection("OffboardingNotification"));
 builder.Services.Configure<PowerAutomateOptions>(builder.Configuration.GetSection("PowerAutomate"));
 builder.Services.Configure<TdxOptions>(builder.Configuration.GetSection("Tdx"));
 builder.Services.AddHttpClient<IFreshdeskService, FreshdeskService>();
