@@ -225,6 +225,7 @@ public class FreshdeskService : IFreshdeskService
             ["RequestTypeLabel"] = request.RequestType.ToFrenchLabel(),
             ["DateEntreePrevue"] = !isOffboarding && request.OnboardingDetail?.DateEntreePrevue is { } entreeDate ? entreeDate.ToString("yyyy-MM-dd") : null,
             ["DerniereJournee"] = isOffboarding && request.OffboardingDetail?.DerniereJournee is { } derniereDate ? derniereDate.ToString("yyyy-MM-dd") : null,
+            ["RaisonArret"] = isOffboarding ? request.OffboardingDetail?.RaisonArret : null,
             ["CommentairesRedingote"] = isOffboarding ? request.OffboardingDetail?.CommentairesRedingote : request.OnboardingDetail?.CommentairesRedingote,
             ["SystemesAcces"] = JoinOrNull(access?.Systemes.Select(x => x.Value)),
             ["ZonesBadge"] = access?.BadgeZones,
