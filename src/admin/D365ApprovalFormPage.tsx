@@ -302,6 +302,16 @@ export function D365ApprovalFormPage({ me }: { me: MeDto }) {
           </select>
         </Field>
 
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, fontSize: 16 }}>
+          <input
+            type="checkbox"
+            checked={data.category === 'Dynaway' || (data.category == null && data.isDynawayPath)}
+            disabled
+            style={{ width: 20, height: 20 }}
+          />
+          Besoin de gestion des actifs (Asset Management) avec Dynaway
+        </label>
+
         <Field label="Rôles D365 requis" required>
           <div className="choice-list">
             {data.roleCatalog.map((role) => (
