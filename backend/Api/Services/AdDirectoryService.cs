@@ -96,7 +96,36 @@ public class AdDirectoryService : IAdDirectoryService
     {
         using var ctx = new PrincipalContext(ContextType.Domain);
         using var user = UserPrincipal.FindByIdentity(ctx, IdentityType.SamAccountName, NormalizeSam(samAccountName));
-        return new AdUserInfo(user?.DisplayName, user?.EmailAddress);
+        if (user is not null) return new AdUserInfo(user.DisplayName, user.EmailAddress);
+
+        // A user who exists only in ENTERPRISE.AD (no iDirectory account) is invisible to the
+        // default bind — same two-domain gap SearchAccounts covers. Exact-sam lookup only.
+        var sam = EscapeLdap(NormalizeSam(samAccountName));
+        foreach (var root in SearchRoots())
+        {
+            try
+            {
+                using (root)
+                using (var searcher = new DirectorySearcher(root)
+                {
+                    Filter = $"(&(objectCategory=person)(objectClass=user)(sAMAccountName={sam}))",
+                    SizeLimit = 1
+                })
+                {
+                    searcher.PropertiesToLoad.AddRange(new[] { "displayName", "cn", "mail" });
+                    var r = searcher.FindOne();
+                    if (r is not null)
+                    {
+                        return new AdUserInfo(GetProp(r, "displayName") ?? GetProp(r, "cn"), GetProp(r, "mail"));
+                    }
+                }
+            }
+            catch
+            {
+                // Domain unreachable — try the next root.
+            }
+        }
+        return new AdUserInfo(null, null);
     }
 
     public IReadOnlyList<AdAccount> GetTremblantAccounts()
