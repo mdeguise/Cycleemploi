@@ -59,13 +59,13 @@ public class FreshdeskService : IFreshdeskService
 
     public Task<long> CreateStationnementTicketAsync(Request request, string requesterEmail, CancellationToken ct) =>
         CreateFannedOutTicketAsync(request, requesterEmail, _options.StationnementGroupId, isOffboarding =>
-            BuildStationnementContentAsync(request, isOffboarding, ct), ct, _options.StationnementTicketType);
+            BuildStationnementContentAsync(request, isOffboarding, ct), ct, _options.StationnementTicketType, _options.StationnementEmailConfigId);
 
     /// <summary>Shared by every independent (non-main) Freshdesk ticket — same subject as the main
     /// ticket, own group, own content, and deliberately NO parent_id: these are standalone tickets,
     /// not Freshdesk's Parent-child ticketing feature, so a failure/edit on one never touches the
     /// others. Correlated only by sharing the same subject text and request number.</summary>
-    private async Task<long> CreateFannedOutTicketAsync(Request request, string requesterEmail, long groupId, Func<bool, Task<string>> buildDescription, CancellationToken ct, string? ticketType = null)
+    private async Task<long> CreateFannedOutTicketAsync(Request request, string requesterEmail, long groupId, Func<bool, Task<string>> buildDescription, CancellationToken ct, string? ticketType = null, long? emailConfigId = null)
     {
         var isOffboarding = request.RequestType == RequestType.Offboarding;
         var subject = await BuildSubjectAsync(request, isOffboarding, ct);
@@ -77,7 +77,7 @@ public class FreshdeskService : IFreshdeskService
             subject,
             email = requesterEmail,
             type = string.IsNullOrWhiteSpace(ticketType) ? _options.TicketType : ticketType,
-            email_config_id = _options.EmailConfigId,
+            email_config_id = emailConfigId ?? _options.EmailConfigId,
             group_id = groupId,
             priority = 1,
             status = 2,

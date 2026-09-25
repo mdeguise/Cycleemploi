@@ -31,4 +31,9 @@ public class FreshdeskOptions
     /// ("RH - Général"), which is wrong for a ticket in a SAC group. Freshdesk's Type list has no
     /// entry named after the group; "SAC Demande stationnement interne" is the internal-parking one.</summary>
     public string StationnementTicketType { get; set; } = "SAC Demande stationnement interne";
+
+    /// <summary>Freshdesk support email "Tremblant Expérience Invité" (sac@tremblantsmt.freshdesk.com),
+    /// whose product is Tremblant Expérience Invité — a ticket's product comes from its
+    /// email_config_id, and EmailConfigId (RH - Général) would file this one under Tremblant RH.</summary>
+    public long StationnementEmailConfigId { get; set; } = 154000026832;
 }
