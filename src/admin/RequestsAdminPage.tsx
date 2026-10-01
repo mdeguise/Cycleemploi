@@ -9,7 +9,7 @@ import type {
 import { TicketsTableView } from './TicketsTableView';
 
 const STATUS_LABELS: Record<string, string> = {
-  Soumise: 'Soumise',
+  Soumise: 'Soumis',
   EnTraitement: 'En traitement',
   Completee: 'Complétée',
 };
