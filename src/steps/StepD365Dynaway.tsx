@@ -11,7 +11,7 @@ import type { D365AdHocPrefillDto } from '../api/types';
 
 /** Same grouping the standalone D365AccessRequest app uses for the real Microsoft Forms "D365 -
  * Access" role catalog — kept in sync with D365AdHocRequestPage.tsx's own ROLE_GROUPS. */
-const ROLE_GROUPS: { title: string; prefix: string }[] = [
+export const ROLE_GROUPS: { title: string; prefix: string }[] = [
   { title: 'Accès Procurement (cochez tout ce qui s\'applique)', prefix: 'Procurement' },
   { title: 'Accès comptes payables (Accounts Payable)', prefix: 'Accounts Payable' },
   { title: 'Accès grand livre (General Ledger)', prefix: 'General Ledger' },
@@ -19,7 +19,7 @@ const ROLE_GROUPS: { title: string; prefix: string }[] = [
   { title: 'Accès comptes recevables (Accounts Receivable)', prefix: 'Accounts Receivable' },
 ];
 
-const ACCESS_TYPE_LABELS: Record<string, string> = {
+export const ACCESS_TYPE_LABELS: Record<string, string> = {
   'New Access': 'Nouvel accès (New Access)',
   'Change Access': 'Modification d\'accès (Change Access)',
   'Remove Access': 'Retrait d\'accès (Remove Access)',
@@ -29,11 +29,11 @@ const ACCESS_TYPE_LABELS: Record<string, string> = {
  * D365AccessApprovalsController.ElevatedApprovalLimitEmails) gets the full one, same catalog the
  * standalone D365AccessRequest app uses. UI-only convenience: the backend re-checks the submitted
  * value against the same two catalogs. */
-const STANDARD_APPROVAL_LIMITS = [500, 2000, 5000];
-const ELEVATED_APPROVAL_LIMITS = [0, 2000, 5000, 25000, 50000, 100000, 500000, 1000000, 1500000];
-const ELEVATED_APPROVAL_LIMIT_EMAILS = ['mbessette@tremblant.ca'];
+export const STANDARD_APPROVAL_LIMITS = [500, 2000, 5000];
+export const ELEVATED_APPROVAL_LIMITS = [0, 2000, 5000, 25000, 50000, 100000, 500000, 1000000, 1500000];
+export const ELEVATED_APPROVAL_LIMIT_EMAILS = ['mbessette@tremblant.ca'];
 
-function formatLimit(v: number): string {
+export function formatLimit(v: number): string {
   return v === 0 ? 'Aucune' : `${v.toLocaleString('fr-CA')} $`;
 }
 
