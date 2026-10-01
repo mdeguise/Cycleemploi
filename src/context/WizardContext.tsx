@@ -85,6 +85,10 @@ function toSubmitDto(request: OnboardingRequest): SubmitRequestDto {
     justificationAcces: request.access.justification || null,
     equipements: request.equipment.equipements,
     notesEquipement: request.equipment.notes || null,
+    allocationMensuelleEquipement: request.equipment.allocationMensuelle.trim()
+      ? Number(request.equipment.allocationMensuelle)
+      : null,
+    approuveParDirecteurEquipement: request.equipment.approuveParDirecteur,
     applications: request.applications.applications,
     autreLogicielRequis: request.applications.autreLogiciel || null,
     commentairesRH: isOffboarding
@@ -180,6 +184,13 @@ function validateStep(step: number, request: OnboardingRequest): boolean {
       if (!request.access.systemes.includes(ACCES_D365)) return true;
       const d = request.d365;
       return Boolean(d.accessType && d.jobTitleEnglish.trim());
+    }
+    case 4: {
+      // Step4Equipment — the director-approval checkbox is only required once a monthly allowance
+      // amount is actually entered (see Step4Equipment's hasAllocation).
+      const eq = request.equipment;
+      const hasAllocation = eq.allocationMensuelle.trim() !== '' && Number(eq.allocationMensuelle) > 0;
+      return !hasAllocation || eq.approuveParDirecteur;
     }
     default:
       return true;

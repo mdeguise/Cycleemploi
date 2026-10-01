@@ -11,7 +11,7 @@ export const DEPARTEMENTS = [
 
 export const TYPES_EMPLOI = ['Temps plein - permanent', 'Temps plein - saisonnier', 'Temps partiel', 'Contractuel'];
 
-export const REGLE_DE_PAYE_AUTRE = 'AUTRES PRÉCISÉ DANS COMMENTAIRES';
+export const REGLE_DE_PAYE_AUTRE = 'AUTRES – Précisez le quart de travail';
 
 /** Employees in this Workday Pay_Group don't need to answer "Règle de paye" — mirrored on the
  * backend in RequestsController's PayGroupNonUnion constant. */

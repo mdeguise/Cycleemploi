@@ -88,11 +88,11 @@ export function Step3Access() {
         </div>
       </div>
 
-      <div className="important-notice">
-        <AlertTriangleIcon className="important-notice__icon" />
-        <div>
-          <strong>Important</strong> — Sélectionnez uniquement les accès nécessaires aux fonctions de l'employé. Les
-          demandes d'accès sont traitées selon les autorisations et les politiques de sécurité de l'entreprise.
+      <div className="big-notice">
+        <AlertTriangleIcon className="big-notice__icon" />
+        <div className="big-notice__text">
+          Sélectionnez uniquement les accès nécessaires aux fonctions de l'employé. Les demandes d'accès sont
+          traitées selon les autorisations et les politiques de sécurité de l'entreprise.
         </div>
       </div>
 

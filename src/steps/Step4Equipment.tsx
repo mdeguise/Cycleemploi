@@ -22,6 +22,18 @@ export function Step4Equipment() {
     setRequest((prev) => ({ ...prev, equipment: { ...prev.equipment, notes } }));
   };
 
+  const updateAllocation = (allocationMensuelle: string) => {
+    setRequest((prev) => ({ ...prev, equipment: { ...prev.equipment, allocationMensuelle } }));
+  };
+
+  const updateApprouve = (approuveParDirecteur: boolean) => {
+    setRequest((prev) => ({ ...prev, equipment: { ...prev.equipment, approuveParDirecteur } }));
+  };
+
+  const allocationValue = Number(eq.allocationMensuelle);
+  const hasAllocation = eq.allocationMensuelle.trim() !== '' && allocationValue > 0;
+  const montantParPaie = hasAllocation ? ((allocationValue * 12) / 26).toFixed(2) : '';
+
   const categories = Array.from(new Set(EQUIPEMENTS.map((e) => e.categorie)));
 
   return (
@@ -74,9 +86,40 @@ export function Step4Equipment() {
                 description={item.description}
                 selected={eq.equipements.includes(item.nom)}
                 onToggle={() => toggle(item.nom)}
+                lightSelection
               />
             ))}
           </div>
+          {cat === 'Télécommunications' && (
+            <>
+              <div className="field-grid field-grid--2">
+                <Field label="Montant de l'allocation par mois ($)">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={eq.allocationMensuelle}
+                    onChange={(ev) => updateAllocation(ev.target.value)}
+                    placeholder="ex. 75.00"
+                  />
+                </Field>
+                <Field label="Montant par paie (calculé)">
+                  <input type="text" value={montantParPaie ? `${montantParPaie} $` : ''} disabled />
+                </Field>
+              </div>
+              {hasAllocation && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14 }}>
+                  <input
+                    type="checkbox"
+                    checked={eq.approuveParDirecteur}
+                    onChange={(ev) => updateApprouve(ev.target.checked)}
+                    style={{ width: 18, height: 18 }}
+                  />
+                  Approuvé par le directeur ou la directrice du département <span style={{ color: 'var(--tremblant-red)' }}>*</span>
+                </label>
+              )}
+            </>
+          )}
         </div>
       ))}
 

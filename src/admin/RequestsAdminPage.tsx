@@ -15,7 +15,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const TYPE_LABELS: Record<string, string> = {
-  Onboarding: 'Nouvelle intégration',
+  Onboarding: 'Nouvelle embauche',
   Reactivation: 'Réactivation',
   Offboarding: 'Cessation',
   D365AccessOnly: 'Accès D365 (directe)',

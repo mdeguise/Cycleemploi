@@ -102,7 +102,7 @@ export function Step1Employee() {
           <div className="step-panel__subtitle">
             {isTermination
               ? "Recherchez et sélectionnez un ou plusieurs employés visés par cet avis"
-              : "Recherchez l'employé à intégrer par numéro d'employé, nom ou prénom"}
+              : "Recherchez l'employé à embaucher par numéro d'employé, nom ou prénom"}
           </div>
         </div>
       </div>
@@ -120,16 +120,16 @@ export function Step1Employee() {
           <div className="type-demande-grid">
           <button
             type="button"
-            className={`type-demande-option${request.typeDemande === 'Nouvelle intégration' ? ' type-demande-option--selected' : ''}`}
-            onClick={() => handleTypeChange('Nouvelle intégration')}
+            className={`type-demande-option${request.typeDemande === 'Nouvelle embauche' ? ' type-demande-option--selected' : ''}`}
+            onClick={() => handleTypeChange('Nouvelle embauche')}
           >
             <span className="type-demande-option__radio">
-              {request.typeDemande === 'Nouvelle intégration' && <span className="type-demande-option__radio-dot" />}
+              {request.typeDemande === 'Nouvelle embauche' && <span className="type-demande-option__radio-dot" />}
             </span>
             <span>
-              <div className="type-demande-option__title">Nouvelle intégration</div>
+              <div className="type-demande-option__title">Nouvelle embauche</div>
               <div className="type-demande-option__desc">
-                Cette personne n'a jamais occupé un emploi ou ne possède aucun dossier d'employé actif à Tremblant
+                Cette personne n'a jamais occupé un emploi ou est terminée ou n'a aucun dossier actif à Tremblant
               </div>
             </span>
           </button>
@@ -144,7 +144,7 @@ export function Step1Employee() {
             <span>
               <div className="type-demande-option__title">Réactivation</div>
               <div className="type-demande-option__desc">
-                Cette personne revient après une terminaison ou une mise à pied
+                Cette personne revient après une mise à pied ou une absence prolongée
               </div>
             </span>
           </button>
@@ -155,9 +155,10 @@ export function Step1Employee() {
           >
             <span className="type-demande-option__radio">{isTermination && <span className="type-demande-option__radio-dot" />}</span>
             <span>
-              <div className="type-demande-option__title">Avis de terminaison ou mise à pied temporaire</div>
+              <div className="type-demande-option__title">Avis d'arrêt de travail</div>
               <div className="type-demande-option__desc">
-                Cette personne quitte son poste de façon permanente ou temporaire
+                Cette personne quitte l'entreprise, débute en arrêt de travail prolongé ou elle est mise à pied pour
+                fin de saison
               </div>
             </span>
           </button>
@@ -170,15 +171,16 @@ export function Step1Employee() {
           <InfoIcon className="workday-notice__icon" />
           <ul>
             <li>
-              Seuls les employés actifs dans Workday apparaîtront dans la liste ci-dessous. Un employé est considéré
-              comme <strong>actif</strong> lorsque son dossier n'est pas associé à un statut de fin d'emploi — un
-              employé en mise à pied demeure considéré actif.
+              Seuls les employés <strong>actifs</strong> dans Workday apparaîtront dans la liste ci-dessous. Par
+              exemple, un employé qui est mise à pied par manque de travail (fin de saison) est considéré actif dans
+              Workday. Un employé qui est terminé (a quitté l'entreprise) est considéré comme inactif.
             </li>
             <li>
-              Si l'employé n'apparaît pas dans la liste déroulante, veuillez contacter votre partenaire d'affaires RH
-              afin de faire activer le dossier de l'employé dans Workday.
+              Si l'employé n'apparaît pas dans la liste déroulante, c'est qu'il n'est pas encore activé dans Workday.
+              Assurez-vous d'avoir remis toute l'information à votre recruteur (ex. date d'embauche, premier jour de
+              travail…). Sans ces informations le processus ne pourra pas avancer.
             </li>
-            <li>Une fois activé, revenez dans ce formulaire pour faire la réactivation ou l'intégration.</li>
+            <li>Une fois activé, revenez dans ce formulaire pour faire la réactivation ou l'embauche.</li>
           </ul>
         </div>
       )}
@@ -329,28 +331,28 @@ export function Step1Employee() {
           )}
 
           <div className="field-grid field-grid--2">
-            <Field label="Date d'entrée prévue" required valid={Boolean(e.dateEntreePrevue)}>
+            <Field label="Date du premier jour de travail" required valid={Boolean(e.dateEntreePrevue)}>
               <DateInput value={e.dateEntreePrevue} onChange={(dateEntreePrevue) => update({ dateEntreePrevue })} />
             </Field>
-            <Field label="Règle de paye" required={!regleDePayeNonRequise} valid={regleDePayeNonRequise || Boolean(e.regleDePaye)}>
+            <Field label="Quart de travail (règle de paie)" required={!regleDePayeNonRequise} valid={regleDePayeNonRequise || Boolean(e.regleDePaye)}>
               <RegleDePayeSelect
                 value={e.regleDePaye}
                 onChange={(regleDePaye) => update({ regleDePaye })}
                 disabled={regleDePayeNonRequise}
               />
               {regleDePayeNonRequise && (
-                <div className="field-hint">Non requis pour le groupe de paye CAN Tremblant-Non Union.</div>
+                <div className="field-hint">Non requis pour un employé salarié.</div>
               )}
             </Field>
           </div>
 
           {e.regleDePaye === REGLE_DE_PAYE_AUTRE && (
-            <Field label="Précisez la règle de paye" required valid={Boolean(e.regleDePayeCommentaire)}>
+            <Field label="Précisez le quart de travail" required valid={Boolean(e.regleDePayeCommentaire)}>
               <input
                 type="text"
                 value={e.regleDePayeCommentaire}
                 onChange={(ev) => update({ regleDePayeCommentaire: ev.target.value })}
-                placeholder="Précisez la règle de paye applicable"
+                placeholder="Précisez le quart de travail applicable"
               />
             </Field>
           )}

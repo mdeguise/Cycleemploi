@@ -1,6 +1,6 @@
-export const TYPE_DEMANDE_TERMINAISON = 'Avis de terminaison ou mise à pied temporaire';
+export const TYPE_DEMANDE_TERMINAISON = "Avis d'arrêt de travail";
 
-export type TypeDemande = 'Nouvelle intégration' | 'Réactivation' | typeof TYPE_DEMANDE_TERMINAISON | '';
+export type TypeDemande = 'Nouvelle embauche' | 'Réactivation' | typeof TYPE_DEMANDE_TERMINAISON | '';
 
 /** Denormalized snapshot captured at selection time — mirrors backend RequestEmployeeDto. Not a
  * live reference to WorkdayDemographic, which reloads on its own hourly schedule outside this
@@ -41,6 +41,11 @@ export interface AccessInfo {
 export interface EquipmentInfo {
   equipements: string[];
   notes: string;
+  /** Monthly allowance ($) paid in lieu of issuing a device (e.g. cellphone) — free text so the
+   * field can be empty; validated/parsed as a number at submission. */
+  allocationMensuelle: string;
+  /** Required (server-enforced) once allocationMensuelle is filled in. */
+  approuveParDirecteur: boolean;
 }
 
 export interface ApplicationsInfo {
@@ -138,6 +143,8 @@ export function createEmptyRequest(demandePar: string): OnboardingRequest {
     equipment: {
       equipements: [],
       notes: '',
+      allocationMensuelle: '',
+      approuveParDirecteur: false,
     },
     applications: {
       applications: [],

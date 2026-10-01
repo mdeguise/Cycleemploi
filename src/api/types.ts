@@ -110,6 +110,8 @@ export interface RequestDto {
   justificationAcces?: string | null;
   equipements: string[];
   notesEquipement?: string | null;
+  allocationMensuelleEquipement?: number | null;
+  approuveParDirecteurEquipement?: boolean;
   applications: string[];
   autreLogicielRequis?: string | null;
   derniereJournee?: string | null;

@@ -11,12 +11,16 @@ interface ChoiceCardProps {
   disabled?: boolean;
   /** Shown under the description when disabled, explaining why. */
   disabledHint?: string;
+  /** Checked state shows only the checkbox square in red, instead of tinting the whole row —
+   * lighter visual weight for long checklists (e.g. Step4Equipment). */
+  lightSelection?: boolean;
 }
 
-export function ChoiceCard({ title, description, badge, selected, onToggle, disabled, disabledHint }: ChoiceCardProps) {
+export function ChoiceCard({ title, description, badge, selected, onToggle, disabled, disabledHint, lightSelection }: ChoiceCardProps) {
   const className = [
     'choice-card',
     selected ? 'choice-card--selected' : '',
+    selected && lightSelection ? 'choice-card--selected-light' : '',
     disabled ? 'choice-card--disabled' : '',
   ].filter(Boolean).join(' ');
   return (

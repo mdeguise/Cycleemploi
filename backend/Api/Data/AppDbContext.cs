@@ -84,6 +84,7 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<EquipmentDetail>()
             .HasOne(d => d.Request).WithOne(r => r.EquipmentDetail)
             .HasForeignKey<EquipmentDetail>(d => d.RequestId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<EquipmentDetail>().Property(d => d.AllocationMensuelle).HasColumnType("decimal(18,2)");
         modelBuilder.Entity<RequestEquipment>().HasKey(x => new { x.RequestId, x.Value });
         modelBuilder.Entity<RequestEquipment>()
             .HasOne<EquipmentDetail>().WithMany(d => d.Equipements)

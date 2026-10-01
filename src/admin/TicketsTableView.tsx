@@ -1,7 +1,7 @@
 import type { LiveTicketState, TicketRefDto, TicketViewRowDto } from '../api/types';
 
 const TYPE_LABELS: Record<string, string> = {
-  Onboarding: 'Nouvelle intégration',
+  Onboarding: 'Nouvelle embauche',
   Reactivation: 'Réactivation',
   Offboarding: 'Cessation',
 };

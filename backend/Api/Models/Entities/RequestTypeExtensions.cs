@@ -7,9 +7,9 @@ public static class RequestTypeExtensions
     /// shown in this app's own UI (the frontend already has its own copy of these strings).</summary>
     public static string ToFrenchLabel(this RequestType type) => type switch
     {
-        RequestType.Onboarding => "Nouvelle intégration",
+        RequestType.Onboarding => "Nouvelle embauche",
         RequestType.Reactivation => "Réactivation",
-        RequestType.Offboarding => "Avis de terminaison ou mise à pied temporaire",
+        RequestType.Offboarding => "Avis d'arrêt de travail",
         RequestType.D365AccessOnly => "Accès D365 (demande directe)",
         _ => type.ToString()
     };

@@ -43,6 +43,14 @@ public class RequestDto
     public List<string> Equipements { get; set; } = [];
     public string? NotesEquipement { get; set; }
 
+    /// <summary>Monthly $ allowance paid in lieu of issuing a device (e.g. cellphone) —
+    /// Télécommunications section of Step4Equipment. Null = no allowance requested.</summary>
+    public decimal? AllocationMensuelleEquipement { get; set; }
+
+    /// <summary>Required (server-enforced, see RequestsController.ValidateForSubmitAsync) once
+    /// AllocationMensuelleEquipement is set.</summary>
+    public bool ApprouveParDirecteurEquipement { get; set; }
+
     // Applications
     public List<string> Applications { get; set; } = [];
     public string? AutreLogicielRequis { get; set; }
@@ -89,6 +97,8 @@ public class SubmitRequestDto
     public string? JustificationAcces { get; set; }
     public List<string> Equipements { get; set; } = [];
     public string? NotesEquipement { get; set; }
+    public decimal? AllocationMensuelleEquipement { get; set; }
+    public bool ApprouveParDirecteurEquipement { get; set; }
     public List<string> Applications { get; set; } = [];
     public string? AutreLogicielRequis { get; set; }
     public DateOnly? DerniereJournee { get; set; }

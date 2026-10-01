@@ -21,12 +21,12 @@ public class CatalogsController : ControllerBase
             "Finances", "Technologies de l'information", "Restauration", "École de ski"
         ],
         TypesEmploi = ["Temps plein - permanent", "Temps plein - saisonnier", "Temps partiel", "Contractuel"],
-        RegleDePayeAutre = "AUTRES PRÉCISÉ DANS COMMENTAIRES",
+        RegleDePayeAutre = "AUTRES – Précisez le quart de travail",
         ReglesDePaye =
         [
             "05H45 SANS REPAS", "7H30 AVEC 60 MIN DE REPAS", "7H30 AVEC 30 MIN DE REPAS",
             "8h SANS REPAS", "8H AVEC 30 MINUTES REPAS", "10H SANS REPAS", "10H AVEC 30 MINUTES REPAS",
-            "AUTRES PRÉCISÉ DANS COMMENTAIRES"
+            "AUTRES – Précisez le quart de travail"
         ],
         SystemesAcces =
         [
@@ -34,7 +34,7 @@ public class CatalogsController : ControllerBase
             new AccessSystemDto { Nom = "Accès VPN", Description = "Accès à distance au réseau corporatif" },
             new AccessSystemDto { Nom = "Badge d'accès aux édifices", Description = "Accès physique aux bureaux et installations" }
         ],
-        PosHebergementSystemes = ["RTP", "SMS", "OPERA", "SYMPHONIE", "APROPOS"],
+        PosHebergementSystemes = ["RTP", "SMS", "OPERA", "SIMPHONY", "APROPOS"],
         Equipements =
         [
             new EquipmentItemDto { Nom = "Ordinateur portable", Categorie = "Informatique" },

@@ -3,6 +3,17 @@ import { Field } from '../components/FormField';
 import { StepFooter } from '../components/StepFooter';
 import { BriefcaseIcon, InfoIcon } from '../components/icons';
 
+// Workday's raw worker-type string, translated for display — not an exhaustive catalog (Workday's
+// own values aren't enumerated anywhere in this app), so an unrecognized value falls back to the
+// raw text rather than showing a wrong translation. Extend this map if another raw value surfaces.
+const TYPE_EMPLOI_LABELS: Record<string, string> = {
+  'Full time — Employee': 'Employé à temps plein',
+  'Full time - Employee': 'Employé à temps plein',
+  'Part time — Employee': 'Employé à temps partiel',
+  'Part time - Employee': 'Employé à temps partiel',
+};
+const translateTypeEmploi = (value: string) => TYPE_EMPLOI_LABELS[value] ?? value;
+
 export function Step2Position() {
   const { request } = useWizard();
   const selected = request.employee.employee;
@@ -15,7 +26,7 @@ export function Step2Position() {
         </span>
         <div>
           <div className="step-panel__title">Poste et département</div>
-          <div className="step-panel__subtitle">Informations tirées du dossier de l'employé sélectionné</div>
+          <div className="step-panel__subtitle">Informations provenant du dossier Workday de l'employé sélectionné</div>
         </div>
       </div>
 
@@ -40,7 +51,7 @@ export function Step2Position() {
               <input type="text" value={selected.codeEmploi} disabled />
             </Field>
             <Field label="Type d'employé">
-              <input type="text" value={selected.typeEmploi} disabled />
+              <input type="text" value={translateTypeEmploi(selected.typeEmploi)} disabled />
             </Field>
           </div>
 

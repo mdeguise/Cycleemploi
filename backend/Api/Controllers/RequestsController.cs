@@ -130,6 +130,8 @@ public class RequestsController : ControllerBase
         request.EquipmentDetail = new EquipmentDetail
         {
             Notes = dto.NotesEquipement,
+            AllocationMensuelle = dto.AllocationMensuelleEquipement,
+            ApprouveParDirecteur = dto.ApprouveParDirecteurEquipement,
             Equipements = dto.Equipements.Distinct().Select(v => new RequestEquipment { Value = v }).ToList()
         };
 
@@ -341,6 +343,11 @@ public class RequestsController : ControllerBase
             }
         }
 
+        if (dto.AllocationMensuelleEquipement is > 0 && !dto.ApprouveParDirecteurEquipement)
+        {
+            errors.Add("L'approbation du directeur ou de la directrice du département est requise pour une allocation d'équipement.");
+        }
+
         if (request.RequestType is RequestType.Onboarding or RequestType.Reactivation)
         {
             if (request.OnboardingDetail is null || request.OnboardingDetail.DateEntreePrevue == default)
@@ -364,7 +371,7 @@ public class RequestsController : ControllerBase
             {
                 errors.Add("RegleDePaye is required.");
             }
-            else if (request.OnboardingDetail?.RegleDePaye == "AUTRES PRÉCISÉ DANS COMMENTAIRES" &&
+            else if (request.OnboardingDetail?.RegleDePaye == "AUTRES – Précisez le quart de travail" &&
                      string.IsNullOrWhiteSpace(request.OnboardingDetail.RegleDePayeCommentaire))
             {
                 errors.Add("RegleDePayeCommentaire is required when RegleDePaye is 'AUTRES...'.");

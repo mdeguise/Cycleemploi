@@ -42,6 +42,8 @@ public static class RequestMapper
         JustificationAcces = r.AccessDetail?.Justification,
         Equipements = r.EquipmentDetail?.Equipements.Select(e => e.Value).ToList() ?? [],
         NotesEquipement = r.EquipmentDetail?.Notes,
+        AllocationMensuelleEquipement = r.EquipmentDetail?.AllocationMensuelle,
+        ApprouveParDirecteurEquipement = r.EquipmentDetail?.ApprouveParDirecteur ?? false,
         Applications = r.ApplicationsDetail?.Applications.Select(a => a.Value).ToList() ?? [],
         AutreLogicielRequis = r.ApplicationsDetail?.AutreLogiciel,
         DerniereJournee = r.OffboardingDetail?.DerniereJournee,
