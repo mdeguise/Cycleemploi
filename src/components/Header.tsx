@@ -42,6 +42,14 @@ export function Header() {
             <div className="meta-block__value">{request.demandePar}</div>
           </div>
         </div>
+        <Link
+          to="/lot"
+          className="btn btn-secondary"
+          style={{ whiteSpace: 'nowrap', textDecoration: 'none' }}
+          title="Soumettre plusieurs embauches à la fois"
+        >
+          Embauche en lot
+        </Link>
         {/* Only rendered for someone who actually has Administration access — for everyone else
             the section does not exist, and the API refuses it regardless of what the UI shows. */}
         {me?.adminRole && (

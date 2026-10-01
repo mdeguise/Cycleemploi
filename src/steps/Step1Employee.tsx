@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { useWizard } from '../context/WizardContext';
 import { Field } from '../components/FormField';
 import { StepFooter } from '../components/StepFooter';
@@ -8,8 +7,7 @@ import { REGLE_DE_PAYE_AUTRE, PAY_GROUP_NON_UNION } from '../data/catalogs';
 import { RegleDePayeSelect } from '../components/RegleDePayeSelect';
 import { DateInput } from '../components/DateInput';
 import { TYPE_DEMANDE_TERMINAISON, type EmployeeSelectionInfo, type EmployeeSnapshot, type TypeDemande } from '../types';
-import { useApi } from '../api/ApiContext';
-import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { useEmployeeSearch } from '../hooks/useEmployeeSearch';
 import type { EmployeeDto } from '../api/types';
 
 function initials(prenom: string, nom: string) {
@@ -28,19 +26,6 @@ function toSnapshot(e: EmployeeDto): EmployeeSnapshot {
     typeEmploi: e.typeEmploi ?? '',
     gestionnaire: e.gestionnaire ?? '',
   };
-}
-
-/** Live search against /api/employees/search (WorkdayDemographic), debounced. Shared by both the
- * onboarding single-select and offboarding multi-select branches below. Réactivation searches for
- * people who have already left, so it's the one caller that must include Terminated employees. */
-function useEmployeeSearch(query: string, includeTerminated: boolean) {
-  const api = useApi();
-  const debounced = useDebouncedValue(query.trim(), 300);
-  return useQuery({
-    queryKey: ['employees', 'search', debounced, includeTerminated],
-    queryFn: () => api.employees.search(debounced, includeTerminated),
-    enabled: debounced.length >= 2,
-  });
 }
 
 export function Step1Employee() {

@@ -29,6 +29,7 @@ import { RequestsAdminPage } from './admin/RequestsAdminPage';
 import { D365ApproversAdminPage } from './admin/D365ApproversAdminPage';
 import { D365ApprovalsListPage } from './admin/D365ApprovalsListPage';
 import { D365ApprovalFormPage } from './admin/D365ApprovalFormPage';
+import { BatchOnboardingPage } from './pages/BatchOnboardingPage';
 import type { MeDto } from './api/types';
 
 const ONBOARDING_STEP_COMPONENTS = [
@@ -243,6 +244,7 @@ function AuthenticatedApp() {
             </AdminLayout>
           }
         />
+        <Route path="/lot" element={<BatchOnboardingPage />} />
         <Route
           path="/*"
           element={
