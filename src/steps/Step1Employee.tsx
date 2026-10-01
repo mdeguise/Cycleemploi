@@ -1,8 +1,9 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useWizard } from '../context/WizardContext';
 import { Field } from '../components/FormField';
 import { StepFooter } from '../components/StepFooter';
-import { UserIcon, SearchIcon, InfoIcon, AlertTriangleIcon } from '../components/icons';
+import { UserIcon, SearchIcon, InfoIcon, AlertTriangleIcon, ChevronRightIcon } from '../components/icons';
 import { REGLE_DE_PAYE_AUTRE, PAY_GROUP_NON_UNION } from '../data/catalogs';
 import { RegleDePayeSelect } from '../components/RegleDePayeSelect';
 import { DateInput } from '../components/DateInput';
@@ -30,6 +31,7 @@ function toSnapshot(e: EmployeeDto): EmployeeSnapshot {
 
 export function Step1Employee() {
   const { request, setRequest, setTypeDemande } = useWizard();
+  const navigate = useNavigate();
   const e = request.employee;
   const isTermination = request.typeDemande === TYPE_DEMANDE_TERMINAISON;
   const isReactivation = request.typeDemande === 'Réactivation';
@@ -145,6 +147,15 @@ export function Step1Employee() {
                 Cette personne quitte l'entreprise, débute en arrêt de travail prolongé ou elle est mise à pied pour
                 fin de saison
               </div>
+            </span>
+          </button>
+          <button type="button" className="type-demande-option" onClick={() => navigate('/lot')}>
+            <span className="type-demande-option__radio">
+              <ChevronRightIcon style={{ width: 11, height: 11, color: 'var(--muted)' }} />
+            </span>
+            <span>
+              <div className="type-demande-option__title">Embauche en lot</div>
+              <div className="type-demande-option__desc">Soumettre plusieurs embauches à la fois, chacune avec ses propres valeurs</div>
             </span>
           </button>
           </div>
