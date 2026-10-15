@@ -6,6 +6,7 @@ import { CalendarIcon, UserIcon } from './icons';
 import { formatDateFr } from '../utils/formatDate';
 import tremblantLogo from '../assets/logo-tremblant.png';
 import { TYPE_DEMANDE_TERMINAISON } from '../types';
+import { ReportIssueButton } from '../issues/IssueReporter';
 
 export function Header() {
   const { request } = useWizard();
@@ -42,6 +43,7 @@ export function Header() {
             <div className="meta-block__value">{request.demandePar}</div>
           </div>
         </div>
+        <ReportIssueButton />
         {/* Only rendered for someone who actually has Administration access — for everyone else
             the section does not exist, and the API refuses it regardless of what the UI shows. */}
         {me?.adminRole && (

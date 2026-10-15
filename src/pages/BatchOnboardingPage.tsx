@@ -19,6 +19,7 @@ import {
 } from '../steps/StepD365Dynaway';
 import type { EmployeeDto, SubmitRequestDto } from '../api/types';
 import tremblantLogo from '../assets/logo-tremblant.png';
+import { ReportIssueButton } from '../issues/IssueReporter';
 
 function initials(prenom: string, nom: string) {
   return `${prenom[0] ?? ''}${nom[0] ?? ''}`.toUpperCase();
@@ -565,6 +566,7 @@ export function BatchOnboardingPage() {
           <div className="app-header__title">Embauche en lot (maquette)</div>
         </div>
         <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+          <ReportIssueButton />
           <Link to="/" className="btn btn-secondary" style={{ textDecoration: 'none' }}>
             Retour au formulaire standard
           </Link>

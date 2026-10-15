@@ -36,3 +36,6 @@ backend/Api/publish-out/
 *.njsproj
 *.sln
 *.sw?
+
+# Signalements téléchargés par tools/signalements.ps1 (captures, documents)
+signalements/

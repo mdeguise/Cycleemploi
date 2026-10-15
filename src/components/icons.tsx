@@ -241,3 +241,28 @@ export function UtensilsIcon({ className, style }: IconProps) {
     </svg>
   );
 }
+
+export function FlagIcon({ className, style }: IconProps) {
+  return (
+    <svg className={className} style={style} {...base}>
+      <path d="M4 22V4M4 4h13l-2 4 2 4H4" />
+    </svg>
+  );
+}
+
+export function CopyIcon({ className, style }: IconProps) {
+  return (
+    <svg className={className} style={style} {...base}>
+      <rect x="9" y="9" width="12" height="12" rx="2" />
+      <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+    </svg>
+  );
+}
+
+export function DownloadIcon({ className, style }: IconProps) {
+  return (
+    <svg className={className} style={style} {...base}>
+      <path d="M12 3v12M7 10l5 5 5-5M4 21h16" />
+    </svg>
+  );
+}

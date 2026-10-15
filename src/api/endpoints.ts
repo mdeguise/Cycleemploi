@@ -35,10 +35,29 @@ import type {
   CompleteD365AccessApprovalResultDto,
   ConfirmStage2Dto,
   D365AdHocPrefillDto,
+  IssueReportDto,
+  IssueReportInput,
+  IssueEditInput,
+  IssueUpdateInput,
 } from './types';
 
 export function createApi(client: ApiClient) {
   return {
+    issues: {
+      create: (dto: IssueReportInput) => client.post<IssueReportDto>('/api/issues', dto),
+      edit: (id: number, dto: IssueEditInput) => client.put<IssueReportDto>(`/api/issues/${id}/edit`, dto),
+      mine: () => client.get<IssueReportDto[]>('/api/issues/mine'),
+      list: (status?: string) =>
+        client.get<IssueReportDto[]>(`/api/issues${status ? `?status=${encodeURIComponent(status)}` : ''}`),
+      openCount: () => client.get<{ count: number }>('/api/issues/open-count'),
+      get: (id: number) => client.get<IssueReportDto>(`/api/issues/${id}`),
+      update: (id: number, dto: IssueUpdateInput) => client.put<IssueReportDto>(`/api/issues/${id}`, dto),
+      markdown: (id: number) => client.getText(`/api/issues/${id}/markdown`),
+      imageUrl: (id: number, imageId: number) => client.url(`/api/issues/${id}/images/${imageId}`),
+      fileUrl: (id: number, fileId: number) => client.url(`/api/issues/${id}/files/${fileId}`),
+      exportUrl: (status?: string) =>
+        client.url(`/api/issues/export${status ? `?status=${encodeURIComponent(status)}` : ''}`),
+    },
     auth: {
       me: () => client.get<MeDto>('/api/auth/me'),
       helpUrl: () => client.get<HelpUrlDto>('/api/auth/help-url'),

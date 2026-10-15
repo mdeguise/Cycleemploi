@@ -582,3 +582,72 @@ export interface TicketViewDto {
   /** True when at least one live-status lookup failed, so the UI can say so rather than show blanks. */
   hasUnknownStatuses: boolean;
 }
+
+export type IssueType = 'BUG' | 'IMPROVEMENT' | 'QUESTION';
+export type IssueStatus = 'NEW' | 'IN_PROGRESS' | 'FIXED' | 'REJECTED' | 'DUPLICATE';
+
+export interface IssueImageDto {
+  imageId: number;
+  mimeType: string;
+}
+
+export interface IssueFileDto {
+  fileId: number;
+  fileName: string;
+  mimeType: string;
+  size: number;
+}
+
+export interface IssueReportDto {
+  issueId: number;
+  createdUtc: string;
+  createdBySam: string;
+  createdByName?: string | null;
+  type: IssueType;
+  title: string;
+  description: string;
+  expected?: string | null;
+  screen?: string | null;
+  context?: string | null;
+  status: IssueStatus;
+  resolution?: string | null;
+  commitRef?: string | null;
+  workLog?: string | null;
+  handledUtc?: string | null;
+  handledBySam?: string | null;
+  images: IssueImageDto[];
+  files: IssueFileDto[];
+}
+
+export interface IssueFileInput {
+  fileName: string;
+  dataUrl: string;
+}
+
+export interface IssueReportInput {
+  type: IssueType;
+  title: string;
+  description: string;
+  expected?: string | null;
+  screen?: string | null;
+  context?: string | null;
+  captures: string[];
+  files: IssueFileInput[];
+}
+
+export interface IssueEditInput {
+  type: IssueType;
+  title: string;
+  description: string;
+  expected?: string | null;
+  removeAttachmentIds: number[];
+  captures: string[];
+  files: IssueFileInput[];
+}
+
+export interface IssueUpdateInput {
+  status: IssueStatus;
+  resolution?: string | null;
+  commitRef?: string | null;
+  workLog?: string | null;
+}

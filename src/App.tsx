@@ -1,5 +1,5 @@
 import './App.css';
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Link } from 'react-router-dom';
@@ -30,6 +30,9 @@ import { D365ApproversAdminPage } from './admin/D365ApproversAdminPage';
 import { D365ApprovalsListPage } from './admin/D365ApprovalsListPage';
 import { D365ApprovalFormPage } from './admin/D365ApprovalFormPage';
 import { BatchOnboardingPage } from './pages/BatchOnboardingPage';
+import { IssuesAdminPage } from './issues/IssuesAdminPage';
+import { IssueReporterProvider, ReportIssueButton, useIssueReporter } from './issues/IssueReporter';
+import { setScreen } from './issues/context';
 import type { MeDto } from './api/types';
 
 const ONBOARDING_STEP_COMPONENTS = [
@@ -47,6 +50,13 @@ const OFFBOARDING_STEP_COMPONENTS = [Step1Employee, Step2Cessation, Step3Departm
 const queryClient = new QueryClient();
 
 function AdminLayout({ title, me, children }: { title: string; me: MeDto; children: ReactNode }) {
+  const api = useApi();
+  const { data: openIssues } = useQuery({
+    queryKey: ['issues', 'open-count'],
+    queryFn: () => api.issues.openCount(),
+    enabled: me.isAppAdmin,
+    refetchInterval: 60_000,
+  });
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -73,6 +83,13 @@ function AdminLayout({ title, me, children }: { title: string; me: MeDto; childr
               <Link to="/admin/app-users">Administrateurs</Link>
             </>
           )}
+          {me.isAppAdmin && (
+            <Link to="/admin/issues">
+              Signalements
+              {!!openIssues?.count && <span className="nav-count">{openIssues.count}</span>}
+            </Link>
+          )}
+          <ReportIssueButton compact />
           <Link to="/">Retour à l'application</Link>
         </div>
       </header>
@@ -119,8 +136,19 @@ function D365ApprovalsSectionGuard({ me, children }: { me: MeDto; children: Reac
   return <>{children}</>;
 }
 
+function IssuesAdminRoute() {
+  const open = useIssueReporter();
+  return <IssuesAdminPage onEdit={(issue) => open(issue)} />;
+}
+
 function WizardBody() {
-  const { currentStep, request } = useWizard();
+  const { currentStep, request, steps } = useWizard();
+
+  // The "Signaler un problème" report records which screen the user was on.
+  useEffect(() => {
+    setScreen(`Formulaire › ${steps[currentStep]?.titre ?? ''} (${request.typeDemande || 'type de demande non choisi'})`);
+  }, [steps, currentStep, request.typeDemande]);
+
   const components =
     request.typeDemande === TYPE_DEMANDE_TERMINAISON ? OFFBOARDING_STEP_COMPONENTS : ONBOARDING_STEP_COMPONENTS;
   const StepComponent = components[currentStep] ?? components[0];
@@ -167,6 +195,7 @@ function AuthenticatedApp() {
 
   return (
     <BrowserRouter>
+      <IssueReporterProvider>
       <Routes>
         <Route
           path="/admin/d365-roles"
@@ -244,6 +273,16 @@ function AuthenticatedApp() {
             </AdminLayout>
           }
         />
+        <Route
+          path="/admin/issues"
+          element={
+            <AdminLayout title="Administration — Signalements" me={me}>
+              <TicketTemplateAdminGuard me={me}>
+                <IssuesAdminRoute />
+              </TicketTemplateAdminGuard>
+            </AdminLayout>
+          }
+        />
         <Route path="/lot" element={<BatchOnboardingPage />} />
         <Route
           path="/*"
@@ -254,6 +293,7 @@ function AuthenticatedApp() {
           }
         />
       </Routes>
+      </IssueReporterProvider>
     </BrowserRouter>
   );
 }

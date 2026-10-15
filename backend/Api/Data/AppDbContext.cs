@@ -34,6 +34,8 @@ public class AppDbContext : DbContext
     public DbSet<D365Viewer> D365Viewers => Set<D365Viewer>();
     public DbSet<D365AccessApproval> D365AccessApprovals => Set<D365AccessApproval>();
     public DbSet<D365AccessApprovalRole> D365AccessApprovalRoles => Set<D365AccessApprovalRole>();
+    public DbSet<IssueReport> IssueReports => Set<IssueReport>();
+    public DbSet<IssueReportImage> IssueReportImages => Set<IssueReportImage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -85,6 +87,29 @@ public class AppDbContext : DbContext
             .HasOne(d => d.Request).WithOne(r => r.EquipmentDetail)
             .HasForeignKey<EquipmentDetail>(d => d.RequestId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<EquipmentDetail>().Property(d => d.AllocationMensuelle).HasColumnType("decimal(18,2)");
+
+        modelBuilder.Entity<IssueReport>(entity =>
+        {
+            entity.HasKey(i => i.IssueId);
+            entity.Property(i => i.CreatedBySam).HasMaxLength(128);
+            entity.Property(i => i.CreatedByName).HasMaxLength(256);
+            entity.Property(i => i.Type).HasMaxLength(20).IsUnicode(false);
+            entity.Property(i => i.Title).HasMaxLength(200);
+            entity.Property(i => i.Screen).HasMaxLength(400);
+            entity.Property(i => i.Status).HasMaxLength(20).IsUnicode(false);
+            entity.Property(i => i.CommitRef).HasMaxLength(40).IsUnicode(false);
+            entity.Property(i => i.HandledBySam).HasMaxLength(128);
+            entity.HasMany(i => i.Images).WithOne().HasForeignKey(x => x.IssueId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(i => new { i.Status, i.CreatedUtc });
+            entity.HasIndex(i => new { i.CreatedBySam, i.CreatedUtc });
+        });
+        modelBuilder.Entity<IssueReportImage>(entity =>
+        {
+            entity.HasKey(x => x.ImageId);
+            entity.Property(x => x.MimeType).HasMaxLength(100).IsUnicode(false);
+            entity.Property(x => x.FileName).HasMaxLength(260);
+            entity.HasIndex(x => new { x.IssueId, x.Ordinal });
+        });
         modelBuilder.Entity<RequestEquipment>().HasKey(x => new { x.RequestId, x.Value });
         modelBuilder.Entity<RequestEquipment>()
             .HasOne<EquipmentDetail>().WithMany(d => d.Equipements)

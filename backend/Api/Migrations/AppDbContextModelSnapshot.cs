@@ -464,6 +464,122 @@ namespace TremblantLifecycle.Api.Migrations
                     b.ToTable("EquipmentDetails");
                 });
 
+            modelBuilder.Entity("TremblantLifecycle.Api.Models.Entities.IssueReport", b =>
+                {
+                    b.Property<int>("IssueId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IssueId"));
+
+                    b.Property<string>("CommitRef")
+                        .HasMaxLength(40)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(40)");
+
+                    b.Property<string>("Context")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CreatedByName")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("CreatedBySam")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Expected")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("HandledBySam")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTime?>("HandledUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Resolution")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Screen")
+                        .HasMaxLength(400)
+                        .HasColumnType("nvarchar(400)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<string>("WorkLog")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("IssueId");
+
+                    b.HasIndex("CreatedBySam", "CreatedUtc");
+
+                    b.HasIndex("Status", "CreatedUtc");
+
+                    b.ToTable("IssueReports");
+                });
+
+            modelBuilder.Entity("TremblantLifecycle.Api.Models.Entities.IssueReportImage", b =>
+                {
+                    b.Property<int>("ImageId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ImageId"));
+
+                    b.Property<byte[]>("Content")
+                        .IsRequired()
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<string>("FileName")
+                        .HasMaxLength(260)
+                        .HasColumnType("nvarchar(260)");
+
+                    b.Property<int>("IssueId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("MimeType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<byte>("Ordinal")
+                        .HasColumnType("tinyint");
+
+                    b.Property<int>("Size")
+                        .HasColumnType("int");
+
+                    b.HasKey("ImageId");
+
+                    b.HasIndex("IssueId", "Ordinal");
+
+                    b.ToTable("IssueReportImages");
+                });
+
             modelBuilder.Entity("TremblantLifecycle.Api.Models.Entities.OffboardingConfidentialComment", b =>
                 {
                     b.Property<int>("RequestId")
@@ -889,6 +1005,15 @@ namespace TremblantLifecycle.Api.Migrations
                     b.Navigation("Request");
                 });
 
+            modelBuilder.Entity("TremblantLifecycle.Api.Models.Entities.IssueReportImage", b =>
+                {
+                    b.HasOne("TremblantLifecycle.Api.Models.Entities.IssueReport", null)
+                        .WithMany("Images")
+                        .HasForeignKey("IssueId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("TremblantLifecycle.Api.Models.Entities.OffboardingConfidentialComment", b =>
                 {
                     b.HasOne("TremblantLifecycle.Api.Models.Entities.Request", "Request")
@@ -1018,6 +1143,11 @@ namespace TremblantLifecycle.Api.Migrations
             modelBuilder.Entity("TremblantLifecycle.Api.Models.Entities.EquipmentDetail", b =>
                 {
                     b.Navigation("Equipements");
+                });
+
+            modelBuilder.Entity("TremblantLifecycle.Api.Models.Entities.IssueReport", b =>
+                {
+                    b.Navigation("Images");
                 });
 
             modelBuilder.Entity("TremblantLifecycle.Api.Models.Entities.Request", b =>
