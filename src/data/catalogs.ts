@@ -181,6 +181,7 @@ export const RAISON_ARRET_DEMISSION_VOLONTAIRE = 'Démission volontaire';
  * shows extra questions specifically for each of these two (date de retour connue / préavis reçu)
  * and that behavior was kept on request when the list was replaced with the HR taxonomy. */
 export const RAISONS_ARRET = [
+  'À la demande de l\'employé',
   'Aidant Naturel',
   'Ass. Invalidité',
   'CNESST',

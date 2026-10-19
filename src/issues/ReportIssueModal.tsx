@@ -272,9 +272,22 @@ export function ReportIssueModal({ edit: initialEdit, onClose }: Props) {
             Merci! Votre signalement porte le numéro <strong>#{sentNumber}</strong>. Vous pouvez en suivre l'état dans
             « Mes signalements ».
           </p>
-          <button type="button" className="btn btn-primary" onClick={onClose}>
-            Fermer
-          </button>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                setSentNumber(null);
+                setEditing(null);
+                setShowMine(true);
+              }}
+            >
+              Voir mes signalements
+            </button>
+            <button type="button" className="btn btn-primary" onClick={onClose}>
+              Fermer
+            </button>
+          </div>
         </div>
       </div>
     );
