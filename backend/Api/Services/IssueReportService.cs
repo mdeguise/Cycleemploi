@@ -16,6 +16,10 @@ public class IssuesOptions
 public interface IIssueNotifier
 {
     Task NotifyAsync(IssueReportDto issue, bool edited, CancellationToken ct);
+
+    /// <summary>Tells the person who raised a report that it was closed (corrigé / rejeté / doublon),
+    /// with the résolution — so they do not have to open "Mes signalements" to find out.</summary>
+    Task NotifyReporterAsync(IssueReportDto issue, string? reporterEmail, CancellationToken ct);
 }
 
 /// <summary>Best-effort e-mail to the fixer through the app's existing SendGrid service — the
@@ -72,6 +76,46 @@ public class IssueNotifier : IIssueNotifier
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Could not e-mail issue report {IssueId}", issue.IssueId);
+        }
+    }
+
+    public async Task NotifyReporterAsync(IssueReportDto issue, string? reporterEmail, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(reporterEmail)) return;
+
+        var outcome = issue.Status switch
+        {
+            IssueStatus.Fixed => "a été corrigé",
+            IssueStatus.Rejected => "n'a pas été retenu",
+            IssueStatus.Duplicate => "a déjà été signalé (doublon)",
+            _ => "a été traité",
+        };
+        var subject = $"Cycle Emploi — votre signalement #{issue.IssueId} {outcome}";
+        var body = new StringBuilder();
+        body.AppendLine("Bonjour,");
+        body.AppendLine();
+        body.AppendLine($"Votre signalement #{issue.IssueId} « {issue.Title} » {outcome}.");
+        if (!string.IsNullOrWhiteSpace(issue.Resolution))
+        {
+            body.AppendLine();
+            body.AppendLine("Résolution :");
+            body.AppendLine(issue.Resolution);
+        }
+        body.AppendLine();
+        body.AppendLine("Vous pouvez aussi consulter l'état de vos signalements dans Cycle Emploi : bouton « Signaler un problème », puis « Mes signalements ». Si la page n'affiche pas les changements, rafraîchissez-la avec Ctrl+F5.");
+        if (!string.IsNullOrWhiteSpace(_options.AppUrl))
+        {
+            body.AppendLine();
+            body.AppendLine(_options.AppUrl.TrimEnd('/'));
+        }
+
+        try
+        {
+            await _email.SendAsync(subject, body.ToString(), [reporterEmail], ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not e-mail the reporter of issue {IssueId}", issue.IssueId);
         }
     }
 }

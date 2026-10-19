@@ -432,6 +432,7 @@ public class IssueReportsController : ControllerBase
                 return BadRequest(new { error = "Les travaux effectués sont requis pour fermer un signalement." });
         }
 
+        var previousStatus = issue.Status;
         issue.Status = status;
         issue.Resolution = string.IsNullOrWhiteSpace(input.Resolution) ? null : input.Resolution.Trim();
         var commit = input.CommitRef?.Trim();
@@ -452,6 +453,15 @@ public class IssueReportsController : ControllerBase
             issue.HandledBySam = Sam;
         }
         await _db.SaveChangesAsync(ct);
-        return Ok(await LoadDtoAsync(id, ct));
+        var dto = await LoadDtoAsync(id, ct);
+
+        // Tell the reporter once, when the report becomes closed — not on every later re-save.
+        var closing = status is IssueStatus.Fixed or IssueStatus.Rejected or IssueStatus.Duplicate;
+        if (closing && previousStatus != status)
+        {
+            var reporterEmail = _ad.GetUserInfo(issue.CreatedBySam).Email;
+            await _notifier.NotifyReporterAsync(dto!, reporterEmail, ct);
+        }
+        return Ok(dto);
     }
 }
