@@ -560,6 +560,7 @@ public class TicketOrchestrationService : ITicketOrchestrationService
             foreach (var kind in FannedOutKinds)
             {
                 if (kind == TicketKind.FreshdeskChildWithJobCodes && !RequiresHorairesTicket(request)) continue;
+                if (kind == TicketKind.FreshdeskStationnement && !RequiresStationnementTicket(request)) continue;
                 if (!await ChildAlreadyCreatedAsync(request.RequestId, kind, ct))
                 {
                     await TryCreateFannedOutFreshdeskTicketAsync(request, requesterEmail, kind, ct);
@@ -624,6 +625,29 @@ public class TicketOrchestrationService : ITicketOrchestrationService
     /// Onboarding/Réactivation only gets one when "Configuration dans Evolia" was checked — per user
     /// request, RH - Horaires' actual job here is Evolia scheduling setup, so no Evolia checkbox
     /// means nothing for them to do.</summary>
+    /// <summary>Motifs de fin d'emploi pour lesquels SAC - ISAC (stationnement) doit être avisé — wording
+    /// must match RAISONS_ARRET in src/data/catalogs.ts exactly. Any other motif (congés, maladie,
+    /// mise à pied temporaire, etc.) means the person keeps their parking, so no ticket.</summary>
+    private static readonly string[] StationnementMotifs =
+    [
+        "Interruption d'emploi",
+        "Mise-à-Pied",
+        "Suspension",
+        "Démission volontaire",
+        "Congédiement",
+        "Fin de contrat",
+        "Retraite",
+    ];
+
+    /// <summary>Onboarding/Réactivation always raise the SAC - ISAC ticket; an offboarding only does
+    /// for the motifs in <see cref="StationnementMotifs"/>.</summary>
+    private static bool RequiresStationnementTicket(Request request)
+    {
+        if (request.RequestType != RequestType.Offboarding) return true;
+        var motif = request.OffboardingDetail?.RaisonArret?.Trim();
+        return motif is not null && StationnementMotifs.Contains(motif, StringComparer.OrdinalIgnoreCase);
+    }
+
     private static bool RequiresHorairesTicket(Request request)
     {
         if (request.RequestType == RequestType.Offboarding) return true;
