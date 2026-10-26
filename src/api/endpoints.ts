@@ -191,6 +191,8 @@ export function createApi(client: ApiClient) {
         if (params.pageSize) qs.set('pageSize', String(params.pageSize));
         return client.get<TicketViewDto>(`/api/admin/requests/ticket-view?${qs.toString()}`);
       },
+      resendAvisArret: (requestId: number) =>
+        client.post<RetryTicketResultDto>(`/api/admin/requests/${requestId}/resend-avis-arret`, {}),
       retryTicket: (requestId: number, ticketId: number) =>
         client.post<RetryTicketResultDto>(`/api/admin/requests/${requestId}/tickets/${ticketId}/retry`, {}),
     },

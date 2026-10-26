@@ -131,6 +131,7 @@ export function RequestsAdminPage() {
   const [detail, setDetail] = useState<AdminRequestDetailDto | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [retryingId, setRetryingId] = useState<number | null>(null);
+  const [isResending, setIsResending] = useState(false);
   const [retryMessage, setRetryMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
   const loadList = useCallback(() => {
@@ -200,6 +201,25 @@ export function RequestsAdminPage() {
       setRetryMessage({ ok: false, text: err instanceof Error ? err.message : 'Erreur inconnue' });
     } finally {
       setRetryingId(null);
+    }
+  };
+
+  const handleResendAvis = async () => {
+    if (selectedId === null) return;
+    if (!window.confirm("Renvoyer l'avis d'arrêt de travail à AVISARRETDETRAVAIL@tremblant.ca ?")) return;
+    setIsResending(true);
+    setRetryMessage(null);
+    try {
+      const res = await api.adminRequests.resendAvisArret(selectedId);
+      setRetryMessage(
+        res.succeeded
+          ? { ok: true, text: "Avis renvoyé à AVISARRETDETRAVAIL@tremblant.ca (sujet « RENVOI »)." }
+          : { ok: false, text: res.error ?? "Échec de l'envoi." },
+      );
+    } catch (err) {
+      setRetryMessage({ ok: false, text: err instanceof Error ? err.message : 'Erreur inconnue' });
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -370,7 +390,14 @@ export function RequestsAdminPage() {
                 soumise le {dateOnly(detail.submittedAt)}
               </div>
 
-              <h4 style={{ margin: '12px 0 4px' }}>Billets</h4>
+              <h4 style={{ margin: '12px 0 4px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                Billets
+                {isOffboarding && detail.canRetry && (
+                  <button type="button" className="btn btn-secondary" disabled={isResending} onClick={handleResendAvis}>
+                    {isResending ? 'Envoi…' : "Renvoyer l'avis"}
+                  </button>
+                )}
+              </h4>
               {retryMessage && (
                 <div
                   className="big-notice"
