@@ -6,4 +6,7 @@ namespace TremblantLifecycle.Api.Services;
 public class OffboardingNotificationOptions
 {
     public string AvisArretDeTravailAddress { get; set; } = "AVISARRETDETRAVAIL@tremblant.ca";
+
+    /// <summary>Other people who get the same notice in the same message (appsettings, no redeploy of code to change).</summary>
+    public List<string> AdditionalAddresses { get; set; } = [];
 }

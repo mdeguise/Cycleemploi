@@ -205,7 +205,9 @@ public class TicketOrchestrationService : ITicketOrchestrationService
             var subject = $"[Cycle Emploi] {(resend ? "RENVOI — " : "")}Avis de terminaison ou mise à pied — demande #{request.RequestNumber}";
             var plainText = RenderPlainText(request, [ticketField], sections);
             var html = RenderHtml(request, [ticketField], sections);
-            await _email.SendAsync(subject, plainText, html, [_offboardingNotificationOptions.AvisArretDeTravailAddress], ct);
+            var recipients = new List<string> { _offboardingNotificationOptions.AvisArretDeTravailAddress };
+            recipients.AddRange(_offboardingNotificationOptions.AdditionalAddresses.Where(a => !string.IsNullOrWhiteSpace(a)));
+            await _email.SendAsync(subject, plainText, html, recipients.Distinct(StringComparer.OrdinalIgnoreCase).ToList(), ct);
             return true;
         }
         catch (Exception emailEx)
