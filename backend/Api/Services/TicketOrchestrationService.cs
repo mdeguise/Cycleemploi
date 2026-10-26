@@ -24,6 +24,10 @@ public interface ITicketOrchestrationService
     /// Administration screen's Réessayer button.</summary>
     Task<TicketRetryResult> RetryAsync(Request request, RequestTicket ticket, CancellationToken ct);
 
+    /// <summary>Re-sends the AVISARRETDETRAVAIL notice (subject marked RENVOI) for an offboarding
+    /// request whose RH Général ticket exists. False if there is no such ticket or the send failed.</summary>
+    Task<bool> ResendAvisArretDeTravailAsync(Request request, CancellationToken ct);
+
     /// <summary>Builds and sends the real TDX "D365 - Access" ticket from a completed approval's
     /// saved fields — called by D365AccessApprovalsController.Complete right after an approver
     /// submits the form.</summary>
@@ -188,7 +192,7 @@ public class TicketOrchestrationService : ITicketOrchestrationService
     /// ticket's own number so the recipient can cross-reference it. Called right after the RH
     /// Général ticket succeeds in TryCreateFreshdeskTicketAsync — best-effort like every other email
     /// in this file.</summary>
-    private async Task TrySendAvisArretDeTravailEmailAsync(Request request, long freshdeskTicketId, CancellationToken ct)
+    private async Task<bool> TrySendAvisArretDeTravailEmailAsync(Request request, long freshdeskTicketId, CancellationToken ct, bool resend = false)
     {
         try
         {
@@ -198,15 +202,25 @@ public class TicketOrchestrationService : ITicketOrchestrationService
                 $"#{freshdeskTicketId}",
                 TicketUrl(TicketKind.Freshdesk, freshdeskTicketId.ToString()));
 
-            var subject = $"[Cycle Emploi] Avis de terminaison ou mise à pied — demande #{request.RequestNumber}";
+            var subject = $"[Cycle Emploi] {(resend ? "RENVOI — " : "")}Avis de terminaison ou mise à pied — demande #{request.RequestNumber}";
             var plainText = RenderPlainText(request, [ticketField], sections);
             var html = RenderHtml(request, [ticketField], sections);
             await _email.SendAsync(subject, plainText, html, [_offboardingNotificationOptions.AvisArretDeTravailAddress], ct);
+            return true;
         }
         catch (Exception emailEx)
         {
             _logger.LogError(emailEx, "Failed to send the AVISARRETDETRAVAIL@tremblant.ca notice for request {RequestNumber}", request.RequestNumber);
+            return false;
         }
+    }
+
+    public async Task<bool> ResendAvisArretDeTravailAsync(Request request, CancellationToken ct)
+    {
+        var main = await _db.RequestTickets.AsNoTracking()
+            .FirstOrDefaultAsync(t => t.RequestId == request.RequestId && t.Kind == TicketKind.Freshdesk && t.Outcome == TicketOutcome.Created, ct);
+        if (main is null || !long.TryParse(main.TicketNumber, out var ticketId)) return false;
+        return await TrySendAvisArretDeTravailEmailAsync(request, ticketId, ct, resend: true);
     }
 
     /// <summary>One row per RequestTicket already recorded for this request (Created shows the real

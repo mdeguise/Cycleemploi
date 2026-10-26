@@ -391,4 +391,40 @@ public class AdminRequestsController : ControllerBase
             Error = result.Error
         });
     }
+
+    /// <summary>Admin only. Re-sends the AVISARRETDETRAVAIL notice (subject marked RENVOI) for every
+    /// offboarding request submitted on/after <paramref name="since"/> — used when the mailbox may have
+    /// missed some. Sequential, one second apart; returns the request numbers sent/failed.</summary>
+    [HttpPost("resend-avis-arret")]
+    public async Task<ActionResult> ResendAvisArret([FromQuery] DateTime since, CancellationToken ct)
+    {
+        if (!await CanRetryAsync(ct)) return Forbid();
+
+        var ids = await _db.Requests.AsNoTracking()
+            .Where(r => r.RequestType == RequestType.Offboarding && r.SubmittedAt >= since)
+            .OrderBy(r => r.RequestId).Select(r => r.RequestId).ToListAsync(ct);
+
+        var sent = new List<string>();
+        var failed = new List<string>();
+        foreach (var id in ids)
+        {
+            var request = await _db.Requests
+                .Include(r => r.Employees)
+                .Include(r => r.OnboardingDetail)
+                .Include(r => r.OffboardingDetail)
+                .Include(r => r.AccessDetail).ThenInclude(a => a!.Systemes)
+                .Include(r => r.AccessDetail).ThenInclude(a => a!.PosHebergement)
+                .Include(r => r.EquipmentDetail).ThenInclude(e => e!.Equipements)
+                .Include(r => r.ApplicationsDetail).ThenInclude(a => a!.Applications)
+                .Include(r => r.ConfidentialComment)
+                .Include(r => r.OnboardingConfidentialComment)
+                .FirstAsync(r => r.RequestId == id, ct);
+            (await _orchestration.ResendAvisArretDeTravailAsync(request, ct) ? sent : failed).Add(request.RequestNumber);
+            _db.ChangeTracker.Clear();
+            await Task.Delay(1000, ct);
+        }
+
+        _logger.LogInformation("Admin {Admin} re-sent {Sent} avis d'arrêt notices since {Since} ({Failed} failed)", User.GetObjectId(), sent.Count, since, failed.Count);
+        return Ok(new { sent = sent.Count, failed, requests = sent });
+    }
 }
