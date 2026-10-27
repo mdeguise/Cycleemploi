@@ -12,6 +12,7 @@ public static class TicketKindLabels
         TicketKind.FreshdeskChildWithJobCodes => "Freshdesk — RH Horaires (avec codes d'emploi)",
         TicketKind.FreshdeskChildWithoutJobCodes => "Freshdesk — RH Redingote",
         TicketKind.FreshdeskStationnement => "Freshdesk — SAC ISAC (stationnement)",
+        TicketKind.FreshdeskHebergement => "Freshdesk — RH Hébergement",
         TicketKind.Tdx => "TDX — OneIT",
         TicketKind.D365Badge => "D365 — badge / alarme",
         TicketKind.D365Access => "TDX — accès D365",

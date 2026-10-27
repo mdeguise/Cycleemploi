@@ -18,13 +18,15 @@ public class FreshdeskService : IFreshdeskService
     private readonly FreshdeskOptions _options;
     private readonly ITicketTemplateService _templates;
     private readonly IEmployeeFieldsService _employeeFields;
+    private readonly IHebergementLookup _hebergements;
 
-    public FreshdeskService(HttpClient http, IOptions<FreshdeskOptions> options, ITicketTemplateService templates, IEmployeeFieldsService employeeFields)
+    public FreshdeskService(HttpClient http, IOptions<FreshdeskOptions> options, ITicketTemplateService templates, IEmployeeFieldsService employeeFields, IHebergementLookup hebergements)
     {
         _http = http;
         _options = options.Value;
         _templates = templates;
         _employeeFields = employeeFields;
+        _hebergements = hebergements;
     }
 
     public async Task<long> CreateTicketAsync(Request request, string requesterEmail, CancellationToken ct)
@@ -60,6 +62,9 @@ public class FreshdeskService : IFreshdeskService
     public Task<long> CreateStationnementTicketAsync(Request request, string requesterEmail, CancellationToken ct) =>
         CreateFannedOutTicketAsync(request, requesterEmail, _options.StationnementGroupId, isOffboarding =>
             BuildStationnementContentAsync(request, isOffboarding, ct), ct, _options.StationnementTicketType, _options.StationnementEmailConfigId);
+
+    public Task<long> CreateHebergementTicketAsync(Request request, string requesterEmail, CancellationToken ct) =>
+        CreateFannedOutTicketAsync(request, requesterEmail, _options.HebergementGroupId, _ => BuildHebergementContentAsync(request, ct), ct);
 
     /// <summary>Shared by every independent (non-main) Freshdesk ticket — same subject as the main
     /// ticket, own group, own content, and deliberately NO parent_id: these are standalone tickets,
@@ -208,6 +213,34 @@ public class FreshdeskService : IFreshdeskService
     {
         var key = isOffboarding ? TicketTemplateKeys.FreshdeskStationnementOffboarding : TicketTemplateKeys.FreshdeskStationnementOnboarding;
         return await RenderFannedOutBlockAsync(request, isOffboarding, key, ct);
+    }
+
+    /// <summary>"RH - Hébergement" — who is leaving and which lodgings (identifier + logement from the weekly
+    /// list) they have, so the housing team can recover the keys/units. Only employees found in the list appear.</summary>
+    private async Task<string> BuildHebergementContentAsync(Request request, CancellationToken ct)
+    {
+        var rows = await _hebergements.ForEmployeesAsync(request.Employees.Select(e => e.WorkdayEmployeeId), ct);
+        if (rows.Count == 0) throw new InvalidOperationException("Aucun hébergement trouvé pour les employés de cette demande.");
+
+        static string E(string? v) => System.Net.WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(v) ? "—" : v);
+        var od = request.OffboardingDetail;
+        var sb = new System.Text.StringBuilder();
+        sb.Append("<p><b>Type de demande:</b> ").Append(E(request.RequestType.ToFrenchLabel())).Append("<br>")
+          .Append("<b>Motif:</b> ").Append(E(od?.RaisonArret)).Append("<br>")
+          .Append("<b>Date de fin (dernière journée):</b> ").Append(E(od?.DerniereJournee?.ToString("yyyy-MM-dd"))).Append("</p>");
+        foreach (var emp in request.Employees)
+        {
+            var mine = rows.Where(r => r.WorkdayEmployeeId == emp.WorkdayEmployeeId).ToList();
+            if (mine.Count == 0) continue;
+            sb.Append("<h4>").Append(E(emp.NameSnapshot)).Append("</h4><p>")
+              .Append("<b>Numéro d'employé:</b> ").Append(E(emp.WorkdayEmployeeId)).Append("<br>")
+              .Append("<b>Gestionnaire:</b> ").Append(E(emp.GestionnaireSnapshot)).Append("<br>")
+              .Append("<b>Titre du poste:</b> ").Append(E(emp.PositionSnapshot)).Append("</p><p><b>Hébergement:</b><br>");
+            foreach (var h in mine)
+                sb.Append(E(h.CusId)).Append(string.IsNullOrWhiteSpace(h.Logement) ? "" : " — " + E(h.Logement)).Append("<br>");
+            sb.Append("</p>");
+        }
+        return sb.ToString();
     }
 
     /// <summary>Shared request-level field set for every fanned-out (non-main) ticket — covers

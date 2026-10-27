@@ -81,6 +81,7 @@ public class TicketOrchestrationService : ITicketOrchestrationService
     private readonly ID365ApproverService _d365Approvers;
     private readonly AppOptions _appOptions;
     private readonly OffboardingNotificationOptions _offboardingNotificationOptions;
+    private readonly IHebergementLookup _hebergements;
     private readonly ILogger<TicketOrchestrationService> _logger;
 
     /// <summary>Systèmes junction rows store the catalog's display text directly — these must match
@@ -123,9 +124,11 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         ID365ApproverService d365Approvers,
         IOptions<AppOptions> appOptions,
         IOptions<OffboardingNotificationOptions> offboardingNotificationOptions,
+        IHebergementLookup hebergements,
         ILogger<TicketOrchestrationService> logger)
     {
         _db = db;
+        _hebergements = hebergements;
         _workday = workday;
         _ad = ad;
         _freshdesk = freshdesk;
@@ -437,7 +440,7 @@ public class TicketOrchestrationService : ITicketOrchestrationService
 
         return kind switch
         {
-            TicketKind.Freshdesk or TicketKind.FreshdeskChildWithJobCodes or TicketKind.FreshdeskChildWithoutJobCodes or TicketKind.FreshdeskStationnement =>
+            TicketKind.Freshdesk or TicketKind.FreshdeskChildWithJobCodes or TicketKind.FreshdeskChildWithoutJobCodes or TicketKind.FreshdeskStationnement or TicketKind.FreshdeskHebergement =>
                 $"https://{_freshdeskOptions.Subdomain}/support/tickets/{ticketNumber}",
             TicketKind.Tdx or TicketKind.D365Access =>
                 $"https://get.alterra.support/TDNext/Apps/{_tdxOptions.AppId}/Tickets/TicketDet?TicketID={ticketNumber}",
@@ -479,6 +482,7 @@ public class TicketOrchestrationService : ITicketOrchestrationService
                 case TicketKind.FreshdeskChildWithJobCodes:
                 case TicketKind.FreshdeskChildWithoutJobCodes:
                 case TicketKind.FreshdeskStationnement:
+                case TicketKind.FreshdeskHebergement:
                     // No parent dependency to check — these are independent tickets (no parent_id),
                     // so unlike before, retrying one no longer requires the main ticket to exist.
                     await TryCreateFannedOutFreshdeskTicketAsync(request, requester.Email!, ticket.Kind, ct);
@@ -577,6 +581,7 @@ public class TicketOrchestrationService : ITicketOrchestrationService
             {
                 if (kind == TicketKind.FreshdeskChildWithJobCodes && !RequiresHorairesTicket(request)) continue;
                 if (kind == TicketKind.FreshdeskStationnement && !RequiresStationnementTicket(request)) continue;
+                if (kind == TicketKind.FreshdeskHebergement && !await RequiresHebergementTicketAsync(request, ct)) continue;
                 if (!await ChildAlreadyCreatedAsync(request.RequestId, kind, ct))
                 {
                     await TryCreateFannedOutFreshdeskTicketAsync(request, requesterEmail, kind, ct);
@@ -634,7 +639,8 @@ public class TicketOrchestrationService : ITicketOrchestrationService
     [
         TicketKind.FreshdeskChildWithJobCodes,
         TicketKind.FreshdeskChildWithoutJobCodes,
-        TicketKind.FreshdeskStationnement
+        TicketKind.FreshdeskStationnement,
+        TicketKind.FreshdeskHebergement
     ];
 
     /// <summary>Offboarding always gets the RH - Horaires ticket (payroll needs to know regardless).
@@ -664,6 +670,25 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         return motif is not null && StationnementMotifs.Contains(motif, StringComparer.OrdinalIgnoreCase);
     }
 
+    /// <summary>Offboarding only, and only when someone on the request has lodging in the weekly list (the
+    /// HebergementEmployes app). If the list cannot be read the failure is recorded as a failed ticket (so
+    /// Administration shows Réessayer) instead of silently skipping the housing team.</summary>
+    private async Task<bool> RequiresHebergementTicketAsync(Request request, CancellationToken ct)
+    {
+        if (request.RequestType != RequestType.Offboarding || !_hebergements.Enabled) return false;
+        try
+        {
+            var rows = await _hebergements.ForEmployeesAsync(request.Employees.Select(e => e.WorkdayEmployeeId), ct);
+            return rows.Count > 0;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Could not read the lodging list for request {RequestNumber}", request.RequestNumber);
+            await _tickets.RecordFailureAsync(request.RequestId, TicketKind.FreshdeskHebergement, null, ex, ct);
+            return false;
+        }
+    }
+
     private static bool RequiresHorairesTicket(Request request)
     {
         if (request.RequestType == RequestType.Offboarding) return true;
@@ -675,6 +700,7 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         TicketKind.FreshdeskChildWithJobCodes => (options.HorairesGroupId, "RH - Horaires"),
         TicketKind.FreshdeskChildWithoutJobCodes => (options.RedingoteGroupId, "RH - Redingote"),
         TicketKind.FreshdeskStationnement => (options.StationnementGroupId, "SAC - ISAC"),
+        TicketKind.FreshdeskHebergement => (options.HebergementGroupId, "RH - Hébergement"),
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Not a fanned-out Freshdesk ticket kind.")
     };
 
@@ -693,6 +719,7 @@ public class TicketOrchestrationService : ITicketOrchestrationService
                 TicketKind.FreshdeskChildWithJobCodes => await _freshdesk.CreateHorairesTicketAsync(request, requesterEmail, ct),
                 TicketKind.FreshdeskChildWithoutJobCodes => await _freshdesk.CreateRedingoteTicketAsync(request, requesterEmail, ct),
                 TicketKind.FreshdeskStationnement => await _freshdesk.CreateStationnementTicketAsync(request, requesterEmail, ct),
+                TicketKind.FreshdeskHebergement => await _freshdesk.CreateHebergementTicketAsync(request, requesterEmail, ct),
                 _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Not a fanned-out Freshdesk ticket kind.")
             };
             await _tickets.RecordSuccessAsync(request.RequestId, kind, null, ticketId.ToString(), ct);

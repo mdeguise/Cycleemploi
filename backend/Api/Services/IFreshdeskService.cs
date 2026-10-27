@@ -27,6 +27,10 @@ public interface IFreshdeskService
     /// (FreshdeskOptions.StationnementGroupId) — the parking department.</summary>
     Task<long> CreateStationnementTicketAsync(Request request, string requesterEmail, CancellationToken ct);
 
+    /// <summary>Same fan-out pattern, to "RH - Hébergement" (FreshdeskOptions.HebergementGroupId) — offboarding
+    /// only; lists the lodgings found for the request's employees. Throws if there are none.</summary>
+    Task<long> CreateHebergementTicketAsync(Request request, string requesterEmail, CancellationToken ct);
+
     /// <summary>Current state of an existing ticket. Unlike the Create methods this NEVER throws —
     /// it is called while rendering a list, where one unreachable ticket must not fail the whole
     /// page. A failure returns Unknown, which the UI shows as such rather than guessing.</summary>

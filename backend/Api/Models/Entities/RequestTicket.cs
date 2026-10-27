@@ -37,7 +37,12 @@ public enum TicketKind
 
     /// <summary>Request-level. Independent Freshdesk ticket fanned out to "SAC - ISAC" (group id,
     /// see FreshdeskOptions.StationnementGroupId), the parking department.</summary>
-    FreshdeskStationnement = 6
+    FreshdeskStationnement = 6,
+
+    /// <summary>Request-level, OFFBOARDING only. Independent Freshdesk ticket to "RH - Hébergement" (see
+    /// FreshdeskOptions.HebergementGroupId) when an employee on the request has lodging in the weekly list
+    /// kept by the HebergementEmployes app.</summary>
+    FreshdeskHebergement = 7
 }
 
 public enum TicketOutcome

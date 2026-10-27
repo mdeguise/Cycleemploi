@@ -27,6 +27,9 @@ public class FreshdeskOptions
     /// <summary>"SAC - ISAC" (stationnement) — same fan-out pattern as HorairesGroupId.</summary>
     public long StationnementGroupId { get; set; }
 
+    /// <summary>"RH - Hébergement" — offboarding only, when an employee has lodging (HebergementEmployes app).</summary>
+    public long HebergementGroupId { get; set; }
+
     /// <summary>Ticket Type for the SAC - ISAC ticket — every other ticket sends TicketType
     /// ("RH - Général"), which is wrong for a ticket in a SAC group. Freshdesk's Type list has no
     /// entry named after the group; "SAC Demande stationnement interne" is the internal-parking one.</summary>
