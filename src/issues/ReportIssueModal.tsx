@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../api/ApiContext';
 import type { IssueFileDto, IssueFileInput, IssueImageDto, IssueReportDto, IssueStatus, IssueType } from '../api/types';
@@ -131,6 +131,18 @@ interface Props {
 }
 
 export function ReportIssueModal({ edit: initialEdit, onClose }: Props) {
+  // Close on a click OUTSIDE the card only when the press AND the release both happened on the dark
+  // backdrop. Otherwise dragging a field's resize handle (or selecting text) and letting go outside the
+  // card fires a click on the backdrop and the whole form vanishes — with what was typed.
+  const pressedOnBackdrop = useRef(false);
+  const overlayClose = {
+    onMouseDown: (ev: React.MouseEvent) => { pressedOnBackdrop.current = ev.target === ev.currentTarget; },
+    onClick: (ev: React.MouseEvent) => {
+      const close = pressedOnBackdrop.current && ev.target === ev.currentTarget;
+      pressedOnBackdrop.current = false;
+      if (close) onClose();
+    },
+  };
   const api = useApi();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<IssueReportDto | null>(initialEdit ?? null);
@@ -262,7 +274,7 @@ export function ReportIssueModal({ edit: initialEdit, onClose }: Props) {
 
   if (sentNumber !== null) {
     return (
-      <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-overlay" {...overlayClose}>
         <div className="modal-card" onClick={(ev) => ev.stopPropagation()}>
           <span className="modal-card__icon">
             <CheckCircleIcon style={{ width: 28, height: 28 }} />
@@ -294,7 +306,7 @@ export function ReportIssueModal({ edit: initialEdit, onClose }: Props) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" {...overlayClose}>
       <div className="issue-modal" onClick={(ev) => ev.stopPropagation()}>
         <div className="issue-modal__head">
           <span className="issue-modal__title">
