@@ -17,7 +17,7 @@ import {
   ELEVATED_APPROVAL_LIMIT_EMAILS,
   formatLimit,
 } from '../steps/StepD365Dynaway';
-import type { EmployeeDto, SubmitRequestDto } from '../api/types';
+import type { EmployeeDto, PositionOptionDto, SubmitRequestDto } from '../api/types';
 import tremblantLogo from '../assets/logo-tremblant.png';
 import { ReportIssueButton } from '../issues/IssueReporter';
 
@@ -74,6 +74,8 @@ interface BatchRow {
   dateEntreePrevue: string;
   regleDePaye: string;
   regleDePayeCommentaire: string;
+  /** Réactivation only: the "poste de retour" as typed by the manager. null = not touched, keeps the Workday position. */
+  posteRetour: string | null;
   /** null = this row follows the shared default profile below; non-null = it has its own. */
   customProfile: Profile | null;
   /** null = no D365 access needed for this person — always per-row, never shared. */
@@ -87,6 +89,7 @@ const makeRow = (): BatchRow => ({
   dateEntreePrevue: '',
   regleDePaye: '',
   regleDePayeCommentaire: '',
+  posteRetour: null,
   customProfile: null,
   d365: null,
 });
@@ -427,6 +430,28 @@ export function BatchOnboardingPage() {
 
   const includeTerminated = typeDemande === 'Réactivation';
 
+  // Réactivation: Workday often still shows the OLD primary position when the manager submits (RH corrects it
+  // afterwards), so each person gets a "poste de retour" — the IT and RH tickets show it. Same list as the wizard.
+  const { data: postes = [] } = useQuery({
+    queryKey: ['employees', 'positions'],
+    queryFn: () => api.employees.positions(),
+    enabled: includeTerminated,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  /** The position the manager typed for this row, resolved against the Workday list (the Workday position itself is always acceptable). */
+  const posteChoisi = (row: BatchRow): PositionOptionDto | undefined => {
+    if (!includeTerminated || row.posteRetour === null || !row.employee) return undefined;
+    const saisi = row.posteRetour.trim().toLowerCase();
+    if (saisi === (row.employee.poste ?? '').trim().toLowerCase()) return undefined;
+    return postes.find((p) => p.poste.toLowerCase() === saisi);
+  };
+  const posteRetourInvalide = (row: BatchRow) => {
+    if (!includeTerminated || row.posteRetour === null || !row.employee) return false;
+    const saisi = row.posteRetour.trim().toLowerCase();
+    return saisi !== (row.employee.poste ?? '').trim().toLowerCase() && !posteChoisi(row);
+  };
+
   const updateRow = (id: string, patch: Partial<BatchRow>) =>
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
 
@@ -458,6 +483,7 @@ export function BatchOnboardingPage() {
     if (row.regleDePaye === REGLE_DE_PAYE_AUTRE && !row.regleDePayeCommentaire.trim()) return false;
     const p = profileFor(row);
     if (p.allocationMensuelle.trim() && Number(p.allocationMensuelle) > 0 && !p.approuveParDirecteur) return false;
+    if (posteRetourInvalide(row)) return false;
     if (row.d365 && (!row.d365.accessType || !row.d365.jobTitleEnglish.trim())) return false;
     return true;
   };
@@ -472,6 +498,7 @@ export function BatchOnboardingPage() {
   const buildDto = (row: BatchRow): SubmitRequestDto => {
     const p = profileFor(row);
     const e = row.employee!;
+    const choisi = posteChoisi(row);
     const systemesAcces = row.d365 ? [...p.systemesAcces, ACCES_D365] : p.systemesAcces;
     return {
       requestType: typeDemande === 'Réactivation' ? 'Reactivation' : 'Onboarding',
@@ -479,9 +506,9 @@ export function BatchOnboardingPage() {
         {
           workdayEmployeeId: e.employeeId,
           nameSnapshot: `${e.prenom} ${e.nom}`,
-          positionSnapshot: e.poste ?? null,
-          departementSnapshot: e.departement ?? null,
-          codeEmploiSnapshot: e.codeEmploi ?? null,
+          positionSnapshot: choisi?.poste ?? e.poste ?? null,
+          departementSnapshot: choisi?.departement ?? e.departement ?? null,
+          codeEmploiSnapshot: choisi?.codeEmploi ?? e.codeEmploi ?? null,
           typeEmploiSnapshot: e.typeEmploi ?? null,
           gestionnaireSnapshot: e.gestionnaire ?? null,
         },
@@ -632,6 +659,12 @@ export function BatchOnboardingPage() {
             </div>
           )}
 
+          <datalist id="postes-retour-lot">
+            {postes.map((p) => (
+              <option key={p.poste} value={p.poste} />
+            ))}
+          </datalist>
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {rows.map((row) => {
               const result = results[row.id];
@@ -644,8 +677,8 @@ export function BatchOnboardingPage() {
                       <EmployeeCell
                         employee={row.employee}
                         includeTerminated={includeTerminated}
-                        onSelect={(e) => updateRow(row.id, { employee: e })}
-                        onClear={() => updateRow(row.id, { employee: null })}
+                        onSelect={(e) => updateRow(row.id, { employee: e, posteRetour: null })}
+                        onClear={() => updateRow(row.id, { employee: null, posteRetour: null })}
                       />
                     </div>
                     <div style={{ flex: '0 0 150px' }}>
@@ -706,6 +739,32 @@ export function BatchOnboardingPage() {
                       </button>
                     )}
                   </div>
+
+                  {includeTerminated && row.employee && (
+                    <Field label="Poste de retour" required valid={!posteRetourInvalide(row)}>
+                      <input
+                        type="text"
+                        list="postes-retour-lot"
+                        value={row.posteRetour ?? row.employee.poste ?? ''}
+                        onChange={(ev) => updateRow(row.id, { posteRetour: ev.target.value })}
+                        placeholder="Commencez à taper le titre du poste"
+                        autoComplete="off"
+                      />
+                      {posteRetourInvalide(row) ? (
+                        <div className="field-hint">Choisissez un poste dans la liste proposée.</div>
+                      ) : row.posteRetour !== null && row.posteRetour.trim().toLowerCase() !== (row.employee.poste ?? '').trim().toLowerCase() ? (
+                        <div className="field-hint">
+                          Workday affiche encore : <strong>{row.employee.poste ?? '—'}</strong>. Le poste choisi sera indiqué aux
+                          équipes TI et RH, qui le confirmeront dans Workday.{' '}
+                          <button type="button" className="employee-selected-card__change" onClick={() => updateRow(row.id, { posteRetour: null })}>
+                            Reprendre le poste de Workday
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="field-hint">Si l'employé revient dans un autre poste que celui affiché par Workday, choisissez-le ici.</div>
+                      )}
+                    </Field>
+                  )}
 
                   <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', gap: 8, alignItems: 'center' }}>
                     {isCustom ? <span className="review-tag">Profil personnalisé</span> : 'Suit le profil par défaut'}
