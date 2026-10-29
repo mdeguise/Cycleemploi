@@ -66,7 +66,7 @@ builder.Services.AddScoped<IEmployeeFieldsService, EmployeeFieldsService>();
 builder.Services.AddScoped<IRequestTicketService, RequestTicketService>();
 builder.Services.AddScoped<ITicketOrchestrationService, TicketOrchestrationService>();
 builder.Services.AddScoped<IPositionWatcher, PositionWatcher>();
-// Not in development: a local run must never comment real TDX tickets or e-mail IT on its own.
+// Not in development: a local run must never comment real TDX tickets on its own.
 if (!builder.Environment.IsDevelopment()) builder.Services.AddHostedService<PositionWatchService>();
 builder.Services.AddScoped<ITicketStatusService, TicketStatusService>();
 

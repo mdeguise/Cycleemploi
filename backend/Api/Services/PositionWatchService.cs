@@ -15,13 +15,12 @@ public interface IPositionWatcher
 /// <summary>Réactivation follow-up. When a manager reactivates someone, Workday often still shows the OLD primary
 /// position (RH corrects it afterwards), so the TDX ticket IT works from can be stale. This compares each recent
 /// reactivation's current Workday primary position with the last one reported; on a change it adds a comment to
-/// the employee's TDX ticket and e-mails IT (the same mailbox as the integration-failure notices). Idempotent:
+/// the employee's TDX ticket (no e-mail: a message to the IT mailbox would open another ticket). Idempotent:
 /// PositionLastFollowed records what was already announced.</summary>
 public class PositionWatcher(
     AppDbContext db,
     WorkdayContext workday,
     ITdxService tdx,
-    IEmailNotificationService email,
     ILogger<PositionWatcher> logger) : IPositionWatcher
 {
     /// <summary>How long after submission a reactivation is still followed.</summary>
@@ -80,13 +79,9 @@ public class PositionWatcher(
                     "Veuillez vérifier les accès et la sécurité en conséquence." +
                     (live.State == LiveTicketState.Closed ? "\n(Ce billet est déjà fermé : le rouvrir au besoin.)" : "");
 
+                // The TDX comment is the only notification: an e-mail to the IT mailbox would open a second TDX ticket.
+                // On failure PositionLastFollowed stays as is, so the next hourly run retries.
                 var done = false;
-                try
-                {
-                    await email.SendAsync($"[Cycle Emploi] Poste mis à jour dans Workday — {e.NameSnapshot} — demande {requestNumber} — billet TDX {tdxId}", text, ct);
-                    done = true;
-                }
-                catch (Exception ex) { logger.LogWarning(ex, "Could not e-mail IT about the position change for {Request}", requestNumber); }
                 try
                 {
                     await tdx.AddFeedEntryAsync(tdxId, text, ct);
