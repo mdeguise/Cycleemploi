@@ -1,5 +1,5 @@
 import type { ApiClient } from './client';
-import type {
+import type { PositionOptionDto,
   AdAccountDto,
   AdminRequestDetailDto,
   AttachmentDto,
@@ -73,6 +73,7 @@ export function createApi(client: ApiClient) {
           `/api/employees/search?q=${encodeURIComponent(q)}&includeTerminated=${includeTerminated}`
         ),
       getById: (workdayId: number) => client.get<EmployeeDto>(`/api/employees/${workdayId}`),
+      positions: () => client.get<PositionOptionDto[]>('/api/employees/positions'),
     },
     requests: {
       /** Creates AND submits in one call — no partial-save state. See SubmitRequestDto. */

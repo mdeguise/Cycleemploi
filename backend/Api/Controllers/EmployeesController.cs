@@ -78,6 +78,25 @@ public class EmployeesController : ControllerBase
         return Ok(results);
     }
 
+    /// <summary>Every position title currently held by a non-terminated employee (with its job code and
+    /// department), for the Réactivation "poste de retour" picker. One entry per title.</summary>
+    [HttpGet("positions")]
+    public async Task<ActionResult<List<PositionOptionDto>>> Positions(CancellationToken ct)
+    {
+        var rows = await _workday.WorkdayDemographics
+            .Where(e => e.PrimaryJob == true && e.EmploymentStatus != "Terminated" && e.PositionTitle != null && e.PositionTitle != "")
+            .Select(e => new { e.PositionTitle, e.JobCode, e.JobFamilyGroup })
+            .ToListAsync(ct);
+
+        var list = rows
+            .GroupBy(r => r.PositionTitle!)
+            .Select(g => g.GroupBy(x => x.JobCode).OrderByDescending(x => x.Count()).First())
+            .Select(g => new PositionOptionDto { Poste = g.First().PositionTitle!, CodeEmploi = g.Key, Departement = g.First().JobFamilyGroup })
+            .OrderBy(p => p.Poste)
+            .ToList();
+        return Ok(list);
+    }
+
     [HttpGet("{workdayId}")]
     public async Task<ActionResult<EmployeeDto>> GetById(string workdayId, CancellationToken ct)
     {
@@ -99,4 +118,11 @@ public class EmployeesController : ControllerBase
 
         return employee is null ? NotFound() : Ok(employee);
     }
+}
+
+public class PositionOptionDto
+{
+    public string Poste { get; set; } = "";
+    public string? CodeEmploi { get; set; }
+    public string? Departement { get; set; }
 }

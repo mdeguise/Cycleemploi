@@ -18,4 +18,13 @@ public class RequestEmployee
     public string? TypeEmploiSnapshot { get; set; }
     public string? GestionnaireSnapshot { get; set; }
     public bool IsPrimary { get; set; }
+
+    /// <summary>RÉACTIVATION only: the position Workday itself showed when the request was submitted (server-read,
+    /// never client-supplied). PositionSnapshot is what the manager asked for ("poste de retour"); when the two
+    /// differ the tickets say so. Null for other request types and for requests older than this column.</summary>
+    public string? PositionWorkdayAtSubmit { get; set; }
+
+    /// <summary>Last Workday primary position the nightly follow-up (PositionWatchService) has already reported
+    /// on the TDX ticket, so a change is announced once.</summary>
+    public string? PositionLastFollowed { get; set; }
 }

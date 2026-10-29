@@ -459,4 +459,14 @@ public class AdminRequestsController : ControllerBase
             Error = ok ? null : "Envoi impossible : le billet RH Général n'existe pas ou l'envoi a échoué (voir le journal du serveur)."
         });
     }
+
+    /// <summary>Admin only. Runs the Réactivation position follow-up now (it also runs by itself every hour):
+    /// compares each recent reactivation's Workday primary position with the last one reported and, on a change,
+    /// comments the TDX ticket and e-mails IT. ?dryRun=true only lists what it would announce.</summary>
+    [HttpPost("position-watch/run")]
+    public async Task<ActionResult<PositionWatchResult>> RunPositionWatch([FromServices] IPositionWatcher watcher, CancellationToken ct, [FromQuery] bool dryRun = false)
+    {
+        if (!await CanRetryAsync(ct)) return Forbid();
+        return Ok(await watcher.RunOnceAsync(dryRun, ct));
+    }
 }

@@ -320,6 +320,23 @@ public class TdxService : ITdxService
         return doc.RootElement.GetProperty("ID").GetInt32();
     }
 
+    public async Task AddFeedEntryAsync(int ticketId, string comments, CancellationToken ct)
+    {
+        var token = await GetTokenAsync(ct);
+        using var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"{_options.BaseUrl}/api/{_options.AppId}/tickets/{ticketId}/feed")
+        {
+            Content = JsonContent.Create(new { Comments = comments, IsPrivate = false, IsRichHtml = false, Notify = Array.Empty<string>() })
+        };
+        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        using var response = await _http.SendAsync(requestMessage, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(ct);
+            throw new TdxTicketException($"TDX returned {(int)response.StatusCode} {response.ReasonPhrase} adding a comment: {body}");
+        }
+    }
+
     private const string TokenCacheKey = "tdx:auth-token";
 
     /// <summary>Cached for 20 minutes. Without this, listing N tickets means N auth round-trips —

@@ -15,6 +15,13 @@ export interface EmployeeDto {
   payGroup?: string | null;
 }
 
+/** One position title currently held in Workday — the Réactivation "poste de retour" picker. */
+export interface PositionOptionDto {
+  poste: string;
+  codeEmploi?: string | null;
+  departement?: string | null;
+}
+
 export interface AccessSystemDto {
   nom: string;
   description: string;

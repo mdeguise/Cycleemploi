@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useApi } from '../api/ApiContext';
 import { useNavigate } from 'react-router-dom';
 import { useWizard } from '../context/WizardContext';
 import { Field } from '../components/FormField';
@@ -26,6 +28,7 @@ function toSnapshot(e: EmployeeDto): EmployeeSnapshot {
     codeEmploi: e.codeEmploi ?? '',
     typeEmploi: e.typeEmploi ?? '',
     gestionnaire: e.gestionnaire ?? '',
+    posteWorkday: e.poste ?? '',
   };
 }
 
@@ -36,6 +39,17 @@ export function Step1Employee() {
   const isTermination = request.typeDemande === TYPE_DEMANDE_TERMINAISON;
   const isReactivation = request.typeDemande === 'Réactivation';
   const [query, setQuery] = useState('');
+  const api = useApi();
+  const [posteSaisi, setPosteSaisi] = useState<string | null>(null);
+
+  // Réactivation: Workday often still shows the OLD primary position when the manager submits (RH corrects it
+  // afterwards), so the manager states the "poste de retour" here — the IT and RH tickets show it.
+  const { data: postes = [] } = useQuery({
+    queryKey: ['employees', 'positions'],
+    queryFn: () => api.employees.positions(),
+    enabled: isReactivation,
+    staleTime: 10 * 60 * 1000,
+  });
 
   const { data: results = [], isFetching } = useEmployeeSearch(query, isReactivation);
 
@@ -51,7 +65,28 @@ export function Step1Employee() {
     setQuery('');
   };
 
-  const clearSelection = () => update({ employee: null, employeePayGroup: '' });
+  const clearSelection = () => { setPosteSaisi(null); update({ employee: null, employeePayGroup: '' }); };
+
+  const choisirPoste = (valeur: string) => {
+    setPosteSaisi(valeur);
+    const trouve = postes.find((p) => p.poste.toLowerCase() === valeur.trim().toLowerCase());
+    if (trouve && e.employee) {
+      update({
+        employee: {
+          ...e.employee,
+          poste: trouve.poste,
+          codeEmploi: trouve.codeEmploi ?? e.employee.codeEmploi,
+          departement: trouve.departement ?? e.employee.departement,
+        },
+      });
+    }
+  };
+  const posteRetourChange = isReactivation && !!e.employee?.posteWorkday && e.employee.poste !== e.employee.posteWorkday;
+  const posteSaisiInvalide = posteSaisi !== null && !postes.some((p) => p.poste.toLowerCase() === posteSaisi.trim().toLowerCase());
+  const reinitialiserPoste = () => {
+    setPosteSaisi(null);
+    if (e.employee?.posteWorkday !== undefined) update({ employee: { ...e.employee, poste: e.employee.posteWorkday } });
+  };
 
   const regleDePayeNonRequise = e.employeePayGroup === PAY_GROUP_NON_UNION;
 
@@ -324,6 +359,41 @@ export function Step1Employee() {
                 Changer
               </button>
             </div>
+          )}
+
+          {isReactivation && e.employee && (
+            <Field label="Poste de retour" required valid={!posteSaisiInvalide}>
+              <input
+                type="text"
+                list="postes-retour"
+                value={posteSaisi ?? e.employee.poste}
+                onChange={(ev) => choisirPoste(ev.target.value)}
+                placeholder="Commencez à taper le titre du poste"
+                autoComplete="off"
+              />
+              <datalist id="postes-retour">
+                {postes.map((p) => (
+                  <option key={p.poste} value={p.poste} />
+                ))}
+              </datalist>
+              {posteSaisiInvalide ? (
+                <div className="field-hint">Choisissez un poste dans la liste proposée.</div>
+              ) : (
+                <div className="field-hint">
+                  {posteRetourChange ? (
+                    <>
+                      Workday affiche encore : <strong>{e.employee.posteWorkday}</strong>. Le poste choisi sera indiqué aux
+                      équipes TI et RH, qui le confirmeront dans Workday.{' '}
+                      <button type="button" className="employee-selected-card__change" onClick={reinitialiserPoste}>
+                        Reprendre le poste de Workday
+                      </button>
+                    </>
+                  ) : (
+                    <>Si l'employé revient dans un autre poste que celui affiché par Workday, choisissez-le ici.</>
+                  )}
+                </div>
+              )}
+            </Field>
           )}
 
           <div className="field-grid field-grid--2">

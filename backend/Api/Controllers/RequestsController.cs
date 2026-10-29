@@ -93,6 +93,28 @@ public class RequestsController : ControllerBase
             IsPrimary = i == 0
         }).ToList();
 
+        if (requestType == RequestType.Reactivation)
+        {
+            // Workday often still shows the OLD primary position at this point (RH corrects it afterwards).
+            // Remember what it showed (read here, never trusted from the browser) so the tickets can say when the
+            // manager asked for a different "poste de retour", and so PositionWatchService can follow the change.
+            foreach (var emp in request.Employees)
+            {
+                var wdTitle = await _workday.WorkdayDemographics.AsNoTracking()
+                    .Where(w => w.EmployeeId == emp.WorkdayEmployeeId && w.PrimaryJob == true)
+                    .Select(w => w.PositionTitle).FirstOrDefaultAsync(ct);
+                emp.PositionWorkdayAtSubmit = wdTitle;
+                emp.PositionLastFollowed = wdTitle;
+
+                var chosen = emp.PositionSnapshot?.Trim();
+                if (!string.IsNullOrEmpty(chosen) && !string.Equals(chosen, wdTitle?.Trim(), StringComparison.OrdinalIgnoreCase)
+                    && !await _workday.WorkdayDemographics.AnyAsync(w => w.PositionTitle == chosen, ct))
+                {
+                    return BadRequest($"Le poste de retour « {chosen} » n'existe pas dans Workday. Choisissez un poste de la liste.");
+                }
+            }
+        }
+
         if (requestType is RequestType.Onboarding or RequestType.Reactivation)
         {
             request.OnboardingDetail = new OnboardingDetail

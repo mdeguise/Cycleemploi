@@ -13,6 +13,17 @@ public class EmployeeFieldsService : IEmployeeFieldsService
         _workday = workday;
     }
 
+    /// <summary>Réactivation: when the manager chose a "poste de retour" different from what Workday showed at
+    /// submission, every ticket says so — TI must not provision the old position, and RH must update Workday.</summary>
+    private static string? PosteWithNote(RequestEmployee employee, string? workdayNow)
+    {
+        var poste = employee.PositionSnapshot ?? workdayNow;
+        var avant = employee.PositionWorkdayAtSubmit;
+        if (string.IsNullOrWhiteSpace(avant) || string.Equals(avant, employee.PositionSnapshot, StringComparison.OrdinalIgnoreCase))
+            return poste;
+        return $"{poste} (poste de retour demandé par le gestionnaire — Workday affichait : {avant} — à confirmer par RH)";
+    }
+
     public async Task<Dictionary<string, string?>> ResolveAsync(RequestEmployee employee, CancellationToken ct)
     {
         var wd = await _workday.WorkdayDemographics
@@ -33,7 +44,7 @@ public class EmployeeFieldsService : IEmployeeFieldsService
             ["EmployeeFirstName"] = wd?.FirstName,
             ["EmployeeLastName"] = wd?.LastName,
             ["EmployeeId"] = employee.WorkdayEmployeeId,
-            ["Poste"] = employee.PositionSnapshot ?? wd?.PositionTitle,
+            ["Poste"] = PosteWithNote(employee, wd?.PositionTitle),
             ["PositionCode"] = wd?.Position,
             ["Departement"] = employee.DepartementSnapshot,
             ["Gestionnaire"] = employee.GestionnaireSnapshot ?? wd?.Manager,

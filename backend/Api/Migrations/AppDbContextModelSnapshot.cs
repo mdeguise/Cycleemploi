@@ -812,7 +812,13 @@ namespace TremblantLifecycle.Api.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("PositionLastFollowed")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("PositionSnapshot")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PositionWorkdayAtSubmit")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("RequestId")

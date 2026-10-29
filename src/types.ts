@@ -15,6 +15,9 @@ export interface EmployeeSnapshot {
   codeEmploi: string;
   typeEmploi: string;
   gestionnaire: string;
+  /** Réactivation: the position Workday showed when the employee was selected (UI only). `poste` becomes the
+   * manager's "poste de retour" when they pick a different one — see Step1Employee. */
+  posteWorkday?: string;
 }
 
 export interface EmployeeSelectionInfo {

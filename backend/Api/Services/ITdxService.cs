@@ -37,6 +37,10 @@ public interface ITdxService
     /// <summary>Current state of an existing TDX ticket. NEVER throws — called while rendering a
     /// list, where one unreachable ticket must not fail the page. Failure returns Unknown.</summary>
     Task<LiveTicketStatus> GetTicketStatusAsync(int ticketId, CancellationToken ct);
+
+    /// <summary>Adds a (public) comment to an existing ticket's feed — used when the employee's position changes
+    /// in Workday after the ticket was raised. Throws on failure; the caller decides what to do.</summary>
+    Task AddFeedEntryAsync(int ticketId, string comments, CancellationToken ct);
 }
 
 /// <summary>Everything needed to fill out the "D365 - Access" TDX form (FormID 10799) for one
