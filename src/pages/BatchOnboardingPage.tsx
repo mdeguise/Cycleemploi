@@ -449,15 +449,22 @@ export function BatchOnboardingPage() {
     if (saisi === (row.employee.poste ?? '').trim().toLowerCase()) return undefined;
     return postes.find((p) => p.poste.toLowerCase() === saisi);
   };
-  /** Réactivation: the question must be answered, and "Oui" needs a position from the list. */
+  /** Free text: the position typed for this row when the answer is "Oui", if it differs from Workday's (listed or not). */
+  const posteDemande = (row: BatchRow): string | undefined => {
+    if (!includeTerminated || row.changePoste !== 'Oui' || !row.employee) return undefined;
+    const saisi = (row.posteRetour ?? '').trim();
+    if (!saisi || saisi.toLowerCase() === (row.employee.poste ?? '').trim().toLowerCase()) return undefined;
+    return saisi;
+  };
+  /** Réactivation: the question must be answered, and "Oui" needs a position different from Workday's. */
   const posteRetourManquant = (row: BatchRow) => {
     if (!includeTerminated || !row.employee) return false;
     if (row.changePoste === '') return true;
-    return row.changePoste === 'Oui' && !posteChoisi(row);
+    return row.changePoste === 'Oui' && !posteDemande(row);
   };
-  /** Something typed that is not a usable position — drives the "choisissez dans la liste" hint. */
+  /** Something typed that is just Workday's own position — drives the hint. */
   const posteSaisiInvalide = (row: BatchRow) =>
-    row.changePoste === 'Oui' && !!row.posteRetour?.trim() && !posteChoisi(row);
+    row.changePoste === 'Oui' && !!row.posteRetour?.trim() && !posteDemande(row);
 
   const updateRow = (id: string, patch: Partial<BatchRow>) =>
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
@@ -506,6 +513,7 @@ export function BatchOnboardingPage() {
     const p = profileFor(row);
     const e = row.employee!;
     const choisi = posteChoisi(row);
+    const demande = posteDemande(row);
     const systemesAcces = row.d365 ? [...p.systemesAcces, ACCES_D365] : p.systemesAcces;
     return {
       requestType: typeDemande === 'Réactivation' ? 'Reactivation' : 'Onboarding',
@@ -513,9 +521,10 @@ export function BatchOnboardingPage() {
         {
           workdayEmployeeId: e.employeeId,
           nameSnapshot: `${e.prenom} ${e.nom}`,
-          positionSnapshot: choisi?.poste ?? e.poste ?? null,
+          positionSnapshot: demande ?? e.poste ?? null,
+          // A title typed by hand has no known job code (the old one belongs to the old position); RH confirms it.
           departementSnapshot: choisi?.departement ?? e.departement ?? null,
-          codeEmploiSnapshot: choisi?.codeEmploi ?? e.codeEmploi ?? null,
+          codeEmploiSnapshot: demande ? (choisi?.codeEmploi ?? '') : (e.codeEmploi ?? null),
           typeEmploiSnapshot: e.typeEmploi ?? null,
           gestionnaireSnapshot: e.gestionnaire ?? null,
         },
@@ -767,20 +776,20 @@ export function BatchOnboardingPage() {
                       </div>
                       {row.changePoste === 'Oui' && (
                         <div style={{ flex: '2 1 360px' }}>
-                          <Field label="À quel poste l'employé va-t-il revenir?" required valid={!!posteChoisi(row)}>
+                          <Field label="À quel poste l'employé va-t-il revenir?" required valid={!!posteDemande(row)}>
                             <input
                               type="text"
                               list="postes-retour-lot"
                               value={row.posteRetour ?? ''}
                               onChange={(ev) => updateRow(row.id, { posteRetour: ev.target.value })}
-                              placeholder="Entrez quelques lettres pour obtenir la liste des postes"
+                              placeholder="Entrez le poste (quelques lettres pour obtenir les suggestions de Workday)"
                               autoComplete="off"
                             />
                             <div className="field-hint">
                               {posteSaisiInvalide(row) ? (
-                                <>Choisissez un poste dans la liste proposée.</>
+                                <>Indiquez un poste différent de celui de Workday.</>
                               ) : (
-                                <>Le poste choisi sera indiqué aux équipes TI et RH, qui le confirmeront dans Workday.</>
+                                <>Le poste indiqué sera transmis aux équipes TI et RH, qui le confirmeront dans Workday.</>
                               )}
                             </div>
                           </Field>

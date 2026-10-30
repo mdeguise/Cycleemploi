@@ -53,10 +53,17 @@ export function Step2Position() {
     update({ changePoste: valeur, ...(selected ? { employee: withWorkdayPosition(selected) } : {}) });
   };
 
+  // Free text: the Workday list only suggests. A title from the list brings its job code and department; any other
+  // title is kept as typed, with no job code (the old one belongs to the old position) — RH confirms it in Workday.
   const choisirPoste = (valeur: string) => {
     if (!selected) return;
     setSaisi(valeur);
-    const trouve = postes.find((p) => p.poste.toLowerCase() === valeur.trim().toLowerCase());
+    const texte = valeur.trim();
+    const trouve = postes.find((p) => p.poste.toLowerCase() === texte.toLowerCase());
+    if (!texte || texte.toLowerCase() === (selected.posteWorkday ?? '').trim().toLowerCase()) {
+      update({ employee: withWorkdayPosition(selected) });
+      return;
+    }
     update({
       employee: trouve
         ? {
@@ -65,7 +72,12 @@ export function Step2Position() {
             codeEmploi: trouve.codeEmploi ?? selected.codeEmploiWorkday ?? selected.codeEmploi,
             departement: trouve.departement ?? selected.departementWorkday ?? selected.departement,
           }
-        : withWorkdayPosition(selected),
+        : {
+            ...selected,
+            poste: texte,
+            codeEmploi: '',
+            departement: selected.departementWorkday ?? selected.departement,
+          },
     });
   };
 
@@ -158,7 +170,7 @@ export function Step2Position() {
                     list="postes-retour"
                     value={texteSaisi}
                     onChange={(ev) => choisirPoste(ev.target.value)}
-                    placeholder="Entrez quelques lettres pour obtenir la liste des postes"
+                    placeholder="Entrez le poste (quelques lettres pour obtenir les suggestions de Workday)"
                     autoComplete="off"
                   />
                   <datalist id="postes-retour">
@@ -168,9 +180,9 @@ export function Step2Position() {
                   </datalist>
                   <div className="field-hint">
                     {saisiInvalide ? (
-                      <>Choisissez un poste dans la liste proposée.</>
+                      <>Indiquez un poste différent de celui de Workday.</>
                     ) : (
-                      <>Le poste choisi sera indiqué aux équipes TI et RH, qui le confirmeront dans Workday.</>
+                      <>Le poste indiqué sera transmis aux équipes TI et RH, qui le confirmeront dans Workday.</>
                     )}
                   </div>
                 </Field>

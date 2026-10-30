@@ -105,13 +105,8 @@ public class RequestsController : ControllerBase
                     .Select(w => w.PositionTitle).FirstOrDefaultAsync(ct);
                 emp.PositionWorkdayAtSubmit = wdTitle;
                 emp.PositionLastFollowed = wdTitle;
-
-                var chosen = emp.PositionSnapshot?.Trim();
-                if (!string.IsNullOrEmpty(chosen) && !string.Equals(chosen, wdTitle?.Trim(), StringComparison.OrdinalIgnoreCase)
-                    && !await _workday.WorkdayDemographics.AnyAsync(w => w.PositionTitle == chosen, ct))
-                {
-                    return BadRequest($"Le poste de retour « {chosen} » n'existe pas dans Workday. Choisissez un poste de la liste.");
-                }
+                // The "poste de retour" is free text: a title Workday does not know yet (new position) is accepted as typed;
+                // the tickets ask RH to confirm it in Workday.
             }
         }
 
