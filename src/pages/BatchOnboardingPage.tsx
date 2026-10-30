@@ -74,7 +74,9 @@ interface BatchRow {
   dateEntreePrevue: string;
   regleDePaye: string;
   regleDePayeCommentaire: string;
-  /** Réactivation only: the "poste de retour" as typed by the manager. null = not touched, keeps the Workday position. */
+  /** Réactivation only: "revient-il dans le même poste que l'an dernier?" — same question as the wizard's Poste et département step. */
+  memePoste: '' | 'Oui' | 'Non';
+  /** Réactivation only, when memePoste is 'Non': the "poste de retour" as typed by the manager. */
   posteRetour: string | null;
   /** null = this row follows the shared default profile below; non-null = it has its own. */
   customProfile: Profile | null;
@@ -89,6 +91,7 @@ const makeRow = (): BatchRow => ({
   dateEntreePrevue: '',
   regleDePaye: '',
   regleDePayeCommentaire: '',
+  memePoste: '',
   posteRetour: null,
   customProfile: null,
   d365: null,
@@ -439,18 +442,22 @@ export function BatchOnboardingPage() {
     staleTime: 10 * 60 * 1000,
   });
 
-  /** The position the manager typed for this row, resolved against the Workday list (the Workday position itself is always acceptable). */
+  /** The position picked for this row when the answer is "Non", resolved against the Workday list and different from the one Workday shows. */
   const posteChoisi = (row: BatchRow): PositionOptionDto | undefined => {
-    if (!includeTerminated || row.posteRetour === null || !row.employee) return undefined;
+    if (!includeTerminated || row.memePoste !== 'Non' || row.posteRetour === null || !row.employee) return undefined;
     const saisi = row.posteRetour.trim().toLowerCase();
     if (saisi === (row.employee.poste ?? '').trim().toLowerCase()) return undefined;
     return postes.find((p) => p.poste.toLowerCase() === saisi);
   };
-  const posteRetourInvalide = (row: BatchRow) => {
-    if (!includeTerminated || row.posteRetour === null || !row.employee) return false;
-    const saisi = row.posteRetour.trim().toLowerCase();
-    return saisi !== (row.employee.poste ?? '').trim().toLowerCase() && !posteChoisi(row);
+  /** Réactivation: the question must be answered, and "Non" needs a position from the list. */
+  const posteRetourManquant = (row: BatchRow) => {
+    if (!includeTerminated || !row.employee) return false;
+    if (row.memePoste === '') return true;
+    return row.memePoste === 'Non' && !posteChoisi(row);
   };
+  /** Something typed that is not a usable position — drives the "choisissez dans la liste" hint. */
+  const posteSaisiInvalide = (row: BatchRow) =>
+    row.memePoste === 'Non' && !!row.posteRetour?.trim() && !posteChoisi(row);
 
   const updateRow = (id: string, patch: Partial<BatchRow>) =>
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
@@ -483,7 +490,7 @@ export function BatchOnboardingPage() {
     if (row.regleDePaye === REGLE_DE_PAYE_AUTRE && !row.regleDePayeCommentaire.trim()) return false;
     const p = profileFor(row);
     if (p.allocationMensuelle.trim() && Number(p.allocationMensuelle) > 0 && !p.approuveParDirecteur) return false;
-    if (posteRetourInvalide(row)) return false;
+    if (posteRetourManquant(row)) return false;
     if (row.d365 && (!row.d365.accessType || !row.d365.jobTitleEnglish.trim())) return false;
     return true;
   };
@@ -677,8 +684,8 @@ export function BatchOnboardingPage() {
                       <EmployeeCell
                         employee={row.employee}
                         includeTerminated={includeTerminated}
-                        onSelect={(e) => updateRow(row.id, { employee: e, posteRetour: null })}
-                        onClear={() => updateRow(row.id, { employee: null, posteRetour: null })}
+                        onSelect={(e) => updateRow(row.id, { employee: e, memePoste: '', posteRetour: null })}
+                        onClear={() => updateRow(row.id, { employee: null, memePoste: '', posteRetour: null })}
                       />
                     </div>
                     <div style={{ flex: '0 0 150px' }}>
@@ -741,29 +748,44 @@ export function BatchOnboardingPage() {
                   </div>
 
                   {includeTerminated && row.employee && (
-                    <Field label="Poste de retour" required valid={!posteRetourInvalide(row)}>
-                      <input
-                        type="text"
-                        list="postes-retour-lot"
-                        value={row.posteRetour ?? row.employee.poste ?? ''}
-                        onChange={(ev) => updateRow(row.id, { posteRetour: ev.target.value })}
-                        placeholder="Commencez à taper le titre du poste"
-                        autoComplete="off"
-                      />
-                      {posteRetourInvalide(row) ? (
-                        <div className="field-hint">Choisissez un poste dans la liste proposée.</div>
-                      ) : row.posteRetour !== null && row.posteRetour.trim().toLowerCase() !== (row.employee.poste ?? '').trim().toLowerCase() ? (
-                        <div className="field-hint">
-                          Workday affiche encore : <strong>{row.employee.poste ?? '—'}</strong>. Le poste choisi sera indiqué aux
-                          équipes TI et RH, qui le confirmeront dans Workday.{' '}
-                          <button type="button" className="employee-selected-card__change" onClick={() => updateRow(row.id, { posteRetour: null })}>
-                            Reprendre le poste de Workday
-                          </button>
+                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                      <div style={{ flex: '1 1 300px' }}>
+                        <Field label="Revient-il dans le même poste que l'an dernier?" required valid={row.memePoste !== ''}>
+                          <select
+                            value={row.memePoste}
+                            onChange={(ev) => updateRow(row.id, { memePoste: ev.target.value as '' | 'Oui' | 'Non', posteRetour: null })}
+                          >
+                            <option value="">Sélectionner</option>
+                            <option value="Oui">Oui</option>
+                            <option value="Non">Non</option>
+                          </select>
+                        </Field>
+                      </div>
+                      {row.memePoste === 'Non' && (
+                        <div style={{ flex: '2 1 360px' }}>
+                          <Field label="Poste de retour" required valid={!!posteChoisi(row)}>
+                            <input
+                              type="text"
+                              list="postes-retour-lot"
+                              value={row.posteRetour ?? ''}
+                              onChange={(ev) => updateRow(row.id, { posteRetour: ev.target.value })}
+                              placeholder="Entrez quelques lettres pour obtenir la liste des postes"
+                              autoComplete="off"
+                            />
+                            <div className="field-hint">
+                              {posteSaisiInvalide(row) ? (
+                                <>Choisissez un poste dans la liste proposée.</>
+                              ) : (
+                                <>
+                                  Workday affiche encore : <strong>{row.employee.poste ?? '—'}</strong>. Le poste choisi sera indiqué
+                                  aux équipes TI et RH, qui le confirmeront dans Workday.
+                                </>
+                              )}
+                            </div>
+                          </Field>
                         </div>
-                      ) : (
-                        <div className="field-hint">Si l'employé revient dans un autre poste que celui affiché par Workday, choisissez-le ici.</div>
                       )}
-                    </Field>
+                    </div>
                   )}
 
                   <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', gap: 8, alignItems: 'center' }}>
