@@ -33,9 +33,10 @@ export interface EmployeeSelectionInfo {
    * submit time for validation — see RequestsController.ValidateForSubmitAsync). Drives whether
    * "Règle de paye" is required/grayed-out for CAN Tremblant-Non Union employees. */
   employeePayGroup: string;
-  /** Réactivation only, answered on the "Poste et département" step: does the employee come back to the same
-   * position as last year? UI-only — the chosen position travels in `employee.poste`. */
-  memePoste: '' | 'Oui' | 'Non';
+  /** Réactivation only, answered on the "Poste et département" step: does the employee change from the position
+   * shown above (Workday's)? 'Oui' = yes, they come back to another one. UI-only — the chosen position travels
+   * in `employee.poste`. */
+  changePoste: '' | 'Oui' | 'Non';
 }
 
 export interface AccessInfo {
@@ -140,7 +141,7 @@ export function createEmptyRequest(demandePar: string): OnboardingRequest {
       regleDePaye: '',
       regleDePayeCommentaire: '',
       employeePayGroup: '',
-      memePoste: '',
+      changePoste: '',
     },
     access: {
       systemes: [],

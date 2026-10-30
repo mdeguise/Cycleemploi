@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useApi } from '../api/ApiContext';
 import { useWizard } from '../context/WizardContext';
 import type { EmployeeSelectionInfo, EmployeeSnapshot } from '../types';
-import { Field } from '../components/FormField';
+import { Field, SectionTitle } from '../components/FormField';
 import { StepFooter } from '../components/StepFooter';
 import { BriefcaseIcon, InfoIcon } from '../components/icons';
 
@@ -24,10 +24,10 @@ export function Step2Position() {
   const sel = request.employee;
   const selected = sel.employee;
   const isReactivation = request.typeDemande === 'Réactivation';
-  const demandePoste = isReactivation && sel.memePoste === 'Non';
+  const demandePoste = isReactivation && sel.changePoste === 'Oui';
 
   // Réactivation: Workday often still shows the PREVIOUS primary position when the manager submits (RH corrects it
-  // afterwards). So the manager says whether the person returns to the same position as last year; when not, they
+  // afterwards). So the manager says whether the person changes position; when so, they
   // pick the new one here (type a few letters) and the IT and RH tickets show it.
   const { data: postes = [] } = useQuery({
     queryKey: ['employees', 'positions'],
@@ -48,9 +48,9 @@ export function Step2Position() {
     departement: emp.departementWorkday ?? emp.departement,
   });
 
-  const repondre = (valeur: '' | 'Oui' | 'Non') => {
+  const repondre = (valeur: 'Oui' | 'Non') => {
     setSaisi(null);
-    update({ memePoste: valeur, ...(selected ? { employee: withWorkdayPosition(selected) } : {}) });
+    update({ changePoste: valeur, ...(selected ? { employee: withWorkdayPosition(selected) } : {}) });
   };
 
   const choisirPoste = (valeur: string) => {
@@ -70,6 +70,12 @@ export function Step2Position() {
   };
 
   const posteChoisi = !!selected && selected.poste !== selected.posteWorkday;
+  // Section 1 always shows what Workday has today — the poste de retour chosen below is not mixed into it.
+  const actuel = {
+    poste: selected?.posteWorkday ?? selected?.poste ?? '',
+    codeEmploi: selected?.codeEmploiWorkday ?? selected?.codeEmploi ?? '',
+    departement: selected?.departementWorkday ?? selected?.departement ?? '',
+  };
   const texteSaisi = saisi ?? (posteChoisi ? selected!.poste : '');
   const saisiInvalide = texteSaisi.trim() !== '' && !posteChoisi;
 
@@ -92,22 +98,61 @@ export function Step2Position() {
         </div>
       ) : (
         <>
+          <SectionTitle icon={<BriefcaseIcon style={{ width: 16, height: 16 }} />}>
+            {isReactivation ? 'Poste actuel (Workday)' : 'Poste actuel'}
+          </SectionTitle>
+
+          <div className="field-grid field-grid--2">
+            <Field label="Département">
+              <input type="text" value={actuel.departement} disabled />
+            </Field>
+            <Field label="Poste">
+              <input type="text" value={actuel.poste} disabled />
+            </Field>
+          </div>
+
+          <div className="field-grid field-grid--2">
+            <Field label="Code d'emploi">
+              <input type="text" value={actuel.codeEmploi} disabled />
+            </Field>
+            <Field label="Type d'employé">
+              <input type="text" value={translateTypeEmploi(selected.typeEmploi)} disabled />
+            </Field>
+          </div>
+
+          <Field label="Gestionnaire immédiat">
+            <input type="text" value={selected.gestionnaire} disabled />
+          </Field>
+
           {isReactivation && (
-            <>
+            <div
+              className={`type-demande-section${sel.changePoste === '' || (demandePoste && !posteChoisi) ? ' type-demande-section--unanswered' : ''}`}
+              style={{ marginTop: 22 }}
+            >
+              <SectionTitle icon={<BriefcaseIcon style={{ width: 16, height: 16 }} />}>Poste de retour</SectionTitle>
               <Field
-                label="L'employé revient-il dans le même poste que l'an dernier?"
+                label={<strong style={{ fontSize: 15 }}>Est-ce que l'employé change du poste mentionné ci-haut?</strong>}
                 required
-                valid={sel.memePoste !== ''}
               >
-                <select value={sel.memePoste} onChange={(ev) => repondre(ev.target.value as '' | 'Oui' | 'Non')}>
-                  <option value="">Sélectionner</option>
-                  <option value="Oui">Oui</option>
-                  <option value="Non">Non</option>
-                </select>
+                <div className="type-demande-grid">
+                  {(['Oui', 'Non'] as const).map((choix) => (
+                    <button
+                      key={choix}
+                      type="button"
+                      className={`type-demande-option${sel.changePoste === choix ? ' type-demande-option--selected' : ''}`}
+                      onClick={() => repondre(choix)}
+                    >
+                      <span className="type-demande-option__radio">
+                        {sel.changePoste === choix && <span className="type-demande-option__radio-dot" />}
+                      </span>
+                      <span className="type-demande-option__title">{choix}</span>
+                    </button>
+                  ))}
+                </div>
               </Field>
 
               {demandePoste && (
-                <Field label="Poste de retour" required valid={posteChoisi}>
+                <Field label="À quel poste l'employé va-t-il revenir?" required valid={posteChoisi}>
                   <input
                     type="text"
                     list="postes-retour"
@@ -125,38 +170,13 @@ export function Step2Position() {
                     {saisiInvalide ? (
                       <>Choisissez un poste dans la liste proposée.</>
                     ) : (
-                      <>
-                        Workday affiche encore : <strong>{selected.posteWorkday}</strong>. Le poste choisi sera indiqué aux équipes TI
-                        et RH, qui le confirmeront dans Workday.
-                      </>
+                      <>Le poste choisi sera indiqué aux équipes TI et RH, qui le confirmeront dans Workday.</>
                     )}
                   </div>
                 </Field>
               )}
-            </>
+            </div>
           )}
-
-          <div className="field-grid field-grid--2">
-            <Field label="Département">
-              <input type="text" value={selected.departement} disabled />
-            </Field>
-            <Field label="Poste">
-              <input type="text" value={selected.poste} disabled />
-            </Field>
-          </div>
-
-          <div className="field-grid field-grid--2">
-            <Field label="Code d'emploi">
-              <input type="text" value={selected.codeEmploi} disabled />
-            </Field>
-            <Field label="Type d'employé">
-              <input type="text" value={translateTypeEmploi(selected.typeEmploi)} disabled />
-            </Field>
-          </div>
-
-          <Field label="Gestionnaire immédiat">
-            <input type="text" value={selected.gestionnaire} disabled />
-          </Field>
         </>
       )}
 

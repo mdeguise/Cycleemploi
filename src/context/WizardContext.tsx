@@ -179,12 +179,12 @@ function validateStep(step: number, request: OnboardingRequest): boolean {
       return Boolean(request.typeDemande && e.employee && e.dateEntreePrevue && regleValid);
     }
     case 1: {
-      // Step2Position, Réactivation only: "même poste que l'an dernier?" must be answered, and a "Non" needs
-      // another position actually picked (employee.poste only moves off Workday's value on a listed title).
+      // Step2Position, Réactivation only: "l'employé change-t-il de poste?" must be answered, and a "Oui" needs
+      // the new position actually picked (employee.poste only moves off Workday's value on a listed title).
       if (request.typeDemande !== 'Réactivation') return true;
       const e = request.employee;
-      if (e.memePoste === 'Oui') return true;
-      return e.memePoste === 'Non' && !!e.employee && e.employee.poste !== e.employee.posteWorkday;
+      if (e.changePoste === 'Non') return true;
+      return e.changePoste === 'Oui' && !!e.employee && e.employee.poste !== e.employee.posteWorkday;
     }
     case 3: {
       // StepD365Dynaway — nothing to require when neither Accès D365 nor Dynaway is selected;

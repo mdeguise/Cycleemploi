@@ -74,9 +74,9 @@ interface BatchRow {
   dateEntreePrevue: string;
   regleDePaye: string;
   regleDePayeCommentaire: string;
-  /** Réactivation only: "revient-il dans le même poste que l'an dernier?" — same question as the wizard's Poste et département step. */
-  memePoste: '' | 'Oui' | 'Non';
-  /** Réactivation only, when memePoste is 'Non': the "poste de retour" as typed by the manager. */
+  /** Réactivation only: "l'employé change-t-il du poste actuel?" — same question as the wizard's Poste et département step ('Oui' = another position). */
+  changePoste: '' | 'Oui' | 'Non';
+  /** Réactivation only, when changePoste is 'Oui': the "poste de retour" as typed by the manager. */
   posteRetour: string | null;
   /** null = this row follows the shared default profile below; non-null = it has its own. */
   customProfile: Profile | null;
@@ -91,7 +91,7 @@ const makeRow = (): BatchRow => ({
   dateEntreePrevue: '',
   regleDePaye: '',
   regleDePayeCommentaire: '',
-  memePoste: '',
+  changePoste: '',
   posteRetour: null,
   customProfile: null,
   d365: null,
@@ -442,22 +442,22 @@ export function BatchOnboardingPage() {
     staleTime: 10 * 60 * 1000,
   });
 
-  /** The position picked for this row when the answer is "Non", resolved against the Workday list and different from the one Workday shows. */
+  /** The position picked for this row when the answer is "Oui" (changes position), resolved against the Workday list and different from the one Workday shows. */
   const posteChoisi = (row: BatchRow): PositionOptionDto | undefined => {
-    if (!includeTerminated || row.memePoste !== 'Non' || row.posteRetour === null || !row.employee) return undefined;
+    if (!includeTerminated || row.changePoste !== 'Oui' || row.posteRetour === null || !row.employee) return undefined;
     const saisi = row.posteRetour.trim().toLowerCase();
     if (saisi === (row.employee.poste ?? '').trim().toLowerCase()) return undefined;
     return postes.find((p) => p.poste.toLowerCase() === saisi);
   };
-  /** Réactivation: the question must be answered, and "Non" needs a position from the list. */
+  /** Réactivation: the question must be answered, and "Oui" needs a position from the list. */
   const posteRetourManquant = (row: BatchRow) => {
     if (!includeTerminated || !row.employee) return false;
-    if (row.memePoste === '') return true;
-    return row.memePoste === 'Non' && !posteChoisi(row);
+    if (row.changePoste === '') return true;
+    return row.changePoste === 'Oui' && !posteChoisi(row);
   };
   /** Something typed that is not a usable position — drives the "choisissez dans la liste" hint. */
   const posteSaisiInvalide = (row: BatchRow) =>
-    row.memePoste === 'Non' && !!row.posteRetour?.trim() && !posteChoisi(row);
+    row.changePoste === 'Oui' && !!row.posteRetour?.trim() && !posteChoisi(row);
 
   const updateRow = (id: string, patch: Partial<BatchRow>) =>
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
@@ -684,8 +684,8 @@ export function BatchOnboardingPage() {
                       <EmployeeCell
                         employee={row.employee}
                         includeTerminated={includeTerminated}
-                        onSelect={(e) => updateRow(row.id, { employee: e, memePoste: '', posteRetour: null })}
-                        onClear={() => updateRow(row.id, { employee: null, memePoste: '', posteRetour: null })}
+                        onSelect={(e) => updateRow(row.id, { employee: e, changePoste: '', posteRetour: null })}
+                        onClear={() => updateRow(row.id, { employee: null, changePoste: '', posteRetour: null })}
                       />
                     </div>
                     <div style={{ flex: '0 0 150px' }}>
@@ -750,10 +750,14 @@ export function BatchOnboardingPage() {
                   {includeTerminated && row.employee && (
                     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                       <div style={{ flex: '1 1 300px' }}>
-                        <Field label="Revient-il dans le même poste que l'an dernier?" required valid={row.memePoste !== ''}>
+                        <Field
+                          label={<strong>Est-ce que l'employé change du poste actuel (Workday : {row.employee.poste ?? '—'})?</strong>}
+                          required
+                          valid={row.changePoste !== ''}
+                        >
                           <select
-                            value={row.memePoste}
-                            onChange={(ev) => updateRow(row.id, { memePoste: ev.target.value as '' | 'Oui' | 'Non', posteRetour: null })}
+                            value={row.changePoste}
+                            onChange={(ev) => updateRow(row.id, { changePoste: ev.target.value as '' | 'Oui' | 'Non', posteRetour: null })}
                           >
                             <option value="">Sélectionner</option>
                             <option value="Oui">Oui</option>
@@ -761,9 +765,9 @@ export function BatchOnboardingPage() {
                           </select>
                         </Field>
                       </div>
-                      {row.memePoste === 'Non' && (
+                      {row.changePoste === 'Oui' && (
                         <div style={{ flex: '2 1 360px' }}>
-                          <Field label="Poste de retour" required valid={!!posteChoisi(row)}>
+                          <Field label="À quel poste l'employé va-t-il revenir?" required valid={!!posteChoisi(row)}>
                             <input
                               type="text"
                               list="postes-retour-lot"
@@ -776,10 +780,7 @@ export function BatchOnboardingPage() {
                               {posteSaisiInvalide(row) ? (
                                 <>Choisissez un poste dans la liste proposée.</>
                               ) : (
-                                <>
-                                  Workday affiche encore : <strong>{row.employee.poste ?? '—'}</strong>. Le poste choisi sera indiqué
-                                  aux équipes TI et RH, qui le confirmeront dans Workday.
-                                </>
+                                <>Le poste choisi sera indiqué aux équipes TI et RH, qui le confirmeront dans Workday.</>
                               )}
                             </div>
                           </Field>

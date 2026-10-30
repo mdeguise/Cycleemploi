@@ -50,11 +50,11 @@ export function Step1Employee() {
   };
 
   const selectEmployee = (dto: EmployeeDto) => {
-    update({ employee: toSnapshot(dto), employeePayGroup: dto.payGroup ?? '', memePoste: '' });
+    update({ employee: toSnapshot(dto), employeePayGroup: dto.payGroup ?? '', changePoste: '' });
     setQuery('');
   };
 
-  const clearSelection = () => update({ employee: null, employeePayGroup: '', memePoste: '' });
+  const clearSelection = () => update({ employee: null, employeePayGroup: '', changePoste: '' });
 
   const regleDePayeNonRequise = e.employeePayGroup === PAY_GROUP_NON_UNION;
 
