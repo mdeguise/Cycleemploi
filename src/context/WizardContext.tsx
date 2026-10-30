@@ -178,6 +178,14 @@ function validateStep(step: number, request: OnboardingRequest): boolean {
         (e.regleDePaye && (e.regleDePaye !== REGLE_DE_PAYE_AUTRE || Boolean(e.regleDePayeCommentaire)));
       return Boolean(request.typeDemande && e.employee && e.dateEntreePrevue && regleValid);
     }
+    case 1: {
+      // Step2Position, Réactivation only: "même poste que l'an dernier?" must be answered, and a "Non" needs
+      // another position actually picked (employee.poste only moves off Workday's value on a listed title).
+      if (request.typeDemande !== 'Réactivation') return true;
+      const e = request.employee;
+      if (e.memePoste === 'Oui') return true;
+      return e.memePoste === 'Non' && !!e.employee && e.employee.poste !== e.employee.posteWorkday;
+    }
     case 3: {
       // StepD365Dynaway — nothing to require when neither Accès D365 nor Dynaway is selected;
       // otherwise the same minimum SubmitAdHoc itself requires (see D365AccessApprovalsController).

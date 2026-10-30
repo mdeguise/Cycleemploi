@@ -15,9 +15,12 @@ export interface EmployeeSnapshot {
   codeEmploi: string;
   typeEmploi: string;
   gestionnaire: string;
-  /** Réactivation: the position Workday showed when the employee was selected (UI only). `poste` becomes the
-   * manager's "poste de retour" when they pick a different one — see Step1Employee. */
+  /** Réactivation: what Workday showed when the employee was selected (UI only). `poste`, `codeEmploi` and
+   * `departement` become the manager's "poste de retour" when they answer "Non" to "même poste que l'an
+   * dernier" and pick another one — see Step2Position; these three let them go back to Workday's values. */
   posteWorkday?: string;
+  codeEmploiWorkday?: string;
+  departementWorkday?: string;
 }
 
 export interface EmployeeSelectionInfo {
@@ -30,6 +33,9 @@ export interface EmployeeSelectionInfo {
    * submit time for validation — see RequestsController.ValidateForSubmitAsync). Drives whether
    * "Règle de paye" is required/grayed-out for CAN Tremblant-Non Union employees. */
   employeePayGroup: string;
+  /** Réactivation only, answered on the "Poste et département" step: does the employee come back to the same
+   * position as last year? UI-only — the chosen position travels in `employee.poste`. */
+  memePoste: '' | 'Oui' | 'Non';
 }
 
 export interface AccessInfo {
@@ -134,6 +140,7 @@ export function createEmptyRequest(demandePar: string): OnboardingRequest {
       regleDePaye: '',
       regleDePayeCommentaire: '',
       employeePayGroup: '',
+      memePoste: '',
     },
     access: {
       systemes: [],
