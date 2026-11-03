@@ -20,7 +20,7 @@ export function IssueReporterProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const p = location.pathname;
     if (p.startsWith('/admin/')) setScreen(`Administration › ${p.replace('/admin/', '')}`);
-    else if (p.startsWith('/lot')) setScreen('Embauche en lot');
+    else if (p.startsWith('/lot')) setScreen('Embauche / Réactivation en lot');
   }, [location.pathname]);
 
   return (

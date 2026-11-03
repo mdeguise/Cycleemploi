@@ -606,7 +606,7 @@ export function BatchOnboardingPage() {
       <header className="app-header">
         <div className="app-header__brand">
           <img src={tremblantLogo} alt="Tremblant" className="app-header__logo" />
-          <div className="app-header__title">Embauche en lot (maquette)</div>
+          <div className="app-header__title">Embauche / Réactivation en lot (maquette)</div>
         </div>
         <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
           <ReportIssueButton />
@@ -623,7 +623,7 @@ export function BatchOnboardingPage() {
               <UserIcon style={{ width: 22, height: 22 }} />
             </span>
             <div>
-              <div className="step-panel__title">Embauche en lot</div>
+              <div className="step-panel__title">Embauche / Réactivation en lot</div>
               <div className="step-panel__subtitle">
                 Maquette — soumet une demande distincte par personne, chacune suivant le pipeline habituel
                 (Freshdesk, TDX, D365). L'accès D365, s'il est requis, se configure individuellement par personne.

@@ -157,8 +157,8 @@ export function Step1Employee() {
               <ChevronRightIcon style={{ width: 11, height: 11, color: 'var(--muted)' }} />
             </span>
             <span>
-              <div className="type-demande-option__title">Embauche en lot</div>
-              <div className="type-demande-option__desc">Soumettre plusieurs embauches à la fois, chacune avec ses propres valeurs</div>
+              <div className="type-demande-option__title">Embauche / Réactivation en lot</div>
+              <div className="type-demande-option__desc">Soumettre plusieurs embauches / réactivations, chacune avec ses propres valeurs</div>
             </span>
           </button>
           </div>
