@@ -625,7 +625,7 @@ export function BatchOnboardingPage() {
             <div>
               <div className="step-panel__title">Embauche / Réactivation en lot</div>
               <div className="step-panel__subtitle">
-                Maquette — soumet une demande distincte par personne, chacune suivant le pipeline habituel
+                Maquette — soumet une demande distincte par personne, chacune suivant le processus habituel
                 (Freshdesk, TDX, D365). L'accès D365, s'il est requis, se configure individuellement par personne.
               </div>
             </div>
