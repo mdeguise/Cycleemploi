@@ -101,6 +101,7 @@ public class TicketOrchestrationService : ITicketOrchestrationService
     private const string Microsoft365ApplicationValue = "Microsoft 365";
     private const string TeamsApplicationValue = "Teams";
     private const string ConfigurationEvoliaSystemeValue = "Configuration dans Evolia";
+    private const string StationnementRequisSystemeValue = "Stationnement requis"; // must match STATIONNEMENT_REQUIS in src/data/catalogs.ts
     private const string OrdinateurPortableEquipementValue = "Ordinateur portable";
     private const string OrdinateurBureauEquipementValue = "Ordinateur de bureau";
 
@@ -661,11 +662,13 @@ public class TicketOrchestrationService : ITicketOrchestrationService
         "Retraite",
     ];
 
-    /// <summary>Onboarding/Réactivation always raise the SAC - ISAC ticket; an offboarding only does
-    /// for the motifs in <see cref="StationnementMotifs"/>.</summary>
+    /// <summary>Onboarding/Réactivation raise the SAC - ISAC ticket only when "Stationnement requis" was
+    /// selected among the access systems (the checkbox, not the later type dropdown — that one can keep a stale value
+    /// after the box is unticked); an offboarding only does for the motifs in <see cref="StationnementMotifs"/>.</summary>
     private static bool RequiresStationnementTicket(Request request)
     {
-        if (request.RequestType != RequestType.Offboarding) return true;
+        if (request.RequestType != RequestType.Offboarding)
+            return request.AccessDetail?.Systemes.Any(s => s.Value == StationnementRequisSystemeValue) ?? false;
         var motif = request.OffboardingDetail?.RaisonArret?.Trim();
         return motif is not null && StationnementMotifs.Contains(motif, StringComparer.OrdinalIgnoreCase);
     }
