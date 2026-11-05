@@ -9,6 +9,10 @@ public record AdUserInfo(string? DisplayName, string? Email);
 /// fallback link to a Workday record when the EmployeeId join is missing.</summary>
 public record AdAccount(string Sam, string? Cn, bool Enabled, string? EmployeeId, string? Email);
 
+/// <summary>Result of looking one employee up in the search domain (enterprise.ad). <paramref name="Reachable"/>
+/// is false when the domain could not be queried — the caller must NOT read that as "no account".</summary>
+public record AdLookup(bool Reachable, AdAccount? Account);
+
 /// <summary>Checks AD group membership and looks up basic profile info for the current caller via
 /// System.DirectoryServices.AccountManagement (LDAP against the domain the app server is joined
 /// to), rather than an Entra ID app registration + Microsoft Graph — the app trusts the same
@@ -41,4 +45,10 @@ public interface IAdDirectoryService
     /// while vm-trm-live is still iDirectory-joined but access is granted to ENTERPRISE accounts.
     /// The query is LDAP-escaped before use.</summary>
     IReadOnlyList<AdAccount> SearchAccounts(string query, int limit);
+
+    /// <summary>The AD account of one employee in the search domain ONLY (Ad:SearchDomain, else enterprise.ad —
+    /// not the server's own iDirectory domain): matched on employeeID (= the Workday EmployeeId), else on the
+    /// mail attribute when <paramref name="email"/> is given. When several accounts match, an enabled one wins.
+    /// Two exact-match queries, no wildcards.</summary>
+    AdLookup FindSearchDomainAccount(string employeeId, string? email);
 }

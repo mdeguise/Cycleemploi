@@ -297,6 +297,23 @@ public class SubmitAdHocD365AccessDto
     public bool NeedsDynaway { get; set; }
 }
 
+/// <summary>Whether a D365 access request can be made for this employee yet: it needs an active AD account in
+/// enterprise.ad, or at least a recent onboarding/réactivation request that will create it. State is one of
+/// "Actif", "Desactive", "Absent" or "Inconnu" (the directory could not be queried — never blocks).</summary>
+public class D365AdStatusDto
+{
+    public string State { get; set; } = null!;
+    public string? Sam { get; set; }
+    public string? AccountName { get; set; }
+
+    /// <summary>The recent Onboarding/Réactivation request found for this employee when the account is not active.</summary>
+    public string? RequestNumber { get; set; }
+    public string? RequestTypeLabel { get; set; }
+
+    public bool CanSubmit { get; set; }
+    public string? Message { get; set; }
+}
+
 public class SubmitAdHocD365AccessResultDto
 {
     public int RequestId { get; set; }

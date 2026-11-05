@@ -618,6 +618,77 @@ public class D365AccessApprovalsController : ControllerBase
         });
     }
 
+    /// <summary>How recent an onboarding/réactivation request must be to count as "the account is on its way".</summary>
+    private const int AdStatusRequestWindowDays = 180;
+
+    /// <summary>The AD precondition for a D365 request: (1) an active account in enterprise.ad → go ahead; otherwise
+    /// (2) a recent onboarding/réactivation request for the employee → go ahead (the account is being created);
+    /// otherwise → blocked until the account exists. A directory that cannot be queried never blocks.</summary>
+    private async Task<D365AdStatusDto> CheckAdStatusAsync(string workdayEmployeeId, string? email, CancellationToken ct)
+    {
+        var lookup = _ad.FindSearchDomainAccount(workdayEmployeeId, email);
+        if (!lookup.Reachable)
+        {
+            return new D365AdStatusDto
+            {
+                State = "Inconnu",
+                CanSubmit = true,
+                Message = "Impossible de vérifier le compte AD de l'employé pour le moment. La demande peut être soumise, mais le compte AD devra être confirmé avant son traitement.",
+            };
+        }
+
+        var account = lookup.Account;
+        if (account is { Enabled: true })
+        {
+            return new D365AdStatusDto { State = "Actif", Sam = account.Sam, AccountName = account.Cn, CanSubmit = true };
+        }
+
+        var since = DateTime.UtcNow.AddDays(-AdStatusRequestWindowDays);
+        var recent = await _db.Requests.AsNoTracking()
+            .Where(r => (r.RequestType == RequestType.Onboarding || r.RequestType == RequestType.Reactivation)
+                        && r.CreatedAt >= since
+                        && r.Employees.Any(e => e.WorkdayEmployeeId == workdayEmployeeId))
+            .OrderByDescending(r => r.CreatedAt)
+            .Select(r => new { r.RequestNumber, r.RequestType })
+            .FirstOrDefaultAsync(ct);
+
+        var state = account is null ? "Absent" : "Desactive";
+        var accountText = account is null ? "n'existe pas encore" : "est désactivé";
+        if (recent is not null)
+        {
+            return new D365AdStatusDto
+            {
+                State = state, Sam = account?.Sam, AccountName = account?.Cn,
+                RequestNumber = recent.RequestNumber, RequestTypeLabel = recent.RequestType.ToFrenchLabel(),
+                CanSubmit = true,
+                Message = $"Le compte AD de cet employé (ENTERPRISE.AD) {accountText}, mais la demande {recent.RequestNumber} ({recent.RequestType.ToFrenchLabel()}) est en cours. " +
+                          "Vous pouvez soumettre la demande D365; elle ne pourra être traitée qu'une fois le compte AD créé et actif.",
+            };
+        }
+
+        return new D365AdStatusDto
+        {
+            State = state, Sam = account?.Sam, AccountName = account?.Cn,
+            CanSubmit = false,
+            Message = $"Le compte AD de cet employé (ENTERPRISE.AD) {accountText} et aucune demande de nouvelle embauche ou de réactivation n'a été trouvée. " +
+                      "La demande d'accès D365 ne pourra pas se faire tant que le compte AD n'est pas créé. Soumettez d'abord une demande de nouvelle embauche ou de réactivation.",
+        };
+    }
+
+    /// <summary>Called by the D365AccessRequest app as soon as an employee is picked, to show the AD notice before
+    /// the form is even loaded. SubmitAdHoc re-checks the same rule server-side.</summary>
+    [HttpGet("adhoc/ad-status")]
+    public async Task<ActionResult<D365AdStatusDto>> AdHocAdStatus([FromQuery] string workdayEmployeeId, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(workdayEmployeeId)) return BadRequest("workdayEmployeeId est requis.");
+        var emp = await _workday.WorkdayDemographics.AsNoTracking()
+            .Where(w => w.EmployeeId == workdayEmployeeId && w.PrimaryJob == true)
+            .Select(w => new { w.WorkEmail, w.Email })
+            .FirstOrDefaultAsync(ct);
+        if (emp is null) return NotFound("Employé introuvable (ou son emploi n'est pas l'emploi principal).");
+        return Ok(await CheckAdStatusAsync(workdayEmployeeId, emp.WorkEmail ?? emp.Email, ct));
+    }
+
     /// <summary>Every distinct Workday Cost_Center currently in use — powers the ad-hoc form's
     /// "Numéro de département" dropdown, so a requester can pick a department other than the
     /// employee's own (AdHocPrefill's DepartmentNumber is only the default). Same "distinct,
@@ -688,10 +759,13 @@ public class D365AccessApprovalsController : ControllerBase
             .Select(w => new
             {
                 w.JobCode, w.PositionTitle, w.JobFamilyGroup, w.CostCenter, w.TimeType, w.WorkerType,
-                w.Manager, w.FirstName, w.PreferredFirstName, w.LastName
+                w.Manager, w.FirstName, w.PreferredFirstName, w.LastName, w.WorkEmail, w.Email
             })
             .FirstOrDefaultAsync(ct);
         if (workdayInfo is null) return BadRequest("Employé introuvable (ou son emploi n'est pas l'emploi principal).");
+
+        var adStatus = await CheckAdStatusAsync(dto.WorkdayEmployeeId, workdayInfo.WorkEmail ?? workdayInfo.Email, ct);
+        if (!adStatus.CanSubmit) return BadRequest(adStatus.Message);
 
         var employeeName = $"{workdayInfo.PreferredFirstName ?? workdayInfo.FirstName} {workdayInfo.LastName}";
 

@@ -82,6 +82,45 @@ public class AdDirectoryService : IAdDirectoryService
         return bySam.Values.OrderBy(a => a.Cn, StringComparer.CurrentCultureIgnoreCase).ToList();
     }
 
+    public AdLookup FindSearchDomainAccount(string employeeId, string? email)
+    {
+        var domain = string.IsNullOrWhiteSpace(_options.SearchDomain) ? MigrationDomain : _options.SearchDomain.Trim();
+        var attempts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(employeeId)) attempts.Add($"(employeeID={EscapeLdap(employeeId.Trim())})");
+        if (!string.IsNullOrWhiteSpace(email)) attempts.Add($"(mail={EscapeLdap(email.Trim())})");
+
+        try
+        {
+            using var root = new DirectoryEntry($"LDAP://{domain}");
+            foreach (var clause in attempts)
+            {
+                using var searcher = new DirectorySearcher(root)
+                {
+                    Filter = $"(&(objectCategory=person)(objectClass=user){clause})",
+                    SizeLimit = 5,
+                };
+                searcher.PropertiesToLoad.AddRange(new[] { "sAMAccountName", "cn", "userAccountControl", "employeeID", "mail" });
+
+                using var found = searcher.FindAll();
+                var accounts = new List<AdAccount>();
+                foreach (SearchResult r in found)
+                {
+                    var sam = GetProp(r, "sAMAccountName");
+                    if (string.IsNullOrEmpty(sam)) continue;
+                    var uac = r.Properties["userAccountControl"].Count > 0 ? Convert.ToInt32(r.Properties["userAccountControl"][0]) : 0;
+                    accounts.Add(new AdAccount(sam, GetProp(r, "cn"), (uac & 0x2) == 0, GetProp(r, "employeeID"), GetProp(r, "mail")));
+                }
+                if (accounts.Count > 0) return new AdLookup(true, accounts.OrderByDescending(a => a.Enabled).First());
+            }
+            return new AdLookup(true, null);
+        }
+        catch
+        {
+            // Domain unreachable (trust hiccup, off-domain dev box): say so rather than claim there is no account.
+            return new AdLookup(false, null);
+        }
+    }
+
     public bool IsUserInGroup(string samAccountName, string groupName)
     {
         using var ctx = new PrincipalContext(ContextType.Domain);
