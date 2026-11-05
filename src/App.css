@@ -157,7 +157,8 @@
   display: flex;
   gap: 24px;
   padding: 18px 28px;
-  align-items: flex-start;
+  /* Stretch, not flex-start: the cards run down to the bottom of the window instead of stopping at their content. */
+  align-items: stretch;
 }
 
 /* ---------- Step nav ---------- */
@@ -894,6 +895,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  /* Pinned to the bottom of a stretched card, so Annuler / Suivant stay in the same place on every step. */
+  margin-top: auto;
   padding-top: 8px;
   border-top: 1px solid var(--border-soft);
 }
