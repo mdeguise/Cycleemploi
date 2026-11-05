@@ -1031,12 +1031,17 @@
   overflow: hidden;
   box-shadow: var(--shadow-card);
   line-height: 0;
+  /* Grows to the bottom of the column; the photo is cropped (cover) rather than stretched. */
+  flex: 1 0 auto;
+  display: flex;
 }
 
 .summary-photo-card__img {
   width: 100%;
   height: auto;
   display: block;
+  object-fit: cover;
+  object-position: center;
 }
 
 /* ---------- Tip banner ---------- */
