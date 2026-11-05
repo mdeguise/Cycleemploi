@@ -306,6 +306,10 @@ public class D365AdStatusDto
     public string? Sam { get; set; }
     public string? AccountName { get; set; }
 
+    /// <summary>Whether the AD account already exists in Entra (msDS-ExternalDirectoryObjectId filled in). Null when
+    /// there is no AD account. Informational only — never blocks; it does not prove the Entra sign-in is allowed.</summary>
+    public bool? EntraLinked { get; set; }
+
     /// <summary>The recent Onboarding/Réactivation request found for this employee when the account is not active.</summary>
     public string? RequestNumber { get; set; }
     public string? RequestTypeLabel { get; set; }

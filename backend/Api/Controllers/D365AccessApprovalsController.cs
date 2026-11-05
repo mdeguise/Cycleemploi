@@ -640,7 +640,13 @@ public class D365AccessApprovalsController : ControllerBase
         var account = lookup.Account;
         if (account is { Enabled: true })
         {
-            return new D365AdStatusDto { State = "Actif", Sam = account.Sam, AccountName = account.Cn, CanSubmit = true };
+            var linked = !string.IsNullOrWhiteSpace(account.ExternalDirectoryObjectId);
+            return new D365AdStatusDto
+            {
+                State = "Actif", Sam = account.Sam, AccountName = account.Cn, EntraLinked = linked, CanSubmit = true,
+                // Not a blocker: the account may simply not have been synchronized yet.
+                Message = linked ? null : "Le compte AD est actif, mais il n'est pas encore lié à Entra (Microsoft 365). La demande D365 peut être soumise; elle pourrait toutefois tarder à être utilisable tant que la synchronisation n'a pas eu lieu.",
+            };
         }
 
         var since = DateTime.UtcNow.AddDays(-AdStatusRequestWindowDays);
@@ -658,7 +664,7 @@ public class D365AccessApprovalsController : ControllerBase
         {
             return new D365AdStatusDto
             {
-                State = state, Sam = account?.Sam, AccountName = account?.Cn,
+                State = state, Sam = account?.Sam, AccountName = account?.Cn, EntraLinked = account is null ? null : !string.IsNullOrWhiteSpace(account.ExternalDirectoryObjectId),
                 RequestNumber = recent.RequestNumber, RequestTypeLabel = recent.RequestType.ToFrenchLabel(),
                 CanSubmit = true,
                 Message = $"Le compte AD de cet employé (ENTERPRISE.AD) {accountText}, mais la demande {recent.RequestNumber} ({recent.RequestType.ToFrenchLabel()}) est en cours. " +

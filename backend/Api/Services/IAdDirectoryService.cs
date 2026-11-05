@@ -6,8 +6,10 @@ public record AdUserInfo(string? DisplayName, string? Email);
 /// User_ login); <paramref name="Cn"/> is the display name incl. the "(T)" suffix; <paramref name="Enabled"/>
 /// is false when disabled; <paramref name="EmployeeId"/> is the Workday EmployeeId when set on the
 /// account; <paramref name="Email"/> is the mail attribute — matches Workday's Work_Email, a reliable
-/// fallback link to a Workday record when the EmployeeId join is missing.</summary>
-public record AdAccount(string Sam, string? Cn, bool Enabled, string? EmployeeId, string? Email);
+/// fallback link to a Workday record when the EmployeeId join is missing. <paramref name="ExternalDirectoryObjectId"/>
+/// is msDS-ExternalDirectoryObjectId ("User_" + the Entra object id), written back once the account exists in Entra;
+/// only FindSearchDomainAccount loads it (null elsewhere).</summary>
+public record AdAccount(string Sam, string? Cn, bool Enabled, string? EmployeeId, string? Email, string? ExternalDirectoryObjectId = null);
 
 /// <summary>Result of looking one employee up in the search domain (enterprise.ad). <paramref name="Reachable"/>
 /// is false when the domain could not be queried — the caller must NOT read that as "no account".</summary>
