@@ -95,6 +95,7 @@ export function D365RolesAdminPage() {
           <div className="field__input-wrap">
             <input
               type="text"
+              aria-label="Code d'emploi"
               value={jobCode}
               onChange={(ev) => setJobCode(ev.target.value)}
               placeholder="Ex. 2253"
@@ -106,7 +107,7 @@ export function D365RolesAdminPage() {
         <div className="field" style={{ marginBottom: 0 }}>
           <label className="field__label">Rôle D365</label>
           <div className="field__input-wrap">
-            <select value={role} onChange={(ev) => setRole(ev.target.value)} style={{ minWidth: 320 }}>
+            <select aria-label="Rôle D365" value={role} onChange={(ev) => setRole(ev.target.value)} style={{ minWidth: 320 }}>
               {roleCatalog.map((r) => (
                 <option key={r} value={r}>
                   {r}

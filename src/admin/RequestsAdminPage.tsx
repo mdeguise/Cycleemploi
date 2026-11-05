@@ -249,6 +249,7 @@ export function RequestsAdminPage() {
           <div className="field__input-wrap">
             <input
               type="text"
+              aria-label="Rechercher par numéro, demandeur ou employé"
               value={q}
               onChange={(ev) => {
                 setPage(1);
@@ -261,7 +262,7 @@ export function RequestsAdminPage() {
         <div className="field">
           <label className="field__label">Statut</label>
           <div className="field__input-wrap">
-            <select value={status} onChange={(ev) => { setPage(1); setStatus(ev.target.value); }}>
+            <select aria-label="Filtrer par statut" value={status} onChange={(ev) => { setPage(1); setStatus(ev.target.value); }}>
               <option value="">Tous</option>
               {Object.entries(STATUS_LABELS).map(([k, v]) => (
                 <option key={k} value={k}>{v}</option>
@@ -272,7 +273,7 @@ export function RequestsAdminPage() {
         <div className="field">
           <label className="field__label">Type</label>
           <div className="field__input-wrap">
-            <select value={requestType} onChange={(ev) => { setPage(1); setRequestType(ev.target.value); }}>
+            <select aria-label="Filtrer par type de demande" value={requestType} onChange={(ev) => { setPage(1); setRequestType(ev.target.value); }}>
               <option value="">Tous</option>
               {Object.entries(TYPE_LABELS).map(([k, v]) => (
                 <option key={k} value={k}>{v}</option>

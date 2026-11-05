@@ -48,6 +48,7 @@ export function DateInput({ value, onChange }: DateInputProps) {
   const [viewYear, setViewYear] = useState(selected?.getFullYear() ?? new Date().getFullYear());
   const [viewMonth, setViewMonth] = useState(selected?.getMonth() ?? new Date().getMonth());
   const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (ev: MouseEvent) => {
@@ -90,18 +91,36 @@ export function DateInput({ value, onChange }: DateInputProps) {
   const cells: (number | null)[] = [...Array(leadingBlanks).fill(null), ...Array.from({ length: totalDays }, (_, i) => i + 1)];
 
   return (
-    <div className="date-input" ref={rootRef}>
-      <button type="button" className="date-input__trigger" onClick={openPicker}>
+    <div
+      className="date-input"
+      ref={rootRef}
+      onKeyDown={(ev) => {
+        if (ev.key === 'Escape' && isOpen) {
+          ev.stopPropagation();
+          setIsOpen(false);
+          triggerRef.current?.focus();
+        }
+      }}
+    >
+      <button
+        ref={triggerRef}
+        type="button"
+        className="date-input__trigger"
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
+        aria-label={value ? `Date : ${formatJjMmAaaa(value)}. Changer la date` : 'Choisir une date (jj-mm-aaaa)'}
+        onClick={openPicker}
+      >
         <CalendarIcon style={{ width: 15, height: 15 }} />
         <span className={value ? undefined : 'date-input__placeholder'}>{value ? formatJjMmAaaa(value) : 'jj-mm-aaaa'}</span>
       </button>
       {isOpen && (
-        <div className="date-input__popup">
+        <div className="date-input__popup" role="dialog" aria-label="Choisir une date">
           <div className="date-input__header">
             <button type="button" className="date-input__nav" onClick={() => changeMonth(-1)} aria-label="Mois précédent">
               <ChevronRightIcon style={{ width: 14, height: 14, transform: 'rotate(180deg)' }} />
             </button>
-            <span className="date-input__month-label">
+            <span className="date-input__month-label" aria-live="polite">
               {MOIS_FR[viewMonth]} {viewYear}
             </span>
             <button type="button" className="date-input__nav" onClick={() => changeMonth(1)} aria-label="Mois suivant">
@@ -123,6 +142,8 @@ export function DateInput({ value, onChange }: DateInputProps) {
                   key={day}
                   type="button"
                   className={`date-input__day${isSelected ? ' date-input__day--selected' : ''}`}
+                  aria-label={`${day} ${MOIS_FR[viewMonth]} ${viewYear}`}
+                  aria-pressed={!!isSelected}
                   onClick={() => selectDay(day)}
                 >
                   {day}

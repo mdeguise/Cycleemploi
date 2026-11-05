@@ -27,6 +27,8 @@ const smallBtnStyle: React.CSSProperties = {
   cursor: 'pointer',
   fontSize: 13,
   lineHeight: 1,
+  minHeight: 32,
+  minWidth: 32,
 };
 const addBtnStyle: React.CSSProperties = {
   padding: '6px 12px',
@@ -40,13 +42,13 @@ const addBtnStyle: React.CSSProperties = {
 function MoveRemove({ onUp, onDown, onRemove }: { onUp?: () => void; onDown?: () => void; onRemove: () => void }) {
   return (
     <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
-      <button type="button" style={smallBtnStyle} onClick={onUp} disabled={!onUp} title="Déplacer vers le haut">
+      <button type="button" style={smallBtnStyle} onClick={onUp} disabled={!onUp} title="Déplacer vers le haut" aria-label="Déplacer vers le haut">
         ↑
       </button>
-      <button type="button" style={smallBtnStyle} onClick={onDown} disabled={!onDown} title="Déplacer vers le bas">
+      <button type="button" style={smallBtnStyle} onClick={onDown} disabled={!onDown} title="Déplacer vers le bas" aria-label="Déplacer vers le bas">
         ↓
       </button>
-      <button type="button" style={{ ...smallBtnStyle, color: 'var(--tremblant-red-dark)' }} onClick={onRemove} title="Retirer">
+      <button type="button" style={{ ...smallBtnStyle, color: 'var(--tremblant-red-dark)' }} onClick={onRemove} title="Retirer" aria-label="Retirer">
         ✕
       </button>
     </div>
@@ -96,6 +98,7 @@ function InlineEditor({
       {parts.map((part, i) => (
         <div key={i} style={rowStyle}>
           <select
+            aria-label="Type d'élément"
             value={part.type}
             onChange={(ev) => {
               const type = ev.target.value as 'field' | 'text';
@@ -109,6 +112,7 @@ function InlineEditor({
 
           {part.type === 'field' ? (
             <select
+              aria-label="Champ à insérer"
               value={part.fieldKey ?? ''}
               onChange={(ev) => setParts(parts.map((p, idx) => (idx === i ? { ...p, fieldKey: ev.target.value } : p)))}
               style={{ flex: 1 }}
@@ -122,6 +126,7 @@ function InlineEditor({
           ) : (
             <input
               type="text"
+              aria-label="Texte"
               value={part.text ?? ''}
               onChange={(ev) => setParts(parts.map((p, idx) => (idx === i ? { ...p, text: ev.target.value } : p)))}
               placeholder="Texte (ex. un espace, un tiret, une parenthèse...)"
@@ -169,6 +174,7 @@ function EmployeeFieldsEditor({
         <div key={i} style={rowStyle}>
           <input
             type="text"
+            aria-label="Étiquette"
             value={line.label}
             onChange={(ev) => onChange(employeeFields.map((l, idx) => (idx === i ? { ...l, label: ev.target.value } : l)))}
             placeholder="Étiquette (ex. Poste)"
@@ -176,6 +182,7 @@ function EmployeeFieldsEditor({
           />
           <span style={{ fontSize: 12 }}>→</span>
           <select
+            aria-label="Champ associé à l'étiquette"
             value={line.fieldKey}
             onChange={(ev) => onChange(employeeFields.map((l, idx) => (idx === i ? { ...l, fieldKey: ev.target.value } : l)))}
             style={{ flex: 1 }}
@@ -224,6 +231,7 @@ function BlockEditor({
         <div key={i} style={{ marginBottom: 6 }}>
           <div style={rowStyle}>
             <select
+              aria-label="Type de bloc"
               value={block.type}
               onChange={(ev) => {
                 const type = ev.target.value as TemplateBlock['type'];
@@ -245,6 +253,7 @@ function BlockEditor({
             {block.type === 'heading' && (
               <input
                 type="text"
+                aria-label="Titre de section"
                 value={block.headingText ?? ''}
                 onChange={(ev) => setBlocks(blocks.map((b, idx) => (idx === i ? { ...b, headingText: ev.target.value } : b)))}
                 placeholder="Titre (ex. Détails)"
@@ -256,6 +265,7 @@ function BlockEditor({
               <>
                 <input
                   type="text"
+                  aria-label="Étiquette"
                   value={block.label ?? ''}
                   onChange={(ev) => setBlocks(blocks.map((b, idx) => (idx === i ? { ...b, label: ev.target.value } : b)))}
                   placeholder="Étiquette (ex. Date de création)"
@@ -263,6 +273,7 @@ function BlockEditor({
                 />
                 <span style={{ fontSize: 12 }}>→</span>
                 <select
+                  aria-label="Champ associé"
                   value={block.fieldKey ?? ''}
                   onChange={(ev) => setBlocks(blocks.map((b, idx) => (idx === i ? { ...b, fieldKey: ev.target.value } : b)))}
                   style={{ flex: 1 }}
@@ -279,6 +290,7 @@ function BlockEditor({
             {block.type === 'employeeGroup' && (
               <input
                 type="text"
+                aria-label="Titre du groupe d'employés"
                 value={block.employeeGroupHeading ?? ''}
                 onChange={(ev) =>
                   setBlocks(blocks.map((b, idx) => (idx === i ? { ...b, employeeGroupHeading: ev.target.value } : b)))

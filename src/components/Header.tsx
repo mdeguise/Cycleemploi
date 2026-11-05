@@ -25,7 +25,7 @@ export function Header() {
     <header className="app-header">
       <div className="app-header__brand">
         <img src={tremblantLogo} alt="Tremblant" className="app-header__logo" />
-        <div className="app-header__title">Embauche, réactivation et avis d'arrêt de travail</div>
+        <h1 className="app-header__title">Embauche, réactivation et avis d'arrêt de travail</h1>
       </div>
 
       <div className="app-header__meta">

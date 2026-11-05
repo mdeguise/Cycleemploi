@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../api/ApiContext';
 import type { IssueFileDto, IssueFileInput, IssueImageDto, IssueReportDto, IssueStatus, IssueType } from '../api/types';
+import { Dialog } from '../components/Dialog';
 import { CheckCircleIcon, FlagIcon, PaperclipIcon, XIcon } from '../components/icons';
 import { getScreen, snapshot } from './context';
 import './issues.css';
@@ -274,12 +275,11 @@ export function ReportIssueModal({ edit: initialEdit, onClose }: Props) {
 
   if (sentNumber !== null) {
     return (
-      <div className="modal-overlay" {...overlayClose}>
-        <div className="modal-card" onClick={(ev) => ev.stopPropagation()}>
+      <Dialog labelledBy="issue-sent-title" cardClassName="modal-card" overlayProps={overlayClose} onEscape={onClose}>
           <span className="modal-card__icon">
             <CheckCircleIcon style={{ width: 28, height: 28 }} />
           </span>
-          <div className="modal-card__title">{editing ? 'Signalement modifié' : 'Signalement envoyé'}</div>
+          <div className="modal-card__title" id="issue-sent-title">{editing ? 'Signalement modifié' : 'Signalement envoyé'}</div>
           <p className="modal-card__text">
             Merci! Votre signalement porte le numéro <strong>#{sentNumber}</strong>. Vous pouvez en suivre l'état dans
             « Mes signalements ».
@@ -300,16 +300,19 @@ export function ReportIssueModal({ edit: initialEdit, onClose }: Props) {
               Fermer
             </button>
           </div>
-        </div>
-      </div>
+      </Dialog>
     );
   }
 
   return (
-    <div className="modal-overlay" {...overlayClose}>
-      <div className="issue-modal" onClick={(ev) => ev.stopPropagation()}>
+    <Dialog
+      labelledBy="issue-modal-title"
+      cardClassName="issue-modal"
+      overlayProps={overlayClose}
+      onEscape={!title.trim() && !description.trim() ? onClose : undefined}
+    >
         <div className="issue-modal__head">
-          <span className="issue-modal__title">
+          <span className="issue-modal__title" id="issue-modal-title">
             <FlagIcon style={{ width: 18, height: 18 }} />
             {editing ? `Modifier le signalement #${editing.issueId}` : 'Signaler un problème'}
           </span>
@@ -355,7 +358,7 @@ export function ReportIssueModal({ edit: initialEdit, onClose }: Props) {
                   {keepImages.map((img) => (
                     <figure key={img.imageId}>
                       <img src={api.issues.imageUrl(editing!.issueId, img.imageId)} alt="" />
-                      <button type="button" className="issue-remove" onClick={() => setKeepImages((p) => p.filter((x) => x !== img))}>
+                      <button type="button" className="issue-remove" aria-label="Retirer cette capture d'écran" onClick={() => setKeepImages((p) => p.filter((x) => x !== img))}>
                         <XIcon style={{ width: 12, height: 12 }} />
                       </button>
                     </figure>
@@ -363,7 +366,7 @@ export function ReportIssueModal({ edit: initialEdit, onClose }: Props) {
                   {captures.map((c, idx) => (
                     <figure key={idx}>
                       <img src={c} alt="" />
-                      <button type="button" className="issue-remove" onClick={() => setCaptures((p) => p.filter((_, n) => n !== idx))}>
+                      <button type="button" className="issue-remove" aria-label="Retirer cette capture d'écran" onClick={() => setCaptures((p) => p.filter((_, n) => n !== idx))}>
                         <XIcon style={{ width: 12, height: 12 }} />
                       </button>
                     </figure>
@@ -406,7 +409,7 @@ export function ReportIssueModal({ edit: initialEdit, onClose }: Props) {
                   {keepFiles.map((f) => (
                     <span key={f.fileId} className="issue-chip">
                       {f.fileName}
-                      <button type="button" onClick={() => setKeepFiles((p) => p.filter((x) => x !== f))}>
+                      <button type="button" aria-label={`Retirer le document ${f.fileName}`} onClick={() => setKeepFiles((p) => p.filter((x) => x !== f))}>
                         <XIcon style={{ width: 12, height: 12 }} />
                       </button>
                     </span>
@@ -414,7 +417,7 @@ export function ReportIssueModal({ edit: initialEdit, onClose }: Props) {
                   {docs.map((d, idx) => (
                     <span key={idx} className="issue-chip">
                       {d.fileName}
-                      <button type="button" onClick={() => setDocs((p) => p.filter((_, n) => n !== idx))}>
+                      <button type="button" aria-label={`Retirer le document ${d.fileName}`} onClick={() => setDocs((p) => p.filter((_, n) => n !== idx))}>
                         <XIcon style={{ width: 12, height: 12 }} />
                       </button>
                     </span>
@@ -433,7 +436,7 @@ export function ReportIssueModal({ edit: initialEdit, onClose }: Props) {
             </>
           )}
 
-          {error && <div className="issue-error">{error}</div>}
+          {error && <div className="issue-error" role="alert">{error}</div>}
         </div>
 
         <div className="issue-modal__foot">
@@ -454,8 +457,7 @@ export function ReportIssueModal({ edit: initialEdit, onClose }: Props) {
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }
 

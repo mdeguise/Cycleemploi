@@ -9,6 +9,9 @@ const base = {
   strokeLinecap: 'round' as const,
   strokeLinejoin: 'round' as const,
   viewBox: '0 0 24 24',
+  // Every icon here is decorative: the text next to it carries the meaning.
+  'aria-hidden': true as const,
+  focusable: false as const,
 };
 
 export function CalendarIcon({ className, style }: IconProps) {

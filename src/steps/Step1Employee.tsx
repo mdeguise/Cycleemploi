@@ -10,6 +10,7 @@ import { DateInput } from '../components/DateInput';
 import { TYPE_DEMANDE_TERMINAISON, type EmployeeSelectionInfo, type EmployeeSnapshot, type TypeDemande } from '../types';
 import { useEmployeeSearch } from '../hooks/useEmployeeSearch';
 import type { EmployeeDto } from '../api/types';
+import { pressable } from '../utils/a11y';
 
 function initials(prenom: string, nom: string) {
   return `${prenom[0] ?? ''}${nom[0] ?? ''}`.toUpperCase();
@@ -218,6 +219,7 @@ export function Step1Employee() {
                 type="text"
                 value={query}
                 onChange={(ev) => setQuery(ev.target.value)}
+                aria-label="Rechercher par numéro d'employé, nom ou prénom"
                 placeholder="Numéro d'employé, nom ou prénom"
                 autoComplete="off"
               />
@@ -227,7 +229,7 @@ export function Step1Employee() {
                     <div className="employee-result-empty">Recherche…</div>
                   ) : filteredResults.length ? (
                     filteredResults.map((emp) => (
-                      <div key={emp.employeeId} className="employee-result-item" onClick={() => addTerminationEmployee(emp)}>
+                      <div key={emp.employeeId} className="employee-result-item" {...pressable(() => addTerminationEmployee(emp))}>
                         <span className="employee-result-item__avatar">{initials(emp.prenom, emp.nom)}</span>
                         <span>
                           <div className="employee-result-item__name">
@@ -282,7 +284,8 @@ export function Step1Employee() {
                   type="text"
                   value={query}
                   onChange={(ev) => setQuery(ev.target.value)}
-                  placeholder="Numéro d'employé, nom ou prénom"
+                  aria-label="Rechercher par numéro d'employé, nom ou prénom"
+                placeholder="Numéro d'employé, nom ou prénom"
                   autoComplete="off"
                 />
                 {query.trim() && (
@@ -291,7 +294,7 @@ export function Step1Employee() {
                       <div className="employee-result-empty">Recherche…</div>
                     ) : results.length ? (
                       results.map((emp) => (
-                        <div key={emp.employeeId} className="employee-result-item" onClick={() => selectEmployee(emp)}>
+                        <div key={emp.employeeId} className="employee-result-item" {...pressable(() => selectEmployee(emp))}>
                           <span className="employee-result-item__avatar">{initials(emp.prenom, emp.nom)}</span>
                           <span>
                             <div className="employee-result-item__name">

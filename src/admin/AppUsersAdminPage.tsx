@@ -154,6 +154,7 @@ export function AppUsersAdminPage() {
                     <td style={{ padding: '8px 12px' }}>{u.email ?? '—'}</td>
                     <td style={{ padding: '8px 12px' }}>
                       <select
+                        aria-label={`Rôle de ${u.displayName ?? u.sam}`}
                         value={u.role}
                         onChange={(ev) => handleRoleChange(u.appUserId, ev.target.value as AppUserRole)}
                         disabled={isLastAdmin}
@@ -188,6 +189,7 @@ export function AppUsersAdminPage() {
               <div className="field__input-wrap">
                 <input
                   type="text"
+                  aria-label="Rechercher un compte (Active Directory)"
                   value={picked ? `${picked.displayName} (${picked.sam})` : query}
                   onChange={(ev) => {
                     setPicked(null);
@@ -221,7 +223,7 @@ export function AppUsersAdminPage() {
             <div className="field">
               <label className="field__label">Rôle</label>
               <div className="field__input-wrap">
-                <select value={role} onChange={(ev) => setRole(ev.target.value as AppUserRole)}>
+                <select aria-label="Rôle dans l'application" value={role} onChange={(ev) => setRole(ev.target.value as AppUserRole)}>
                   <option value="Lecteur">{ROLE_LABELS.Lecteur}</option>
                   <option value="Admin">{ROLE_LABELS.Admin}</option>
                 </select>

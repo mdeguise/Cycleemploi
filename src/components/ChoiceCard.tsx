@@ -27,6 +27,12 @@ export function ChoiceCard({ title, description, badge, selected, onToggle, disa
     <div
       className={className}
       onClick={disabled ? undefined : onToggle}
+      onKeyDown={(ev) => {
+        if (!disabled && (ev.key === ' ' || ev.key === 'Enter')) {
+          ev.preventDefault();
+          onToggle();
+        }
+      }}
       role="checkbox"
       aria-checked={selected}
       aria-disabled={disabled}

@@ -4,6 +4,7 @@ import { useApi } from '../api/ApiContext';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import type { D365UserSecurityRoleDto, EmployeeDto } from '../api/types';
 import { DiscrepancyTables } from './DiscrepanciesPage';
+import { pressable } from '../utils/a11y';
 
 type Mode = 'corrections' | 'ecarts';
 
@@ -63,7 +64,7 @@ function LinkRow({ row, onLinked, onDeleted }: { row: D365UserSecurityRoleDto; o
                 <div className="employee-result-empty">Recherche…</div>
               ) : results.length ? (
                 results.map((emp) => (
-                  <div key={emp.employeeId} className="employee-result-item" onClick={() => handleLink(emp)}>
+                  <div key={emp.employeeId} className="employee-result-item" {...pressable(() => handleLink(emp))}>
                     <span className="employee-result-item__avatar">{initials(emp.prenom, emp.nom)}</span>
                     <span>
                       <div className="employee-result-item__name">

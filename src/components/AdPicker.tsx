@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { AdAccountDto } from '../api/types';
 
 /** Shared AD people-picker: the account is PICKED from AD rather than typed, because the
@@ -46,11 +46,13 @@ export function usePicker(search: (q: string) => Promise<AdAccountDto[]>) {
 
 export function PickerField({ picker, label = 'Rechercher un compte (Active Directory)' }: { picker: ReturnType<typeof usePicker>; label?: string }) {
   const { query, setQuery, hits, isSearching, picked, setPicked } = picker;
+  const inputId = useId();
   return (
     <div className="field">
-      <label className="field__label">{label}</label>
+      <label className="field__label" htmlFor={inputId}>{label}</label>
       <div className="field__input-wrap">
         <input
+          id={inputId}
           type="text"
           value={picked ? (picked.sam ? `${picked.displayName} (${picked.sam})` : picked.displayName) : query}
           onChange={(ev) => {
@@ -60,7 +62,7 @@ export function PickerField({ picker, label = 'Rechercher un compte (Active Dire
           placeholder="Nom ou code d'utilisateur — min. 2 caractères"
         />
       </div>
-      {isSearching && <div className="required-note">Recherche…</div>}
+      {isSearching && <div className="required-note" role="status">Recherche…</div>}
       {!picked && hits.length > 0 && (
         <ul style={{ listStyle: 'none', margin: '4px 0 0', padding: 0, border: '1px solid var(--border, #ddd)', maxHeight: 220, overflowY: 'auto' }}>
           {hits.map((h) => (
@@ -68,7 +70,7 @@ export function PickerField({ picker, label = 'Rechercher un compte (Active Dire
               <button
                 type="button"
                 onClick={() => { setPicked(h); }}
-                style={{ display: 'block', width: '100%', textAlign: 'left', padding: '6px 10px', border: 'none', background: 'none', cursor: 'pointer' }}
+                style={{ display: 'block', width: '100%', minHeight: 44, textAlign: 'left', padding: '6px 10px', border: 'none', background: 'none', cursor: 'pointer' }}
               >
                 {h.displayName} — <code>{h.sam}</code>
                 {h.email ? ` — ${h.email}` : ''}

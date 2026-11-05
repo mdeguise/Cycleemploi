@@ -134,7 +134,7 @@ function ApproversSection() {
             <div className="field">
               <label className="field__label">Rôle</label>
               <div className="field__input-wrap">
-                <select value={approvalRole} onChange={(ev) => setApprovalRole(ev.target.value as D365ApprovalRole)}>
+                <select aria-label="Rôle d'approbation" value={approvalRole} onChange={(ev) => setApprovalRole(ev.target.value as D365ApprovalRole)}>
                   {APPROVAL_ROLES.map((r) => (
                     <option key={r} value={r}>{APPROVAL_ROLE_LABELS[r]}</option>
                   ))}

@@ -57,9 +57,9 @@ export function StepReviewOffboarding() {
           <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <UserIcon style={{ width: 15, height: 15 }} /> Employé(s) visé(s)
           </span>
-          <span className="review-section__edit" onClick={() => goToStep(0)}>
+          <button type="button" className="review-section__edit" onClick={() => goToStep(0)}>
             Modifier
-          </span>
+          </button>
         </div>
         <div className="review-section__body">
           <div className="review-tag-list">
@@ -81,9 +81,9 @@ export function StepReviewOffboarding() {
           <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <LogOutIcon style={{ width: 15, height: 15 }} /> Détails de la cessation
           </span>
-          <span className="review-section__edit" onClick={() => goToStep(1)}>
+          <button type="button" className="review-section__edit" onClick={() => goToStep(1)}>
             Modifier
-          </span>
+          </button>
         </div>
         <div className="review-section__body">
           <div>
@@ -154,9 +154,9 @@ export function StepReviewOffboarding() {
           <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <ShieldIcon style={{ width: 15, height: 15 }} /> Commentaires et suivis
           </span>
-          <span className="review-section__edit" onClick={() => goToStep(2)}>
+          <button type="button" className="review-section__edit" onClick={() => goToStep(2)}>
             Modifier
-          </span>
+          </button>
         </div>
         <div className="review-section__body">
           <div>

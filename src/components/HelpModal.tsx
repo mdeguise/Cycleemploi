@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useApi } from '../api/ApiContext';
 import { ApiError } from '../api/client';
+import { Dialog } from './Dialog';
 import { CheckCircleIcon, LifeBuoyIcon } from './icons';
 
 interface HelpModalProps {
@@ -51,21 +52,21 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
   };
 
   return (
-    <div className="modal-overlay" onClick={handleClose}>
-      <div className="modal-card help-modal-card" onClick={(ev) => ev.stopPropagation()}>
+    <Dialog labelledBy="help-modal-title" cardClassName="modal-card help-modal-card" onBackdrop={handleClose} onEscape={ticketId === null && !description.trim() ? handleClose : ticketId !== null ? handleClose : undefined}>
         {ticketId === null ? (
           <>
             <span className="modal-card__icon">
               <LifeBuoyIcon style={{ width: 28, height: 28 }} />
             </span>
-            <div className="modal-card__title">Besoin d'aide?</div>
+            <div className="modal-card__title" id="help-modal-title">Besoin d'aide?</div>
             <p className="modal-card__text">
               Décrivez votre problème ou votre question ci-dessous. Une demande sera envoyée directement à l'équipe
               informatique.
             </p>
             <div className="field help-modal__field">
-              <label className="field__label">Description de votre problème ou de votre question</label>
+              <label className="field__label" htmlFor="help-modal-description">Description de votre problème ou de votre question</label>
               <textarea
+                id="help-modal-description"
                 value={description}
                 onChange={(ev) => setDescription(ev.target.value)}
                 placeholder="Décrivez votre problème ou votre question…"
@@ -74,7 +75,7 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
               />
             </div>
             {error && (
-              <div className="required-note" style={{ color: 'var(--tremblant-red-dark)' }}>
+              <div className="required-note" role="alert" style={{ color: 'var(--tremblant-red-dark)' }}>
                 {error}
               </div>
             )}
@@ -102,7 +103,7 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
             <span className="modal-card__icon">
               <CheckCircleIcon style={{ width: 28, height: 28 }} />
             </span>
-            <div className="modal-card__title">Demande envoyée</div>
+            <div className="modal-card__title" id="help-modal-title">Demande envoyée</div>
             <p className="modal-card__text">
               Votre demande a été envoyée à l'équipe informatique (billet TDX #{ticketId}). Vous serez contacté
               directement pour le suivi.
@@ -112,7 +113,6 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
             </button>
           </>
         )}
-      </div>
-    </div>
+    </Dialog>
   );
 }

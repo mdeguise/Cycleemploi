@@ -62,9 +62,9 @@ function AdminLayout({ title, me, children }: { title: string; me: MeDto; childr
       <header className="app-header">
         <div className="app-header__brand">
           <img src={tremblantLogo} alt="Tremblant" className="app-header__logo" />
-          <div className="app-header__title">{title}</div>
+          <h1 className="app-header__title">{title}</h1>
         </div>
-        <div style={{ display: 'flex', gap: 16 }}>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
           <a
             href="https://m365.cloud.microsoft/m365apps/1c4340de-2a85-40e5-8eb0-4f295368978b?auth=2&home=1&origindomain=microsoft365&client-request-id=6e63936f-b713-4fb2-b714-8212400690b3"
             target="_blank"
@@ -93,7 +93,7 @@ function AdminLayout({ title, me, children }: { title: string; me: MeDto; childr
           <Link to="/">Retour à l'application</Link>
         </div>
       </header>
-      <div className="app-body">{children}</div>
+      <main className="app-body">{children}</main>
     </div>
   );
 }
@@ -156,11 +156,11 @@ function WizardBody() {
   return (
     <div className="app-shell">
       <Header />
-      <div className="app-body">
+      <main className="app-body">
         <StepNav />
         <StepComponent />
         <SummarySidebar />
-      </div>
+      </main>
     </div>
   );
 }

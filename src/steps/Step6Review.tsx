@@ -76,9 +76,9 @@ export function Step6Review() {
           <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <UserIcon style={{ width: 15, height: 15 }} /> Employé
           </span>
-          <span className="review-section__edit" onClick={() => goToStep(0)}>
+          <button type="button" className="review-section__edit" onClick={() => goToStep(0)}>
             Modifier
-          </span>
+          </button>
         </div>
         <div className="review-section__body">
           <div>
@@ -115,9 +115,9 @@ export function Step6Review() {
           <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <BriefcaseIcon style={{ width: 15, height: 15 }} /> Poste et département
           </span>
-          <span className="review-section__edit" onClick={() => goToStep(1)}>
+          <button type="button" className="review-section__edit" onClick={() => goToStep(1)}>
             Modifier
-          </span>
+          </button>
         </div>
         <div className="review-section__body">
           <div>
@@ -148,9 +148,9 @@ export function Step6Review() {
           <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <LockIcon style={{ width: 15, height: 15 }} /> Accès et comptes
           </span>
-          <span className="review-section__edit" onClick={() => goToStep(2)}>
+          <button type="button" className="review-section__edit" onClick={() => goToStep(2)}>
             Modifier
-          </span>
+          </button>
         </div>
         <div className="review-section__body">
           <div>
@@ -208,9 +208,9 @@ export function Step6Review() {
             <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <GridIcon style={{ width: 15, height: 15 }} /> D365 et Dynaway
             </span>
-            <span className="review-section__edit" onClick={() => goToStep(3)}>
+            <button type="button" className="review-section__edit" onClick={() => goToStep(3)}>
               Modifier
-            </span>
+            </button>
           </div>
           <div className="review-section__body">
             <div>
@@ -260,9 +260,9 @@ export function Step6Review() {
           <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <LaptopIcon style={{ width: 15, height: 15 }} /> Équipement
           </span>
-          <span className="review-section__edit" onClick={() => goToStep(4)}>
+          <button type="button" className="review-section__edit" onClick={() => goToStep(4)}>
             Modifier
-          </span>
+          </button>
         </div>
         <div className="review-section__body">
           <div className="review-tag-list">
@@ -284,9 +284,9 @@ export function Step6Review() {
           <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <AppsIcon style={{ width: 15, height: 15 }} /> Applications
           </span>
-          <span className="review-section__edit" onClick={() => goToStep(2)}>
+          <button type="button" className="review-section__edit" onClick={() => goToStep(2)}>
             Modifier
-          </span>
+          </button>
         </div>
         <div className="review-section__body">
           <div>
@@ -317,9 +317,9 @@ export function Step6Review() {
           <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <ShieldIcon style={{ width: 15, height: 15 }} /> Commentaires et suivis
           </span>
-          <span className="review-section__edit" onClick={() => goToStep(5)}>
+          <button type="button" className="review-section__edit" onClick={() => goToStep(5)}>
             Modifier
-          </span>
+          </button>
         </div>
         <div className="review-section__body">
           <div>

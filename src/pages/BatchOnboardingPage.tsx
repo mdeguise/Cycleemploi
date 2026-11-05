@@ -20,6 +20,7 @@ import {
 import type { EmployeeDto, PositionOptionDto, SubmitRequestDto } from '../api/types';
 import tremblantLogo from '../assets/logo-tremblant.png';
 import { ReportIssueButton } from '../issues/IssueReporter';
+import { pressable } from '../utils/a11y';
 
 function initials(prenom: string, nom: string) {
   return `${prenom[0] ?? ''}${nom[0] ?? ''}`.toUpperCase();
@@ -274,6 +275,7 @@ function EmployeeCell({
         type="text"
         value={query}
         onChange={(ev) => setQuery(ev.target.value)}
+        aria-label="Rechercher un employé par numéro, nom ou prénom"
         placeholder="Numéro, nom ou prénom"
         autoComplete="off"
       />
@@ -286,10 +288,10 @@ function EmployeeCell({
               <div
                 key={emp.employeeId}
                 className="employee-result-item"
-                onClick={() => {
+                {...pressable(() => {
                   onSelect(emp);
                   setQuery('');
-                }}
+                })}
               >
                 <span className="employee-result-item__avatar">{initials(emp.prenom, emp.nom)}</span>
                 <span>
@@ -606,9 +608,9 @@ export function BatchOnboardingPage() {
       <header className="app-header">
         <div className="app-header__brand">
           <img src={tremblantLogo} alt="Tremblant" className="app-header__logo" />
-          <div className="app-header__title">Embauche / Réactivation en lot (maquette)</div>
+          <h1 className="app-header__title">Embauche / Réactivation en lot (maquette)</h1>
         </div>
-        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
           <ReportIssueButton />
           <Link to="/" className="btn btn-secondary" style={{ textDecoration: 'none' }}>
             Retour au formulaire standard
@@ -616,7 +618,7 @@ export function BatchOnboardingPage() {
         </div>
       </header>
 
-      <div className="app-body" style={{ display: 'block', maxWidth: 1100, margin: '0 auto', width: '100%', padding: '20px 24px' }}>
+      <main className="app-body" style={{ display: 'block', maxWidth: 1100, margin: '0 auto', width: '100%', padding: '20px 24px' }}>
         <div className="step-panel">
           <div className="step-panel__header">
             <span className="step-panel__icon">
@@ -863,7 +865,7 @@ export function BatchOnboardingPage() {
             </div>
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

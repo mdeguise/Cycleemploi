@@ -38,7 +38,7 @@ export function useIssueReporter() {
 export function ReportIssueButton({ compact }: { compact?: boolean }) {
   const open = useIssueReporter();
   return (
-    <button type="button" className="btn btn-secondary report-btn" title="Signaler un problème" onClick={() => open()}>
+    <button type="button" className="btn btn-secondary report-btn" title="Signaler un problème" aria-label="Signaler un problème" onClick={() => open()}>
       <FlagIcon style={{ width: 15, height: 15 }} />
       {!compact && <span className="report-label">Signaler un problème</span>}
     </button>

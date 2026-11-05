@@ -5,6 +5,7 @@ import type { IssueReportDto, IssueStatus } from '../api/types';
 import { CopyIcon, DownloadIcon, FlagIcon } from '../components/icons';
 import { STATUS_LABEL, TYPE_LABEL, StatusBadge } from './ReportIssueModal';
 import './issues.css';
+import { pressable } from '../utils/a11y';
 
 const FILTERS: { value: string; label: string }[] = [
   { value: 'open', label: 'Ouverts' },
@@ -148,7 +149,7 @@ function IssueDetail({ id, onEdit }: { id: number; onEdit: (i: IssueReportDto) =
           <div className="issue-captures">
             {issue.images.map((img) => (
               <figure key={img.imageId}>
-                <a href={api.issues.imageUrl(issue.issueId, img.imageId)} target="_blank" rel="noreferrer">
+                <a href={api.issues.imageUrl(issue.issueId, img.imageId)} target="_blank" rel="noreferrer" aria-label="Ouvrir la capture d'écran dans un nouvel onglet">
                   <img src={api.issues.imageUrl(issue.issueId, img.imageId)} alt="" />
                 </a>
               </figure>
@@ -247,7 +248,7 @@ export function IssuesAdminPage({ onEdit }: { onEdit: (i: IssueReportDto) => voi
       <div className="issues-layout">
         <div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-            <select value={filter} onChange={(ev) => setFilter(ev.target.value)} style={{ flex: 1 }}>
+            <select aria-label="Filtrer les signalements" value={filter} onChange={(ev) => setFilter(ev.target.value)} style={{ flex: 1 }}>
               {FILTERS.map((f) => (
                 <option key={f.value} value={f.value}>
                   {f.label}
@@ -262,7 +263,7 @@ export function IssuesAdminPage({ onEdit }: { onEdit: (i: IssueReportDto) => voi
           {!isLoading && list.length === 0 && <div className="issue-muted">Aucun signalement.</div>}
           <ul className="issue-list">
             {list.map((i) => (
-              <li key={i.issueId} className={i.issueId === selectedId ? 'selected' : ''} onClick={() => setSelectedId(i.issueId)}>
+              <li key={i.issueId} className={i.issueId === selectedId ? 'selected' : ''} aria-current={i.issueId === selectedId ? 'true' : undefined} {...pressable(() => setSelectedId(i.issueId))}>
                 <span className="issue-no">#{i.issueId}</span>
                 <span className="issue-main">
                   <span className="issue-title">{i.title}</span>
