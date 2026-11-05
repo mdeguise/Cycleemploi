@@ -1534,3 +1534,53 @@ input[type="text"] {
     overflow-x: auto;
   }
 }
+
+
+/* ---------- Fill the window height ----------
+   --fill grows with the window (0 up to ~720px tall, capped at 56px). Spacing, fields, choice cards and text areas
+   take a share of it, so a short step uses a tall screen instead of leaving a blank band above the buttons. Wide
+   layout only; on a narrow screen the page simply scrolls. */
+@media (min-width: 1101px) {
+  :root {
+    --fill: clamp(0px, calc((100vh - 720px) / 10), 56px);
+  }
+  .step-panel {
+    gap: calc(8px + var(--fill) * 0.55);
+    padding-top: calc(18px + var(--fill) * 0.3);
+    padding-bottom: calc(18px + var(--fill) * 0.3);
+  }
+  .field-grid {
+    gap: calc(18px + var(--fill) * 0.45);
+  }
+  .field {
+    gap: calc(6px + var(--fill) * 0.15);
+  }
+  .field input[type="text"],
+  .field input[type="email"],
+  .field input[type="tel"],
+  .field input[type="date"],
+  .field input[type="number"],
+  .field select,
+  .regle-paye-select__trigger,
+  .date-input__trigger {
+    min-height: calc(44px + var(--fill) * 0.6);
+  }
+  .field textarea {
+    min-height: calc(80px + var(--fill) * 4);
+  }
+  .choice-list {
+    gap: calc(10px + var(--fill) * 0.35);
+  }
+  .choice-card {
+    padding: calc(14px + var(--fill) * 0.3);
+  }
+  .type-demande-option {
+    padding: calc(8px + var(--fill) * 0.45) 10px;
+  }
+  .step-nav {
+    gap: calc(4px + var(--fill) * 0.25);
+  }
+  .step-nav__item {
+    padding: calc(12px + var(--fill) * 0.3) 14px;
+  }
+}
