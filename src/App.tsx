@@ -30,8 +30,8 @@ import { D365ApproversAdminPage } from './admin/D365ApproversAdminPage';
 import { D365ApprovalsListPage } from './admin/D365ApprovalsListPage';
 import { D365ApprovalFormPage } from './admin/D365ApprovalFormPage';
 import { BatchOnboardingPage } from './pages/BatchOnboardingPage';
-import { IssuesAdminPage } from './issues/IssuesAdminPage';
-import { IssueReporterProvider, ReportIssueButton, useIssueReporter } from './issues/IssueReporter';
+import { IssueReporterProvider, ReportIssueButton } from './issues/IssueReporter';
+import { GUICHET } from './issues/Signalement';
 import { setScreen } from './issues/context';
 import type { MeDto } from './api/types';
 
@@ -50,13 +50,6 @@ const OFFBOARDING_STEP_COMPONENTS = [Step1Employee, Step2Cessation, Step3Departm
 const queryClient = new QueryClient();
 
 function AdminLayout({ title, me, children }: { title: string; me: MeDto; children: ReactNode }) {
-  const api = useApi();
-  const { data: openIssues } = useQuery({
-    queryKey: ['issues', 'open-count'],
-    queryFn: () => api.issues.openCount(),
-    enabled: me.isAppAdmin,
-    refetchInterval: 60_000,
-  });
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -84,10 +77,7 @@ function AdminLayout({ title, me, children }: { title: string; me: MeDto; childr
             </>
           )}
           {me.isAppAdmin && (
-            <Link to="/admin/issues">
-              Signalements
-              {!!openIssues?.count && <span className="nav-count">{openIssues.count}</span>}
-            </Link>
+            <a href={GUICHET} target="_blank" rel="noreferrer" title="Les signalements se traitent dans Le Guichet, espace Signalements, file Cycle Emploi">Signalements ↗</a>
           )}
           <ReportIssueButton compact />
           <Link to="/">Retour à l'application</Link>
@@ -134,11 +124,6 @@ function D365ApprovalsSectionGuard({ me, children }: { me: MeDto; children: Reac
     );
   }
   return <>{children}</>;
-}
-
-function IssuesAdminRoute() {
-  const open = useIssueReporter();
-  return <IssuesAdminPage onEdit={(issue) => open(issue)} />;
 }
 
 function WizardBody() {
@@ -270,16 +255,6 @@ function AuthenticatedApp() {
               <D365ApprovalsSectionGuard me={me}>
                 <D365ApprovalFormPage me={me} />
               </D365ApprovalsSectionGuard>
-            </AdminLayout>
-          }
-        />
-        <Route
-          path="/admin/issues"
-          element={
-            <AdminLayout title="Administration — Signalements" me={me}>
-              <TicketTemplateAdminGuard me={me}>
-                <IssuesAdminRoute />
-              </TicketTemplateAdminGuard>
             </AdminLayout>
           }
         />

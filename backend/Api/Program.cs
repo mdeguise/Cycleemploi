@@ -76,8 +76,6 @@ builder.Services.Configure<SendGridOptions>(builder.Configuration.GetSection("Se
 builder.Services.Configure<OffboardingNotificationOptions>(builder.Configuration.GetSection("OffboardingNotification"));
 builder.Services.Configure<HebergementOptions>(builder.Configuration.GetSection("Hebergement"));
 builder.Services.AddSingleton<IHebergementLookup, HebergementLookup>();
-builder.Services.Configure<IssuesOptions>(builder.Configuration.GetSection("Issues"));
-builder.Services.AddScoped<IIssueNotifier, IssueNotifier>();
 builder.Services.Configure<PowerAutomateOptions>(builder.Configuration.GetSection("PowerAutomate"));
 builder.Services.Configure<TdxOptions>(builder.Configuration.GetSection("Tdx"));
 builder.Services.AddHttpClient<IFreshdeskService, FreshdeskService>();
