@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../api/ApiContext';
 import type { IssueFileDto, IssueFileInput, IssueImageDto, IssueReportDto, IssueStatus, IssueType } from '../api/types';
 import { Dialog } from '../components/Dialog';
 import { CheckCircleIcon, FlagIcon, PaperclipIcon, XIcon } from '../components/icons';
 import { getScreen, snapshot } from './context';
+import { IssueThread } from './IssueThread';
 import './issues.css';
 
 export const TYPE_LABEL: Record<IssueType, string> = {
@@ -16,6 +17,7 @@ export const TYPE_LABEL: Record<IssueType, string> = {
 export const STATUS_LABEL: Record<IssueStatus, string> = {
   NEW: 'Nouveau',
   IN_PROGRESS: 'En cours',
+  A_VALIDER: 'À valider',
   FIXED: 'Corrigé',
   REJECTED: 'Rejeté',
   DUPLICATE: 'Doublon',
@@ -24,6 +26,7 @@ export const STATUS_LABEL: Record<IssueStatus, string> = {
 export const STATUS_STYLE: Record<IssueStatus, { background: string; color: string }> = {
   NEW: { background: '#fdecee', color: '#7d1624' },
   IN_PROGRESS: { background: '#fff4d6', color: '#8a5a00' },
+  A_VALIDER: { background: '#ffedd5', color: '#9a3412' },
   FIXED: { background: '#dff5e3', color: '#1c6b34' },
   REJECTED: { background: '#e9e9ee', color: '#555' },
   DUPLICATE: { background: '#e9e9ee', color: '#555' },
@@ -84,11 +87,65 @@ function StatusBadge({ status }: { status: IssueStatus }) {
   );
 }
 
-function MyIssues({ onEdit }: { onEdit: (i: IssueReportDto) => void }) {
+/** Signalements qui attendent la personne qui les a faits : un correctif livré à confirmer (« À valider »), ou une
+ * question de l'équipe (Nouveau / En cours dont le dernier message vient de l'équipe) — consigne de Marc, 2026-11-10. */
+export function waitingForMe(rows: IssueReportDto[] | undefined): IssueReportDto[] {
+  return (rows ?? []).filter(
+    (i) => i.status === 'A_VALIDER' || ((i.status === 'NEW' || i.status === 'IN_PROGRESS') && !!i.lastMessageFromTeam),
+  );
+}
+
+/** « C'est réglé » / « Ce n'est pas réglé » sur un correctif livré (consigne de Marc, 2026-11-10). « C'est réglé » ferme
+ * le signalement (Corrigé) ; « Ce n'est pas réglé » le renvoie à l'équipe, avec ce qui ne va pas écrit dans l'échange. */
+function ConfirmFix({ issueId }: { issueId: number }) {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  const [notFixed, setNotFixed] = useState(false);
+  const confirm = useMutation({
+    mutationFn: (regle: boolean) => api.issues.confirm(issueId, regle),
+    onSuccess: (_r, regle) => {
+      if (!regle) setNotFixed(true);
+      void queryClient.invalidateQueries({ queryKey: ['issues'] });
+    },
+  });
+  if (notFixed)
+    return (
+      <div className="sig-confirm" role="status">
+        C’est noté : le signalement retourne à l’équipe. Expliquez ce qui ne va pas encore dans l’échange ci-dessous.
+      </div>
+    );
+  return (
+    <div className="sig-confirm">
+      <span>
+        <strong>Le correctif est livré.</strong> Vérifiez, puis répondez :
+      </span>
+      <button type="button" className="btn sig-ok" disabled={confirm.isPending} onClick={() => confirm.mutate(true)}>
+        ✓ C’est réglé
+      </button>
+      <button type="button" className="btn btn-secondary" disabled={confirm.isPending} onClick={() => confirm.mutate(false)}>
+        Ce n’est pas réglé
+      </button>
+      {confirm.isError && <span className="issue-error-text">{messageOf(confirm.error)}</span>}
+    </div>
+  );
+}
+
+function MyIssues({ onEdit, openIssueId }: { onEdit: (i: IssueReportDto) => void; openIssueId: number | null }) {
   const api = useApi();
   const { data, isLoading } = useQuery({ queryKey: ['issues', 'mine'], queryFn: () => api.issues.mine() });
+  const [openThread, setOpenThread] = useState<number | null>(openIssueId);
+  // Ouvert depuis un lien : le signalement visé est déplié et amené à l'écran.
+  useEffect(() => {
+    if (openIssueId && data) document.getElementById(`mine-${openIssueId}`)?.scrollIntoView({ block: 'nearest' });
+  }, [openIssueId, data]);
   if (isLoading) return <div className="issue-muted">Chargement…</div>;
   if (!data?.length) return <div className="issue-muted">Vous n'avez encore fait aucun signalement.</div>;
+  if (openIssueId && !data.some((i) => i.issueId === openIssueId))
+    return (
+      <div className="issue-muted">
+        Le signalement #{openIssueId} n’est pas parmi les vôtres : seule la personne qui l’a fait et les administrateurs peuvent l’ouvrir.
+      </div>
+    );
   return (
     <table className="issue-table">
       <thead>
@@ -103,7 +160,8 @@ function MyIssues({ onEdit }: { onEdit: (i: IssueReportDto) => void }) {
       </thead>
       <tbody>
         {data.map((i) => (
-          <tr key={i.issueId}>
+          <Fragment key={i.issueId}>
+          <tr id={`mine-${i.issueId}`}>
             <td>#{i.issueId}</td>
             <td>{new Date(i.createdUtc).toLocaleDateString('fr-CA')}</td>
             <td>{i.title}</td>
@@ -112,6 +170,15 @@ function MyIssues({ onEdit }: { onEdit: (i: IssueReportDto) => void }) {
             </td>
             <td>{i.resolution ?? '—'}</td>
             <td>
+              <button
+                type="button"
+                className="issue-link"
+                title="Ce qui s’est dit et décidé ; vous pouvez répondre ici"
+                aria-expanded={openThread === i.issueId}
+                onClick={() => setOpenThread(openThread === i.issueId ? null : i.issueId)}
+              >
+                Échange{(i.messageCount ?? 0) > 0 ? ` (${i.messageCount})` : ''}
+              </button>
               {i.status === 'NEW' && (
                 <button type="button" className="issue-link" onClick={() => onEdit(i)}>
                   Modifier
@@ -119,6 +186,15 @@ function MyIssues({ onEdit }: { onEdit: (i: IssueReportDto) => void }) {
               )}
             </td>
           </tr>
+          {openThread === i.issueId && (
+            <tr className="issue-thread-row">
+              <td colSpan={6}>
+                {i.status === 'A_VALIDER' && <ConfirmFix issueId={i.issueId} />}
+                <IssueThread issueId={i.issueId} requesterName={i.createdByName ?? i.createdBySam} compact />
+              </td>
+            </tr>
+          )}
+          </Fragment>
         ))}
       </tbody>
     </table>
@@ -128,10 +204,12 @@ function MyIssues({ onEdit }: { onEdit: (i: IssueReportDto) => void }) {
 interface Props {
   /** When set, the modal edits this (still NEW) report instead of creating one. */
   edit?: IssueReportDto | null;
+  /** When set, the modal opens on « Mes signalements » with this report unfolded (link of an e-mail, orange button). */
+  mineIssueId?: number | null;
   onClose: () => void;
 }
 
-export function ReportIssueModal({ edit: initialEdit, onClose }: Props) {
+export function ReportIssueModal({ edit: initialEdit, mineIssueId, onClose }: Props) {
   // Close on a click OUTSIDE the card only when the press AND the release both happened on the dark
   // backdrop. Otherwise dragging a field's resize handle (or selecting text) and letting go outside the
   // card fires a click on the backdrop and the whole form vanishes — with what was typed.
@@ -155,7 +233,7 @@ export function ReportIssueModal({ edit: initialEdit, onClose }: Props) {
   const [docs, setDocs] = useState<IssueFileInput[]>([]);
   const [keepImages, setKeepImages] = useState<IssueImageDto[]>(initialEdit?.images ?? []);
   const [keepFiles, setKeepFiles] = useState<IssueFileDto[]>(initialEdit?.files ?? []);
-  const [showMine, setShowMine] = useState(false);
+  const [showMine, setShowMine] = useState(mineIssueId != null);
   const [error, setError] = useState<string | null>(null);
   const [sentNumber, setSentNumber] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -323,7 +401,7 @@ export function ReportIssueModal({ edit: initialEdit, onClose }: Props) {
 
         <div className="issue-modal__body">
           {showMine ? (
-            <MyIssues onEdit={startEdit} />
+            <MyIssues onEdit={startEdit} openIssueId={mineIssueId ?? null} />
           ) : (
             <>
               <div className="issue-types">

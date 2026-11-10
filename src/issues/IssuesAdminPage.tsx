@@ -4,12 +4,14 @@ import { useApi } from '../api/ApiContext';
 import type { IssueReportDto, IssueStatus } from '../api/types';
 import { CopyIcon, DownloadIcon, FlagIcon } from '../components/icons';
 import { STATUS_LABEL, TYPE_LABEL, StatusBadge } from './ReportIssueModal';
+import { IssueThread } from './IssueThread';
 import './issues.css';
 import { pressable } from '../utils/a11y';
 
 const FILTERS: { value: string; label: string }[] = [
   { value: 'open', label: 'Ouverts' },
   { value: '', label: 'Tous' },
+  { value: 'A_VALIDER', label: 'À valider' },
   { value: 'FIXED', label: 'Corrigés' },
   { value: 'REJECTED', label: 'Rejetés' },
   { value: 'DUPLICATE', label: 'Doublons' },
@@ -176,6 +178,9 @@ function IssueDetail({ id, onEdit }: { id: number; onEdit: (i: IssueReportDto) =
         </details>
       )}
 
+      <h4>Échange{issue.messageCount ? ` (${issue.messageCount})` : ''}</h4>
+      <IssueThread issueId={issue.issueId} requesterName={issue.createdByName ?? issue.createdBySam} />
+
       <h4>Suivi</h4>
       <div className="issue-followup">
         <label className="issue-field">
@@ -193,7 +198,7 @@ function IssueDetail({ id, onEdit }: { id: number; onEdit: (i: IssueReportDto) =
           <input type="text" maxLength={40} value={commit} onChange={(ev) => setCommit(ev.target.value)} />
         </label>
         <label className="issue-field" style={{ gridColumn: '1 / -1' }}>
-          <span>Résolution (visible par la personne qui a signalé)</span>
+          <span>Résolution (visible par la personne qui a signalé ; « À valider » lui envoie un courriel pour confirmer)</span>
           <textarea rows={3} value={resolution} onChange={(ev) => setResolution(ev.target.value)} />
         </label>
         <label className="issue-field" style={{ gridColumn: '1 / -1' }}>

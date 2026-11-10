@@ -99,8 +99,33 @@ public class IssueReportsController : ControllerBase
     private async Task<IssueReportDto?> LoadDtoAsync(int id, CancellationToken ct)
     {
         var i = await WithAttachmentMeta().FirstOrDefaultAsync(x => x.IssueId == id, ct);
-        return i is null ? null : ToDto(i);
+        if (i is null) return null;
+        var dto = ToDto(i);
+        await AttachThreadAsync([dto], ct);
+        return dto;
     }
+
+    /// <summary>Fil « Échange » : nombre de messages, date du dernier, et s'il vient de l'équipe — c'est ce qui fait
+    /// passer le bouton du haut à l'orange (« un signalement attend votre réponse »).</summary>
+    private async Task AttachThreadAsync(IReadOnlyCollection<IssueReportDto> dtos, CancellationToken ct)
+    {
+        if (dtos.Count == 0) return;
+        var ids = dtos.Select(d => d.IssueId).ToList();
+        var rows = await _db.IssueReportMessages.AsNoTracking().Where(m => ids.Contains(m.IssueId))
+            .Select(m => new { m.IssueId, m.MessageId, m.CreatedUtc, m.FromTeam }).ToListAsync(ct);
+        foreach (var g in rows.GroupBy(r => r.IssueId))
+        {
+            var dto = dtos.First(d => d.IssueId == g.Key);
+            var last = g.OrderByDescending(r => r.CreatedUtc).ThenByDescending(r => r.MessageId).First();
+            dto.MessageCount = g.Count();
+            dto.LastMessageUtc = last.CreatedUtc;
+            dto.LastMessageFromTeam = last.FromTeam;
+        }
+    }
+
+    private static IssueMessageDto MessageDto(IssueReportMessage m) => new(m.MessageId, m.CreatedUtc, m.FromTeam, m.AuthorSam, m.AuthorName, m.Body);
+
+    private string DisplayName => _ad.GetUserInfo(User.GetSamAccountName()).DisplayName ?? Sam;
 
     // ---- attachment decoding -------------------------------------------------------------
 
@@ -271,7 +296,9 @@ public class IssueReportsController : ControllerBase
     {
         var sam = Sam;
         var rows = await WithAttachmentMeta().Where(i => i.CreatedBySam == sam).OrderByDescending(i => i.CreatedUtc).ToListAsync(ct);
-        return Ok(rows.Select(ToDto).ToList());
+        var dtos = rows.Select(ToDto).ToList();
+        await AttachThreadAsync(dtos, ct);
+        return Ok(dtos);
     }
 
     /// <summary>status = "open" (NEW + IN_PROGRESS), a status code, or omitted for everything.</summary>
@@ -289,7 +316,9 @@ public class IssueReportsController : ControllerBase
         }
         var rows = await q.ToListAsync(ct);
         int Rank(string s) => s == IssueStatus.New ? 0 : s == IssueStatus.InProgress ? 1 : 2;
-        return Ok(rows.OrderBy(i => Rank(i.Status)).ThenByDescending(i => i.CreatedUtc).Select(ToDto).ToList());
+        var dtos = rows.OrderBy(i => Rank(i.Status)).ThenByDescending(i => i.CreatedUtc).Select(ToDto).ToList();
+        await AttachThreadAsync(dtos, ct);
+        return Ok(dtos);
     }
 
     [HttpGet("open-count")]
@@ -341,7 +370,9 @@ public class IssueReportsController : ControllerBase
         var baseUrl = string.Equals(captures, "files", StringComparison.OrdinalIgnoreCase)
             ? null
             : $"{Request.Scheme}://{Request.Host}/api/issues";
-        return Content(IssueMarkdown.Build(dto, baseUrl), "text/markdown", Encoding.UTF8);
+        var thread = (await _db.IssueReportMessages.AsNoTracking().Where(m => m.IssueId == id)
+            .OrderBy(m => m.CreatedUtc).ThenBy(m => m.MessageId).ToListAsync(ct)).Select(MessageDto).ToList();
+        return Content(IssueMarkdown.Build(dto, baseUrl, thread), "text/markdown", Encoding.UTF8);
     }
 
     [HttpGet("export")]
@@ -424,12 +455,14 @@ public class IssueReportsController : ControllerBase
         if (!IssueStatus.All.Contains(status)) return BadRequest(new { error = "Statut invalide." });
 
         var newWork = input.WorkLog?.Trim();
-        if (status == IssueStatus.Fixed)
+        // « À valider » (correctif livré) comme « Corrigé » : la résolution est ce que la personne lira, les travaux sont
+        // le journal technique de la correction.
+        if (status is IssueStatus.Fixed or IssueStatus.Validate)
         {
             if (string.IsNullOrWhiteSpace(input.Resolution))
-                return BadRequest(new { error = "Une résolution est requise pour fermer un signalement." });
+                return BadRequest(new { error = "Une résolution est requise pour livrer ou fermer un signalement." });
             if (string.IsNullOrWhiteSpace(newWork) && string.IsNullOrWhiteSpace(issue.WorkLog))
-                return BadRequest(new { error = "Les travaux effectués sont requis pour fermer un signalement." });
+                return BadRequest(new { error = "Les travaux effectués sont requis pour livrer ou fermer un signalement." });
         }
 
         var previousStatus = issue.Status;
@@ -462,6 +495,86 @@ public class IssueReportsController : ControllerBase
             var reporterEmail = _ad.GetUserInfo(issue.CreatedBySam).Email;
             await _notifier.NotifyReporterAsync(dto!, reporterEmail, ct);
         }
+        // Livré (« À valider ») : la personne qui a signalé vérifie et clique « C'est réglé » dans l'application.
+        if (status == IssueStatus.Validate && previousStatus != status)
+            await _notifier.NotifyDeliveredAsync(dto!, _ad.GetUserInfo(issue.CreatedBySam).Email, ct);
         return Ok(dto);
+    }
+
+    /// <summary>La réponse de la personne qui a signalé à un correctif livré (« À valider ») : « C'est réglé » → FIXED
+    /// (Corrigé), le signalement est fermé ; « Ce n'est pas réglé » → IN_PROGRESS, il retourne à l'équipe. Inscrit dans
+    /// l'échange, l'équipe est avisée. Seule la personne qui a signalé peut répondre (consigne de Marc, 2026-11-10).</summary>
+    [HttpPost("{id:int}/confirmation")]
+    public async Task<ActionResult<IssueReportDto>> Confirm(int id, IssueConfirmInput input, CancellationToken ct)
+    {
+        var issue = await _db.IssueReports.FirstOrDefaultAsync(i => i.IssueId == id, ct);
+        if (issue is null) return NotFound();
+        if (!string.Equals(issue.CreatedBySam, Sam, StringComparison.OrdinalIgnoreCase)) return Forbid();
+        if (issue.Status != IssueStatus.Validate)
+            return BadRequest(new { error = "Ce signalement n'attend pas votre confirmation (il n'est pas « À valider »)." });
+        var comment = (input.Commentaire ?? "").Trim();
+        if (comment.Length > 8000) return BadRequest(new { error = "Commentaire trop long (8 000 caractères au plus)." });
+
+        issue.Status = input.Regle ? IssueStatus.Fixed : IssueStatus.InProgress;
+        issue.HandledUtc = DateTime.UtcNow;
+        var name = DisplayName;
+        var msg = new IssueReportMessage
+        {
+            IssueId = id, CreatedUtc = DateTime.UtcNow, FromTeam = false, AuthorSam = Sam,
+            AuthorName = name.Length > 200 ? name[..200] : name,
+            Body = (input.Regle ? "C'est réglé." : "Ce n'est pas réglé.") + (comment.Length > 0 ? $"\n{comment}" : ""),
+        };
+        _db.IssueReportMessages.Add(msg);
+        await _db.SaveChangesAsync(ct);
+
+        var dto = (await LoadDtoAsync(id, ct))!;
+        await _notifier.NotifyMessageAsync(dto, MessageDto(msg), null, ct);
+        return Ok(dto);
+    }
+
+    // ---- Fil « Échange » : ce qui s'est dit et décidé, gardé avec le signalement ----------
+
+    /// <summary>Le fil d'un signalement : visible par la personne qui l'a signalé et par les administrateurs.</summary>
+    [HttpGet("{id:int}/messages")]
+    public async Task<ActionResult<List<IssueMessageDto>>> Messages(int id, CancellationToken ct)
+    {
+        var issue = await _db.IssueReports.AsNoTracking().FirstOrDefaultAsync(i => i.IssueId == id, ct);
+        if (issue is null) return NotFound();
+        if (!await CanSeeAsync(issue, ct)) return Forbid();
+        var rows = await _db.IssueReportMessages.AsNoTracking().Where(m => m.IssueId == id)
+            .OrderBy(m => m.CreatedUtc).ThenBy(m => m.MessageId).ToListAsync(ct);
+        return Ok(rows.Select(MessageDto).ToList());
+    }
+
+    /// <summary>Ajoute un message au fil. La personne qui a signalé écrit « du côté du demandeur » ; un administrateur
+    /// qui n'en est pas l'auteur écrit « du côté de l'équipe ». Un courriel d'avis part à l'autre côté (au mieux).</summary>
+    [HttpPost("{id:int}/messages")]
+    public async Task<ActionResult<IssueMessageDto>> PostMessage(int id, IssueMessageInput input, CancellationToken ct)
+    {
+        var issue = await _db.IssueReports.AsNoTracking().FirstOrDefaultAsync(i => i.IssueId == id, ct);
+        if (issue is null) return NotFound();
+        if (!await CanSeeAsync(issue, ct)) return Forbid();
+        var text = (input.Body ?? "").Trim();
+        if (text.Length == 0) return BadRequest(new { error = "Écrivez un message." });
+        if (text.Length > 8000) return BadRequest(new { error = "Message trop long (8 000 caractères au plus)." });
+
+        var fromTeam = !string.Equals(issue.CreatedBySam, Sam, StringComparison.OrdinalIgnoreCase);
+        var name = DisplayName;
+        var msg = new IssueReportMessage
+        {
+            IssueId = id, CreatedUtc = DateTime.UtcNow, FromTeam = fromTeam, AuthorSam = Sam,
+            AuthorName = name.Length > 200 ? name[..200] : name, Body = text,
+        };
+        _db.IssueReportMessages.Add(msg);
+        await _db.SaveChangesAsync(ct);
+
+        var mdto = MessageDto(msg);
+        if (input.Notify != false)
+        {
+            var dto = (await LoadDtoAsync(id, ct))!;
+            var reporterEmail = fromTeam ? _ad.GetUserInfo(issue.CreatedBySam).Email : null;
+            await _notifier.NotifyMessageAsync(dto, mdto, reporterEmail, ct);
+        }
+        return Ok(mdto);
     }
 }

@@ -36,6 +36,7 @@ public class AppDbContext : DbContext
     public DbSet<D365AccessApprovalRole> D365AccessApprovalRoles => Set<D365AccessApprovalRole>();
     public DbSet<IssueReport> IssueReports => Set<IssueReport>();
     public DbSet<IssueReportImage> IssueReportImages => Set<IssueReportImage>();
+    public DbSet<IssueReportMessage> IssueReportMessages => Set<IssueReportMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -100,6 +101,7 @@ public class AppDbContext : DbContext
             entity.Property(i => i.CommitRef).HasMaxLength(40).IsUnicode(false);
             entity.Property(i => i.HandledBySam).HasMaxLength(128);
             entity.HasMany(i => i.Images).WithOne().HasForeignKey(x => x.IssueId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(i => i.Messages).WithOne().HasForeignKey(m => m.IssueId).OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(i => new { i.Status, i.CreatedUtc });
             entity.HasIndex(i => new { i.CreatedBySam, i.CreatedUtc });
         });
@@ -109,6 +111,16 @@ public class AppDbContext : DbContext
             entity.Property(x => x.MimeType).HasMaxLength(100).IsUnicode(false);
             entity.Property(x => x.FileName).HasMaxLength(260);
             entity.HasIndex(x => new { x.IssueId, x.Ordinal });
+        });
+        // Fil « Échange » : nom de table EXACT (dbo.IssueReportMessage, au singulier) — la copie vers Le Guichet le lit par ce nom.
+        modelBuilder.Entity<IssueReportMessage>(entity =>
+        {
+            entity.ToTable("IssueReportMessage");
+            entity.HasKey(m => m.MessageId);
+            entity.Property(m => m.CreatedUtc).HasColumnType("datetime2(3)").HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.Property(m => m.AuthorSam).HasMaxLength(128);
+            entity.Property(m => m.AuthorName).HasMaxLength(200);
+            entity.HasIndex(m => new { m.IssueId, m.CreatedUtc });
         });
         modelBuilder.Entity<RequestEquipment>().HasKey(x => new { x.RequestId, x.Value });
         modelBuilder.Entity<RequestEquipment>()

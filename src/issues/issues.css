@@ -378,3 +378,101 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Fil « Échange » et réponse au correctif livré (consigne de Marc, 2026-11-10). */
+.issue-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.issue-thread textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+}
+
+.issue-thread__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.issue-msg {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border-left: 3px solid #9ca3af;
+  background: #f6f6f8;
+  font-size: 13px;
+}
+
+.issue-msg.team {
+  border-left-color: #2f4f8f;
+  background: #eef3fb;
+}
+
+.issue-msg__head {
+  margin-bottom: 2px;
+}
+
+.issue-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.issue-error-text {
+  color: var(--tremblant-red-dark, #7d1624);
+  font-size: 13px;
+}
+
+.issue-thread-row td {
+  background: #fafafa;
+  white-space: normal;
+}
+
+.sig-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+  background: #fffbeb;
+  color: #1c1917;
+  font-size: 13px;
+}
+
+.btn.sig-ok {
+  background: #15803d;
+  border-color: #15803d;
+  color: #fff;
+}
+
+/* Un signalement attend la réponse de l'usager : le bouton du haut devient orange, sur tous les écrans. */
+.report-btn.attente {
+  background: #f59e0b;
+  border-color: #b45309;
+  color: #1c1917;
+  font-weight: 700;
+}
+
+.report-btn.attente:hover {
+  background: #fbbf24;
+}
+
+.report-btn .report-count {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #1c1917;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+}

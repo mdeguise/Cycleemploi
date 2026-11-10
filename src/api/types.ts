@@ -591,7 +591,7 @@ export interface TicketViewDto {
 }
 
 export type IssueType = 'BUG' | 'IMPROVEMENT' | 'QUESTION';
-export type IssueStatus = 'NEW' | 'IN_PROGRESS' | 'FIXED' | 'REJECTED' | 'DUPLICATE';
+export type IssueStatus = 'NEW' | 'IN_PROGRESS' | 'A_VALIDER' | 'FIXED' | 'REJECTED' | 'DUPLICATE';
 
 export interface IssueImageDto {
   imageId: number;
@@ -624,6 +624,20 @@ export interface IssueReportDto {
   handledBySam?: string | null;
   images: IssueImageDto[];
   files: IssueFileDto[];
+  /** Fil « Échange » : nombre de messages, date du dernier, et s'il vient de l'équipe. */
+  messageCount?: number;
+  lastMessageUtc?: string | null;
+  lastMessageFromTeam?: boolean;
+}
+
+/** Un message du fil « Échange » ; fromTeam = écrit par l'équipe, sinon par la personne qui a signalé. */
+export interface IssueMessageDto {
+  messageId: number;
+  createdUtc: string;
+  fromTeam: boolean;
+  authorSam: string | null;
+  authorName: string | null;
+  body: string;
 }
 
 export interface IssueFileInput {

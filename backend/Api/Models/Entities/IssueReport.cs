@@ -25,6 +25,23 @@ public class IssueReport
     public string? HandledBySam { get; set; }
 
     public List<IssueReportImage> Images { get; set; } = [];
+
+    /// <summary>Fil « Échange » : ce qui s'est dit et décidé entre la personne qui a signalé et l'équipe.</summary>
+    public List<IssueReportMessage> Messages { get; set; } = [];
+}
+
+/// <summary>Un message du fil « Échange » d'un signalement (table dbo.IssueReportMessage — même nom et mêmes colonnes
+/// que dans EOD et PO Tool : la copie vers Le Guichet les lit par ces noms). FromTeam = écrit par quelqu'un d'autre que
+/// la personne qui a signalé (un administrateur).</summary>
+public class IssueReportMessage
+{
+    public int MessageId { get; set; }
+    public int IssueId { get; set; }
+    public DateTime CreatedUtc { get; set; }
+    public bool FromTeam { get; set; }
+    public string? AuthorSam { get; set; }
+    public string? AuthorName { get; set; }
+    public string Body { get; set; } = null!;
 }
 
 /// <summary>Screenshots AND documents share this table — an image when MimeType starts with
@@ -44,11 +61,13 @@ public static class IssueStatus
 {
     public const string New = "NEW";
     public const string InProgress = "IN_PROGRESS";
+    /// <summary>« À valider » : le correctif est livré, la personne qui a signalé confirme (« C'est réglé ») avant la clôture.</summary>
+    public const string Validate = "A_VALIDER";
     public const string Fixed = "FIXED";
     public const string Rejected = "REJECTED";
     public const string Duplicate = "DUPLICATE";
 
-    public static readonly string[] All = [New, InProgress, Fixed, Rejected, Duplicate];
+    public static readonly string[] All = [New, InProgress, Validate, Fixed, Rejected, Duplicate];
     public static readonly string[] Open = [New, InProgress];
 }
 

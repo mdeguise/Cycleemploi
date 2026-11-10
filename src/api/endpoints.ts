@@ -39,6 +39,7 @@ import type { PositionOptionDto,
   IssueReportInput,
   IssueEditInput,
   IssueUpdateInput,
+  IssueMessageDto,
 } from './types';
 
 export function createApi(client: ApiClient) {
@@ -53,6 +54,12 @@ export function createApi(client: ApiClient) {
       get: (id: number) => client.get<IssueReportDto>(`/api/issues/${id}`),
       update: (id: number, dto: IssueUpdateInput) => client.put<IssueReportDto>(`/api/issues/${id}`, dto),
       markdown: (id: number) => client.getText(`/api/issues/${id}/markdown`),
+      messages: (id: number) => client.get<IssueMessageDto[]>(`/api/issues/${id}/messages`),
+      postMessage: (id: number, body: string, notify: boolean) =>
+        client.post<IssueMessageDto>(`/api/issues/${id}/messages`, { body, notify }),
+      /** La réponse de la personne qui a signalé à un correctif livré : « C'est réglé » (fermé) ou « Ce n'est pas réglé ». */
+      confirm: (id: number, regle: boolean, commentaire?: string) =>
+        client.post<IssueReportDto>(`/api/issues/${id}/confirmation`, { regle, commentaire: commentaire ?? null }),
       imageUrl: (id: number, imageId: number) => client.url(`/api/issues/${id}/images/${imageId}`),
       fileUrl: (id: number, fileId: number) => client.url(`/api/issues/${id}/files/${fileId}`),
       exportUrl: (status?: string) =>

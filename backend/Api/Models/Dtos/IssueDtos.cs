@@ -23,7 +23,21 @@ public class IssueReportDto
     public string? HandledBySam { get; set; }
     public List<IssueImageDto> Images { get; set; } = [];
     public List<IssueFileDto> Files { get; set; } = [];
+    /// <summary>Fil « Échange » : nombre de messages, date du dernier, et s'il vient de l'équipe (une question attend
+    /// alors la personne qui a signalé).</summary>
+    public int MessageCount { get; set; }
+    public DateTime? LastMessageUtc { get; set; }
+    public bool LastMessageFromTeam { get; set; }
 }
+
+/// <summary>Un message du fil « Échange » ; FromTeam = écrit par l'équipe, sinon par la personne qui a signalé.</summary>
+public record IssueMessageDto(int MessageId, DateTime CreatedUtc, bool FromTeam, string? AuthorSam, string? AuthorName, string Body);
+
+/// <summary>Notify = aviser l'autre côté par courriel (au mieux). Vrai par défaut.</summary>
+public record IssueMessageInput(string? Body, bool? Notify);
+
+/// <summary>La réponse de la personne qui a signalé à un correctif livré (« À valider ») : réglé ou non, commentaire facultatif.</summary>
+public record IssueConfirmInput(bool Regle, string? Commentaire);
 
 public class IssueFileInput
 {

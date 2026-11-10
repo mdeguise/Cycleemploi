@@ -580,6 +580,44 @@ namespace TremblantLifecycle.Api.Migrations
                     b.ToTable("IssueReportImages");
                 });
 
+            modelBuilder.Entity("TremblantLifecycle.Api.Models.Entities.IssueReportMessage", b =>
+                {
+                    b.Property<int>("MessageId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("MessageId"));
+
+                    b.Property<string>("AuthorName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("AuthorSam")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2(3)")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<bool>("FromTeam")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("IssueId")
+                        .HasColumnType("int");
+
+                    b.HasKey("MessageId");
+
+                    b.HasIndex("IssueId", "CreatedUtc");
+
+                    b.ToTable("IssueReportMessage", (string)null);
+                });
+
             modelBuilder.Entity("TremblantLifecycle.Api.Models.Entities.OffboardingConfidentialComment", b =>
                 {
                     b.Property<int>("RequestId")
@@ -1020,6 +1058,15 @@ namespace TremblantLifecycle.Api.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("TremblantLifecycle.Api.Models.Entities.IssueReportMessage", b =>
+                {
+                    b.HasOne("TremblantLifecycle.Api.Models.Entities.IssueReport", null)
+                        .WithMany("Messages")
+                        .HasForeignKey("IssueId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("TremblantLifecycle.Api.Models.Entities.OffboardingConfidentialComment", b =>
                 {
                     b.HasOne("TremblantLifecycle.Api.Models.Entities.Request", "Request")
@@ -1154,6 +1201,8 @@ namespace TremblantLifecycle.Api.Migrations
             modelBuilder.Entity("TremblantLifecycle.Api.Models.Entities.IssueReport", b =>
                 {
                     b.Navigation("Images");
+
+                    b.Navigation("Messages");
                 });
 
             modelBuilder.Entity("TremblantLifecycle.Api.Models.Entities.Request", b =>

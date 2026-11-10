@@ -9,7 +9,9 @@
     sur le dépôt peut alors les lire directement, captures comprises.
 
     Avec -Id et -Statut : met à jour le suivi d'un signalement, par exemple une
-    fois le correctif déployé. -Travaux est OBLIGATOIRE pour FIXED : décris ce qui
+    fois le correctif déployé. A_VALIDER (« À valider ») = correctif livré : la
+    personne qui a signalé reçoit un courriel et clique « C'est réglé » dans
+    l'application. -Travaux est OBLIGATOIRE pour A_VALIDER et FIXED : décris ce qui
     a été modifié (fichiers, logique, raison), pas seulement le résultat — c'est
     le journal technique de la correction, conservé avec le signalement.
 
@@ -37,14 +39,14 @@
 [CmdletBinding(DefaultParameterSetName = 'Recuperer')]
 param(
     [Parameter(ParameterSetName = 'Recuperer')]
-    [ValidateSet('open', 'tous', 'NEW', 'IN_PROGRESS', 'FIXED', 'REJECTED', 'DUPLICATE')]
+    [ValidateSet('open', 'tous', 'NEW', 'IN_PROGRESS', 'A_VALIDER', 'FIXED', 'REJECTED', 'DUPLICATE')]
     [string] $Filtre = 'open',
 
     [Parameter(ParameterSetName = 'Suivi', Mandatory)]
     [int] $Id,
 
     [Parameter(ParameterSetName = 'Suivi', Mandatory)]
-    [ValidateSet('NEW', 'IN_PROGRESS', 'FIXED', 'REJECTED', 'DUPLICATE')]
+    [ValidateSet('NEW', 'IN_PROGRESS', 'A_VALIDER', 'FIXED', 'REJECTED', 'DUPLICATE')]
     [string] $Statut,
 
     [Parameter(ParameterSetName = 'Suivi')] [string] $Commit,
@@ -67,8 +69,8 @@ $commun = @{ UseDefaultCredentials = $true; AllowUnencryptedAuthentication = $tr
 
 if ($PSCmdlet.ParameterSetName -eq 'Suivi') {
     if ($TravauxFichier) { $Travaux = [IO.File]::ReadAllText((Resolve-Path $TravauxFichier), [Text.Encoding]::UTF8) }
-    if ($Statut -eq 'FIXED' -and -not $Travaux) {
-        Write-Warning "FIXED sans -Travaux : le serveur refusera s'il n'y a pas déjà de travaux journalisés sur ce signalement."
+    if (($Statut -in @('A_VALIDER', 'FIXED')) -and -not $Travaux) {
+        Write-Warning "$Statut sans -Travaux : le serveur refusera s'il n'y a pas déjà de travaux journalisés sur ce signalement."
     }
     $corps = @{ status = $Statut; resolution = $Resolution; commitRef = $Commit; workLog = $Travaux } | ConvertTo-Json
     $s = Invoke-RestMethod "$Api/issues/$Id" -Method Put -Body ([Text.Encoding]::UTF8.GetBytes($corps)) `
