@@ -174,7 +174,7 @@ public class D365AccessApprovalDetailDto
     public bool? LevyEmployee { get; set; }
     public List<string> Roles { get; set; } = [];
 
-    /// <summary>The fixed 10-item TDX role-checkbox catalog — see TdxD365RoleCheckboxes.All.</summary>
+    /// <summary>The fixed 8-item TDX role-checkbox catalog (two Financial Reporting roles retired 2026-11-12) — see TdxD365RoleCheckboxes.All.</summary>
     public List<string> RoleCatalog { get; set; } = [];
 
     public List<D365PeerRoleDto> Peers { get; set; } = [];

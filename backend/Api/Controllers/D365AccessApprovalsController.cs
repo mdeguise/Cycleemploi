@@ -408,7 +408,8 @@ public class D365AccessApprovalsController : ControllerBase
         {
             return BadRequest("La limite d'approbation ne peut pas être négative.");
         }
-        var invalidRoles = dto.Roles.Except(TdxD365RoleCheckboxes.All).ToList();
+        // An existing approval may still carry a role that was taken off the forms (TdxD365RoleCheckboxes.Retired).
+        var invalidRoles = dto.Roles.Except(TdxD365RoleCheckboxes.Known).ToList();
         if (invalidRoles.Count > 0)
         {
             return BadRequest($"Rôle(s) inconnu(s) : {string.Join(", ", invalidRoles)}");

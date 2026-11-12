@@ -15,7 +15,6 @@ export const ROLE_GROUPS: { title: string; prefix: string }[] = [
   { title: 'Accès Procurement (cochez tout ce qui s\'applique)', prefix: 'Procurement' },
   { title: 'Accès comptes payables (Accounts Payable)', prefix: 'Accounts Payable' },
   { title: 'Accès grand livre (General Ledger)', prefix: 'General Ledger' },
-  { title: 'Rapports financiers (Financial Reporting)', prefix: 'Financial Reporting' },
   { title: 'Accès comptes recevables (Accounts Receivable)', prefix: 'Accounts Receivable' },
 ];
 

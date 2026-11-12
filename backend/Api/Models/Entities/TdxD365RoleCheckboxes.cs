@@ -25,9 +25,19 @@ public static class TdxD365RoleCheckboxes
         AccountsPayableAccess,
         GeneralLedgerJePreparer,
         GeneralLedgerJeReviewer,
-        FinancialReportingResortSpecific,
-        FinancialReportingDenverCorp,
         AccountsReceivableClerk,
         AccountsReceivableManager,
     ];
+
+    /// <summary>Roles taken off the request forms on 2026-11-12 (Financial Reporting - Resort Specific and
+    /// Denver/Corp): nobody can pick them any more, but approvals that already carry one keep working, so they stay
+    /// accepted when an existing approval is edited or sent (see <see cref="Known"/>) and keep their TDX mapping.</summary>
+    public static readonly IReadOnlyList<string> Retired =
+    [
+        FinancialReportingResortSpecific,
+        FinancialReportingDenverCorp,
+    ];
+
+    /// <summary>Everything the server recognizes: the roles on offer plus the retired ones.</summary>
+    public static readonly IReadOnlyList<string> Known = [.. All, .. Retired];
 }
