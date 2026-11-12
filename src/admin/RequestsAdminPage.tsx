@@ -249,13 +249,13 @@ export function RequestsAdminPage() {
           <div className="field__input-wrap">
             <input
               type="text"
-              aria-label="Rechercher par numéro, demandeur ou employé"
+              aria-label="Rechercher par numéro de demande, numéro de billet, demandeur ou employé"
               value={q}
               onChange={(ev) => {
                 setPage(1);
                 setQ(ev.target.value);
               }}
-              placeholder="Numéro, demandeur ou employé"
+              placeholder="Demande, billet, demandeur ou employé"
             />
           </div>
         </div>

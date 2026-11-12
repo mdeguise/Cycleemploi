@@ -94,7 +94,9 @@ public class AdminRequestsController : ControllerBase
             query = query.Where(r =>
                 EF.Functions.Like(r.RequestNumber, like) ||
                 EF.Functions.Like(r.CreatedByDisplayName, like) ||
-                r.Employees.Any(e => EF.Functions.Like(e.NameSnapshot, like)));
+                r.Employees.Any(e => EF.Functions.Like(e.NameSnapshot, like)) ||
+                // A TDX / Freshdesk ticket number finds the request that created the ticket.
+                _db.RequestTickets.Any(t => t.RequestId == r.RequestId && t.TicketNumber != null && EF.Functions.Like(t.TicketNumber, like)));
         }
 
         if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<RequestStatus>(status, true, out var parsedStatus))
@@ -196,7 +198,9 @@ public class AdminRequestsController : ControllerBase
             query = query.Where(r =>
                 EF.Functions.Like(r.RequestNumber, like) ||
                 EF.Functions.Like(r.CreatedByDisplayName, like) ||
-                r.Employees.Any(e => EF.Functions.Like(e.NameSnapshot, like)));
+                r.Employees.Any(e => EF.Functions.Like(e.NameSnapshot, like)) ||
+                // A TDX / Freshdesk ticket number finds the request that created the ticket.
+                _db.RequestTickets.Any(t => t.RequestId == r.RequestId && t.TicketNumber != null && EF.Functions.Like(t.TicketNumber, like)));
         }
         if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<RequestStatus>(status, true, out var parsedStatus))
         {
